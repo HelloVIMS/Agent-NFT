@@ -1,0 +1,32 @@
+# Foundry
+out/
+cache/
+broadcast/
+coverage/
+gas-snapshot
+.gas-snapshot
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Mac rsync conflict cruft
+* 2.sol
+* 2.md
+* 2.toml
+* 2.txt
+* 2.lock
+* 2.example
+* 2.sh
+
+# Logs
+*.log
+foundry.lock

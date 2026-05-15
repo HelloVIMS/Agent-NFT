@@ -1,0 +1,110 @@
+{
+  "network": "base-sepolia",
+  "chainId": 84532,
+  "deployer": "0xE48840eD6678218Bd21dF2671b98bCF23de661b9",
+  "treasury": "0xE48840eD6678218Bd21dF2671b98bCF23de661b9",
+  "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+  "usdc": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+  "systemFeeBps": 50,
+  "deployedAt": "2026-04-29T17:00:00Z",
+  "explorer": "https://sepolia.basescan.org",
+  "proxies": {
+    "AgentIdentityRegistry": "0xfE1ef66Ba95891d3cDf6FB83FE1444Bc3bB9FEeF",
+    "AgentTBARegistry":      "0x1383FA459907ce08f7A6c4619C40f672C0cA7D5e",
+    "AgentTBAImplementation":"0x50183A126Ad080e88eDE5166bEaDAa0DdaAaa24C",
+    "AgentReputationRegistry":"0x5563EE2939F6839CE82B3cA6E50AA285e8d1C316",
+    "AgentPaymentRouter":    "0x1d4320d0cdcbA7d60dc1A76cE63AA13a2Cd43b97",
+    "AgentContextRegistry":  "0x816D8AA61c283d874ae6C9A9c380A43fd325f9D5",
+    "AgentMemory":           "0x2eEc7cB85a127D2f2B49EE1957d87797C961a2D1",
+    "AgentX402Receiver":     "0xd180DC89270Df505F5d4B7B36e83318f330014A7",
+    "AgentCollectionFactory":"0x6B182188269208533Ed95B7C2b83240f21fA7f12",
+    "AgentRoyaltySplitterFactory":"0x785d63DE8d3EE714A5F550f1FcE2593154B98393"
+  },
+  "implementations": {
+    "AgentIdentityRegistry":  "0xf04A33b2f9DD5fE9B8248Af134fa502D468D8397",
+    "AgentReputationRegistry":"0x4198D94008A348261DcceCeeed6711B10eb60519",
+    "AgentContextRegistry":   "0x5a31595F915dC8e2b67A1397BaDdA19D1d734ca3",
+    "AgentMemory":            "0xEE3B214e08d54042Ae72991DF8D67D9Abb839F6A",
+    "AgentX402Receiver":      "0xE1322cD39fB7A35e44fE34D05a3d383413EB005e",
+    "AgentCollectionImpl":    "0x9A0E93F14385e94F50284Ab4D973fbCBa3746f9d"
+  },
+  "agentCollectionLibraries": {
+    "AgentCollectionRenderer":   "0x167655252e710533083c12e0EA48c10d1f92F2fa",
+    "AgentCollectionEIP712":     "0xc8C233ceA8D2D6edCcE00bF6744e4aA8d4F5B8C7",
+    "AgentCollectionPaymentLib": "0x14C2B4259155cA4179a547064D977C8CA42BefBE",
+    "deployedAt":                "2026-05-10T05:15:00Z",
+    "notes":                     "Linked external libraries for AgentCollectionImpl. PaymentLib added to keep impl bytecode under EIP-170 once collectionBaseURI / Pattern B was added; EIP712 grew a verifyCommit() entry that consolidates the keeper signature verification block."
+  },
+  "agentCollectionFactory": {
+    "factory":               "0x6B182188269208533Ed95B7C2b83240f21fA7f12",
+    "factoryV2Legacy":       "0x8dd6F96997b9b52d32c1216222817420ec7b79BD",
+    "factoryV1Legacy":       "0x45F4F9082a6232111F5a9daFe89d23B5bbc3399A",
+    "implementation":        "0x9A0E93F14385e94F50284Ab4D973fbCBa3746f9d",
+    "implementationV1":      "0xE5a34709CCb56acA387A43afb8D008aEA4bBba86",
+    "implementationV2":      "0x6aE96a8A2584BD7dA2672157521698493fc271f8",
+    "beacon":                "0xA28E020f8E6258B890e78630C0A5034642f97f2C",
+    "splitterFactory":       "0x785d63DE8d3EE714A5F550f1FcE2593154B98393",
+    "splitterFactoryV1Legacy":"0xB0194Ca0EB5799293121Be50a0D6e71e717595DF",
+    "protocolFeeRecipient":  "0xE48840eD6678218Bd21dF2671b98bCF23de661b9",
+    "protocolPrimaryFeeBps": 200,
+    "protocolSecondaryFeeBps":50,
+    "deployedAt":            "2026-05-08T03:30:00Z",
+    "redeployedAt":          "2026-05-08T19:35:00Z",
+    "patternBUpgradedAt":    "2026-05-10T05:15:00Z",
+    "notes":                 "Beacon-proxy factory v3. Impl v3 (Pattern B): adds collectionBaseURI + setBaseURI(), so creators can pre-upload shuffled metadata to IPFS and `tokenURI(id)` resolves to `${baseURI}${id}.json` for any token minted via mintAgent('','') / mintAgentAllowlist('','',proof). Bytecode kept under EIP-170 by linking AgentCollectionRenderer, AgentCollectionEIP712 (with verifyCommit consolidating the keeper signature flow), and the new AgentCollectionPaymentLib (primary-mint payment split). createCollectionWithSplits() keeps msg.sender as collectionCreator (governance: hooks, mint config, allowlist, baseURI, lock) and wires the splitter as royaltyReceiver via setRoyaltyReceiverOnce."
+  },
+  "implementationHistory": {
+    "AgentIdentityRegistry": [
+      { "version": "v1", "address": "0xE55E549d0e4D7cF99f4EFc1a28Bb760997fC54cD", "deployedAt": "2026-04-29T17:00:00Z" },
+      { "version": "v7",   "address": "0xf6658189b7e48945f3fE648EE41ac833e24A0D4c", "deployedAt": "2026-04-30T17:00:00Z", "notes": "Adds secondary-market royalty splitter (ERC-2981 vault)" },
+      { "version": "v7.1", "address": "0xf04A33b2f9DD5fE9B8248Af134fa502D468D8397", "deployedAt": "2026-04-30T17:10:00Z", "notes": "Lowers MIN_CREATOR_ROYALTY_BPS from 100 to 0 (creators may opt out of royalties)" }
+    ]
+  },
+  "secondaryRoyalty": {
+    "model": "additive",
+    "systemFeeBps": 50,
+    "systemFeeMaxBps": 500,
+    "treasury": "0xE48840eD6678218Bd21dF2671b98bCF23de661b9",
+    "splitterContract": "AgentRoyaltyVault",
+    "addressDerivation": "CREATE2 from AgentIdentityRegistry with salt = bytes32(agentId)",
+    "notes": "royaltyInfo() returns the per-agent vault address as receiver and (creatorBps + 50) as the total bps. Marketplace sends combined royalty to vault; anyone can call vault.release() (ETH) or vault.releaseToken(token) to split into creator + treasury."
+  },
+  "evolutionHooks": {
+    "deployedAt":           "2026-05-08T16:37:00Z",
+    "missingHooksDeployedAt":"2026-05-10T05:35:00Z",
+    "deployer":             "0xE48840eD6678218Bd21dF2671b98bCF23de661b9",
+    "TransferRecolorHook":  "0xB8D4F540DFB9fdF52F397Bc3AC8fc83780E4F041",
+    "GenerationHook":       "0x81F246384E9D569A3B1132B5548e69C10c201F87",
+    "SoulboundHook":        "0xc5f78D3Fe55bd43CBe59420c17F572508DF2Ee1E",
+    "TimeOfDayHook":        "0xa2f14D44F97e0CA6E8318215fd7dC6078eCBbEaB",
+    "SeasonalHook":         "0xc2d3167D78905a85F78ee3c70824abb20EFc0221",
+    "HueRotateHook":        "0xf1081ab35eaE7587607AbddEd038167a2e98Abb2",
+    "RevenueLevelHook":     "0x7B4f44FAF4775F07fcE3f1e328863e9E57eBb295",
+    "TipJarHook":           "0x89fBfa76df1ADc174116FC809719c13B15dEBCB0",
+    "OracleHook":           "0xEc0f1A9944bCf8F7F7c62a6eD2d902EecC7449C6",
+    "ReputationLevelHook":  "0x6518354AecD89890F0EC2A7132A2F8ff4F2b7805",
+    "EvolutionStagesHook":  "0x915600dBe61B8495e49B5d2666cE3BDA1e74ccD3",
+    "VoteGatedHook":        "0x3f3b94f2437D72F05105ad2B3948d3f7C00A6392",
+    "adapters": {
+      "IdentityTipBeneficiaryResolver": "0x59713745374f8da99eDF620F144f5B793e0Fbdb7"
+    },
+    "config": {
+      "paymentRouter":      "0x1d4320d0cdcbA7d60dc1A76cE63AA13a2Cd43b97",
+      "identityRegistry":   "0xfE1ef66Ba95891d3cDf6FB83FE1444Bc3bB9FEeF",
+      "reputationRegistry": "0x5563EE2939F6839CE82B3cA6E50AA285e8d1C316",
+      "priceFeed":          "0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1",
+      "bearThresholdE8":    200000000000,
+      "bullThresholdE8":    350000000000,
+      "soulboundUnlocksAt": 0,
+      "hueRotateSecondsPerStep": 60,
+      "voteGovernor":       "0xE48840eD6678218Bd21dF2671b98bCF23de661b9",
+      "voteMaxStage":       4,
+      "reputationThresholdsScaled1e18": [10, 50, 100, 500]
+    },
+    "notes": "Reference deployments with safe defaults. Creators may deploy bespoke instances via the marketplace's 'Customize & deploy' flow (EvolutionHooksCard → HookCustomizer); the resulting address is wired in via setCollectionHook on the per-collection AgentCollection contract."
+  },
+  "frontend": {
+    "mintUI": "https://agent.vims.com",
+    "exportName": "BASE_SEPOLIA_AGENT_NFT"
+  }
+}

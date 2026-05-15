@@ -1,0 +1,28 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc = "0.8.24"
+optimizer = true
+# optimizer_runs=1 favors deployed-bytecode SIZE over runtime gas.
+# Required so AgentCollectionImpl can fit the VimsProvenance fingerprint
+# (~+700 B) under the EIP-170 24,576-byte ceiling. The contract was already
+# at ~24,377 B before fingerprinting; runs=1 plus the `_executeMint` helper
+# extraction bring it down to ~23,694 B (882-byte margin).
+#
+# Trade-off: each external call across the protocol pays a small amount of
+# extra runtime gas vs. runs=200. This is an acceptable cost for permanent,
+# on-chain VIMS attribution and keeps every contract on a single,
+# audit-friendly compiler profile (Foundry 1.5.1 does not yet support
+# reliable per-file optimizer overrides).
+optimizer_runs = 1
+via_ir = true
+bytecode_hash = "none"
+
+[rpc_endpoints]
+base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
+base = "${BASE_RPC_URL}"
+
+[etherscan]
+base_sepolia = { key = "${BASESCAN_API_KEY}", url = "https://api-sepolia.basescan.org/api" }
+base = { key = "${BASESCAN_API_KEY}", url = "https://api.basescan.org/api" }

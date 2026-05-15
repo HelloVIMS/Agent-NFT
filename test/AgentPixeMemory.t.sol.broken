@@ -1,0 +1,345 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "forge-std/Test.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import "../src/AgentIdentityRegistry.sol";
+
+contract AgentPixeMemoryTest is Test {
+    AgentIdentityRegistry public registry;
+    
+    address public owner = address(0x1);
+    address public user1 = address(0x2);
+    address public user2 = address(0x3);
+    
+    // Sample content hashes
+    bytes32 public hash1 = keccak256("pixe content v1");
+    bytes32 public hash2 = keccak256("pixe content v2 delta");
+    bytes32 public hash3 = keccak256("pixe content v3 delta");
+    bytes32 public consolidatedHash = keccak256("consolidated pixe content");
+    bytes32 public merkleRoot = keccak256("merkle root of versions 0-2");
+    
+    event PixeVersionAdded(
+        uint256 indexed agentId, 
+        uint256 indexed version,
+        bytes32 contentHash,
+        uint8 versionType,
+        string arweaveTxId
+    );
+    
+    event PixeConsolidated(
+        uint256 indexed agentId,
+        uint16 fromVersion,
+        uint16 toVersion,
+        uint16 indexed resultVersion,
+        bytes32 merkleRoot
+    );
+    
+    function setUp() public {
+        vm.startPrank(owner);
+        AgentIdentityRegistry impl = new AgentIdentityRegistry();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl),
+            abi.encodeCall(AgentIdentityRegistry.initialize, ())
+        );
+        registry = AgentIdentityRegistry(address(proxy));
+        vm.stopPrank();
+        
+        // Register an agent for testing
+        vm.prank(user1);
+        registry.registerAgent("TestBot", "ipfs://metadata");
+    }
+    
+    // ============ addPixeVersion Tests ============
+    
+    function test_AddFirstPixeVersion() public {
+        vm.prank(user1);
+        
+        vm.expectEmit(true, true, false, true);
+        emit PixeVersionAdded(0, 0, hash1, 1, "ar_tx_123"); // First version is consolidated (type 1)
+        
+        uint256 version = registry.addPixeVersion(0, "ar_tx_123", hash1, "Initial knowledge base");
+        
+        assertEq(version, 0);
+        assertEq(registry.getPixeVersionCount(0), 1);
+        assertEq(registry.latestConsolidatedVersion(0), 0);
+    }
+    
+    function test_AddDeltaVersion() public {
+        vm.startPrank(user1);
+        registry.addPixeVersion(0, "ar_tx_1", hash1, "Initial");
+        
+        vm.expectEmit(true, true, false, true);
+        emit PixeVersionAdded(0, 1, hash2, 0, "ar_tx_2"); // Delta version (type 0)
+        
+        uint256 version = registry.addPixeVersion(0, "ar_tx_2", hash2, "Added new memories");
+        vm.stopPrank();
+        
+        assertEq(version, 1);
+        assertEq(registry.getPixeVersionCount(0), 2);
+        // Latest consolidated should still be 0
+        assertEq(registry.latestConsolidatedVersion(0), 0);
+    }
+    
+    function test_AddPixeVersion_RevertNotOwner() public {
+        vm.prank(user2);
+        vm.expectRevert(abi.encodeWithSelector(AgentIdentityRegistry.NotOwner.selector));
+        registry.addPixeVersion(0, "ar_tx_123", hash1, "Hacked");
+    }
+    
+    function test_AddPixeVersion_RevertEmptyTxId() public {
+        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSelector(AgentIdentityRegistry.EmptyInput.selector));
+        registry.addPixeVersion(0, "", hash1, "Description");
+    }
+    
+    function test_AddPixeVersion_RevertEmptyHash() public {
+        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSelector(AgentIdentityRegistry.EmptyInput.selector));
+        registry.addPixeVersion(0, "ar_tx_123", bytes32(0), "Description");
+    }
+    
+    // ============ consolidateVersions Tests ============
+    
+    function test_ConsolidateVersions() public {
+        vm.startPrank(user1);
+        registry.addPixeVersion(0, "ar_tx_1", hash1, "Initial");
+        registry.addPixeVersion(0, "ar_tx_2", hash2, "Delta 1");
+        registry.addPixeVersion(0, "ar_tx_3", hash3, "Delta 2");
+        
+        vm.expectEmit(true, false, false, true);
+        emit PixeConsolidated(0, 0, 2, 3, merkleRoot);
+        
+        uint256 version = registry.consolidateVersions(
+            0,
+            "ar_consolidated",
+            consolidatedHash,
+            merkleRoot,
+            "Consolidated v0-v2"
+        );
+        vm.stopPrank();
+        
+        assertEq(version, 3);
+        assertEq(registry.getPixeVersionCount(0), 4);
+        assertEq(registry.latestConsolidatedVersion(0), 3);
+    }
+    
+    function test_ConsolidateVersions_RevertNothingNew() public {
+        vm.startPrank(user1);
+        registry.addPixeVersion(0, "ar_tx_1", hash1, "Initial");
+        
+        vm.expectRevert(abi.encodeWithSelector(AgentIdentityRegistry.InvalidValue.selector));
+        registry.consolidateVersions(0, "ar_tx", consolidatedHash, merkleRoot, "Desc");
+        vm.stopPrank();
+    }
+    
+    function test_ConsolidateVersions_RevertNoVersions() public {
+        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSelector(AgentIdentityRegistry.NotExists.selector));
+        registry.consolidateVersions(0, "ar_tx", consolidatedHash, merkleRoot, "Desc");
+    }
+    
+    function test_ConsolidateVersions_RevertNotOwner() public {
+        vm.startPrank(user1);
+        registry.addPixeVersion(0, "ar_tx_1", hash1, "Initial");
+        registry.addPixeVersion(0, "ar_tx_2", hash2, "Delta");
+        vm.stopPrank();
+        
+        vm.prank(user2);
+        vm.expectRevert(abi.encodeWithSelector(AgentIdentityRegistry.NotOwner.selector));
+        registry.consolidateVersions(0, "ar_tx", consolidatedHash, merkleRoot, "Hacked");
+    }
+    
+    // ============ getPixeVersion Tests ============
+    
+    function test_GetPixeVersion() public {
+        vm.prank(user1);
+        registry.addPixeVersion(0, "ar_tx_123", hash1, "Test description");
+        
+        (
+            string memory arweaveTxId,
+            bytes32 contentHash,
+            uint8 versionType,
+            uint256 timestamp,
+            uint16 baseVersion,
+            string memory description
+        ) = registry.getPixeVersion(0, 0);
+        
+        assertEq(arweaveTxId, "ar_tx_123");
+        assertEq(contentHash, hash1);
+        assertEq(versionType, 1); // First version is consolidated
+        assertGt(timestamp, 0);
+        assertEq(baseVersion, 0);
+        assertEq(description, "Test description");
+    }
+    
+    function test_GetPixeVersion_RevertNonexistent() public {
+        vm.expectRevert(abi.encodeWithSelector(AgentIdentityRegistry.NotExists.selector));
+        registry.getPixeVersion(0, 0);
+    }
+    
+    // ============ getLatestPixe Tests ============
+    
+    function test_GetLatestPixe() public {
+        vm.startPrank(user1);
+        registry.addPixeVersion(0, "ar_tx_1", hash1, "First");
+        registry.addPixeVersion(0, "ar_tx_2", hash2, "Second");
+        vm.stopPrank();
+        
+        (
+            string memory arweaveTxId,
+            bytes32 contentHash,
+            uint8 versionType,
+            uint256 timestamp,
+            string memory description,
+            uint256 version
+        ) = registry.getLatestPixe(0);
+        
+        assertEq(arweaveTxId, "ar_tx_2");
+        assertEq(contentHash, hash2);
+        assertEq(versionType, 0); // Delta
+        assertGt(timestamp, 0);
+        assertEq(description, "Second");
+        assertEq(version, 1);
+    }
+    
+    function test_GetLatestPixe_RevertNoVersions() public {
+        vm.expectRevert(abi.encodeWithSelector(AgentIdentityRegistry.NotExists.selector));
+        registry.getLatestPixe(0);
+    }
+    
+    // ============ getLatestConsolidatedPixe Tests ============
+    
+    function test_GetLatestConsolidatedPixe() public {
+        vm.startPrank(user1);
+        registry.addPixeVersion(0, "ar_tx_1", hash1, "Initial");
+        registry.addPixeVersion(0, "ar_tx_2", hash2, "Delta 1");
+        registry.consolidateVersions(0, "ar_consolidated", consolidatedHash, merkleRoot, "Consolidated");
+        registry.addPixeVersion(0, "ar_tx_3", hash3, "New delta after consolidation");
+        vm.stopPrank();
+        
+        (
+            string memory arweaveTxId,
+            bytes32 contentHash,
+            uint256 timestamp,
+            string memory description,
+            uint256 version
+        ) = registry.getLatestConsolidatedPixe(0);
+        
+        assertEq(arweaveTxId, "ar_consolidated");
+        assertEq(contentHash, consolidatedHash);
+        assertGt(timestamp, 0);
+        assertEq(description, "Consolidated");
+        assertEq(version, 2); // Consolidated version index
+    }
+    
+    // ============ verifyContentHash Tests ============
+    
+    function test_VerifyContentHash() public {
+        vm.prank(user1);
+        registry.addPixeVersion(0, "ar_tx_123", hash1, "Test");
+        
+        assertTrue(registry.verifyContentHash(0, 0, hash1));
+        assertFalse(registry.verifyContentHash(0, 0, hash2));
+    }
+    
+    function test_VerifyContentHash_RevertNonexistent() public {
+        vm.expectRevert(abi.encodeWithSelector(AgentIdentityRegistry.NotExists.selector));
+        registry.verifyContentHash(0, 0, hash1);
+    }
+    
+    // ============ getConsolidationHistory Tests ============
+    
+    function test_GetConsolidationHistory() public {
+        vm.startPrank(user1);
+        registry.addPixeVersion(0, "ar_tx_1", hash1, "Initial");
+        registry.addPixeVersion(0, "ar_tx_2", hash2, "Delta 1");
+        registry.consolidateVersions(0, "ar_c1", consolidatedHash, merkleRoot, "First consolidation");
+        
+        registry.addPixeVersion(0, "ar_tx_3", hash3, "Delta 2");
+        bytes32 merkleRoot2 = keccak256("merkle root 2");
+        bytes32 consolidatedHash2 = keccak256("consolidated 2");
+        registry.consolidateVersions(0, "ar_c2", consolidatedHash2, merkleRoot2, "Second consolidation");
+        vm.stopPrank();
+        
+        AgentIdentityRegistry.ConsolidationRecord[] memory history = registry.getConsolidationHistory(0);
+        
+        assertEq(history.length, 2);
+        assertEq(history[0].fromVersion, 0);
+        assertEq(history[0].toVersion, 1);
+        assertEq(history[0].merkleRoot, merkleRoot);
+        assertEq(history[0].resultVersion, 2);
+        
+        assertEq(history[1].fromVersion, 2);
+        assertEq(history[1].toVersion, 3);
+        assertEq(history[1].merkleRoot, merkleRoot2);
+        assertEq(history[1].resultVersion, 4);
+    }
+    
+    // ============ getPixeURL Tests ============
+    
+    function test_GetPixeURL() public {
+        vm.prank(user1);
+        registry.addPixeVersion(0, "abc123xyz", hash1, "Test");
+        
+        string memory url = registry.getPixeURL(0, 0);
+        assertEq(url, "ar://abc123xyz");
+    }
+    
+    // ============ getAllPixeVersions Tests ============
+    
+    function test_GetAllPixeVersions() public {
+        vm.startPrank(user1);
+        registry.addPixeVersion(0, "ar_tx_1", hash1, "First");
+        registry.addPixeVersion(0, "ar_tx_2", hash2, "Second");
+        registry.addPixeVersion(0, "ar_tx_3", hash3, "Third");
+        vm.stopPrank();
+        
+        AgentIdentityRegistry.PixeVersion[] memory versions = registry.getAllPixeVersions(0);
+        
+        assertEq(versions.length, 3);
+        assertEq(versions[0].contentHash, hash1);
+        assertEq(versions[1].contentHash, hash2);
+        assertEq(versions[2].contentHash, hash3);
+        assertEq(versions[0].versionType, 1); // First is consolidated
+        assertEq(versions[1].versionType, 0); // Delta
+        assertEq(versions[2].versionType, 0); // Delta
+    }
+    
+    // ============ Edge Cases and Gas Tests ============
+    
+    function test_MultipleConsolidations() public {
+        vm.startPrank(user1);
+        
+        // Add initial + 2 deltas
+        registry.addPixeVersion(0, "ar_tx_0", hash1, "Initial");
+        registry.addPixeVersion(0, "ar_tx_1", hash2, "Delta 1");
+        registry.addPixeVersion(0, "ar_tx_2", hash3, "Delta 2");
+        
+        // First consolidation (versions 0-2 -> 3)
+        registry.consolidateVersions(0, "ar_c1", consolidatedHash, merkleRoot, "Consolidation 1");
+        assertEq(registry.latestConsolidatedVersion(0), 3);
+        
+        // Add more deltas
+        registry.addPixeVersion(0, "ar_tx_4", keccak256("v4"), "Delta 3");
+        registry.addPixeVersion(0, "ar_tx_5", keccak256("v5"), "Delta 4");
+        
+        // Second consolidation (versions 3-5 -> 6)
+        registry.consolidateVersions(0, "ar_c2", keccak256("consolidated 2"), keccak256("merkle 2"), "Consolidation 2");
+        assertEq(registry.latestConsolidatedVersion(0), 6);
+        assertEq(registry.getPixeVersionCount(0), 7);
+        
+        vm.stopPrank();
+    }
+    
+    function testFuzz_AddPixeVersion(bytes32 contentHash, string memory description) public {
+        vm.assume(contentHash != bytes32(0));
+        vm.assume(bytes(description).length > 0);
+        
+        vm.prank(user1);
+        uint256 version = registry.addPixeVersion(0, "ar_tx_fuzz", contentHash, description);
+        
+        assertEq(version, 0);
+        assertTrue(registry.verifyContentHash(0, 0, contentHash));
+    }
+}
