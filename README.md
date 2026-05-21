@@ -1,4 +1,27 @@
+<div align="center">
+  <img src="assets/banner.svg" alt="Agent NFT Banner" width="100%"/>
+</div>
+
 # Agent NFT
+
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-emerald?style=flat-square" alt="License"/>
+  <img src="https://img.shields.io/badge/Solidity-0.8.20-blue?style=flat-square&logo=solidity&logoColor=white" alt="Solidity"/>
+  <img src="https://img.shields.io/badge/Foundry-passing-green?style=flat-square" alt="Foundry"/>
+  <img src="https://img.shields.io/badge/tests-137%20passing-green?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Base%20Sepolia-deployed-blue?style=flat-square" alt="Base Sepolia"/>
+  <img src="https://img.shields.io/badge/audited-INQTEL%20%2B%20ClawBot-orange?style=flat-square" alt="Audit"/>
+  <img src="https://img.shields.io/badge/ERC--721-identity-10b981?style=flat-square" alt="ERC-721"/>
+  <img src="https://img.shields.io/badge/ERC--6551-TBA-3b82f6?style=flat-square" alt="ERC-6551"/>
+  <img src="https://img.shields.io/badge/EIP--712-signing-a855f7?style=flat-square" alt="EIP-712"/>
+  <img src="https://img.shields.io/badge/EIP--3009-settlement-f59e0b?style=flat-square" alt="EIP-3009"/>
+  <img src="https://img.shields.io/badge/ERC--2981-royalties-ec4899?style=flat-square" alt="ERC-2981"/>
+  <img src="https://img.shields.io/badge/ERC--4337-account%20abstraction-06b6d4?style=flat-square" alt="ERC-4337"/>
+  <img src="https://img.shields.io/badge/x402-atomic%20payment-f97316?style=flat-square" alt="x402"/>
+  <img src="https://img.shields.io/badge/ERC--1271-signature%20validation-8b5cf6?style=flat-square" alt="ERC-1271"/>
+  <img src="https://img.shields.io/badge/.pixe-memory-14b8a6?style=flat-square" alt=".pixe"/>
+  <img src="https://img.shields.io/badge/UUPS-V8%20upgradeable-6366f1?style=flat-square" alt="UUPS"/>
+</p>
 
 The canonical on-chain identity, memory, and payment stack behind
 **[agent.vims.com](https://agent.vims.com)** — where AI agents are minted as
@@ -143,6 +166,164 @@ secondary sale ($100):                x402 service ($100):                paymen
   - Creator: `_agentCreator[agentId]` (soulbound, set at mint).
 - **Service payments:** `AgentX402Receiver.treasury` / `AgentPaymentRouter.aeyeosTreasury` — both currently point at `0xE484…61b9`. Both updatable by their owners.
 - **Agent share:** TBA at `agents[agentId].tbaAddress` if set, else `ownerOf(agentId)`.
+
+---
+
+## 1:Many subaccounts and linked external accounts
+
+The identity surface for an agent has three layers:
+
+- **The NFT (`AgentIdentityRegistry`)** — singular, soulbound creator
+  royalty, ERC-8004 identity.
+- **Subaccounts** — many EVM accounts on *this* chain bound to one agent
+  NFT, each carrying a permission bitmap. Native to `AgentIdentityRegistry`.
+- **Linked accounts (`AgentLinkedAccountRegistry`)** — many *external* or
+  *cross-chain* accounts (Solana wallet, Bitcoin pubkey, ChangeNOW
+  receive-address, email-derived identifier, EVM addresses on other chains)
+  attested to the same agent NFT.
+
+### Permission bitmap
+
+Subaccount and linked-account permissions share the same bit layout in
+`AgentIdentityRegistry`:
+
+| Bit | Constant              | Meaning                                                    |
+| --- | --------------------- | ---------------------------------------------------------- |
+| `0` | `PERM_PAY`            | Eligible recipient for `AgentPaymentRouter.payAgentTo`.    |
+| `1` | `PERM_REPUTATION`     | Can submit / revoke feedback in `AgentReputationRegistry`. |
+| `2` | `PERM_CONTEXT_WRITE`  | Can write context files in `AgentContextRegistry`.         |
+| `3` | `PERM_MEMORY_WRITE`   | Reserved for future `AgentMemory` subaccount writes.       |
+| `4` | `PERM_TREASURY`       | Reserved for treasury / withdrawal flows.                  |
+| `5` | `PERM_LINK`           | Reserved for off-chain linked-account managers.            |
+
+The **primary TBA** (`agents[agentId].tbaAddress`) is bound automatically
+with `PERM_ALL` (every bit set) on `setTBAAddress`. Any agent whose TBA was
+set before the reverse-lookup mapping existed can backfill the binding
+permissionlessly via `bindPrimaryTBA(agentId)`.
+
+### Subaccount lifecycle
+
+```solidity
+// Owner spawns a subaccount with PAY + REPUTATION.
+identity.registerSubaccount(
+    agentId,
+    subaccount,                                  // any EVM address (typically a sub-TBA)
+    bytes32(0),                                  // optional CREATE2 salt for indexers
+    identity.PERM_PAY() | identity.PERM_REPUTATION()
+);
+
+// Anyone can resolve a caller back to its agent.
+(uint256 boundId, bool bound, bool isPrimary, uint96 perms, bool active)
+    = identity.agentIdOf(subaccount);
+
+// Reverting guard for downstream writers.
+identity.requirePermission(msg.sender, identity.PERM_CONTEXT_WRITE(), agentId);
+```
+
+A subaccount can be revoked (`revokeSubaccount`), have its permissions
+updated (`updateSubaccountPermissions`), and the same address can be re-bound
+to a different agent after revocation. Cap: **64 subaccounts per agent.**
+
+### Wiring across the stack
+
+Subaccount permissions are **honored on-chain** by:
+
+- **`AgentContextRegistry`** — `addFile` / `updateFile` / `setFileEnabled`
+  accept the NFT owner *or* any subaccount with `PERM_CONTEXT_WRITE` for
+  that agent.
+- **`AgentReputationRegistry`** — when a bound caller (subaccount or primary
+  TBA) calls `giveFeedback` / `revokeFeedback`, the call is **canonicalised
+  to the agent owner**: dedup, self-review checks, and the recorded `client`
+  field all collapse to one stable identity, so an agent cannot spam
+  reviews by spawning fresh subaccounts. Bound callers must hold
+  `PERM_REPUTATION`.
+- **`AgentPaymentRouter`** — new entry points `payAgentTo(agentId, sub)` and
+  `payAgentToUSDC(agentId, amount, sub)` route the recipient share to a
+  subaccount holding `PERM_PAY` for that agent. Creator + system cuts
+  unchanged. Existing `payAgent` / `payAgentUSDC` flows are untouched.
+
+### Linked accounts (`AgentLinkedAccountRegistry`)
+
+A separate UUPS proxy that records cross-chain / off-chain accounts as
+metadata. **Three attestation modes:**
+
+- **Owner-attested** — `linkAccount(agentId, chainId, accountId, kind, label, perms)`.
+  The agent NFT owner asserts the link. Required for non-EVM (Solana,
+  Bitcoin, email, x402 endpoint) and remote-EVM accounts the owner controls
+  on this chain.
+- **Self-attested** — `linkAccountWithAttestation(...)` accepts an EIP-712
+  `LinkAttestation(agentId,chainId,accountId,nonce,deadline)` signed by an
+  EVM account. Verified via `SignatureChecker` (EOA + ERC-1271 contracts),
+  replay-guarded by per-agent `attestationNonce`.
+- **Externally-attested** — `linkAccountAttested(...)` is callable only by
+  contracts on the owner-managed `trustedAttesters` allowlist. The attester
+  contract is the trust anchor: it MUST verify an underlying proof (bridge
+  message, VAA, Merkle proof, AVS attestation) before forwarding to the
+  registry. The registry stamps each link with `attestedBy = msg.sender`
+  and tags it with the attester's machine-readable `attesterKind`
+  (`"layerzero"`, `"ccip"`, `"hyperlane"`, `"wormhole"`, `"axelar"`,
+  `"merkle"`, `"eigenlayer-avs"`, `"custom"`). See
+  `src/interfaces/IAgentLinkAttester.sol` for the reference shape.
+
+Linked-account permissions remain **advisory** for on-chain payment
+routing — `AgentPaymentRouter` is gated by subaccounts. The attester
+hook is the integration point for any future on-chain consumer that wants
+to act on cross-chain identity (e.g. a payout splitter that releases to
+the linked Solana address only when a Wormhole VAA-backed attestation is
+present).
+
+### Trust model
+
+| Mode | Trust anchor | Suitable for |
+| --- | --- | --- |
+| Owner-attested | NFT owner signature on this chain | Solana / BTC / email / x402 addresses the owner controls |
+| Self-attested | EIP-712 signature from the linked EVM account itself | Multi-key ownership claims on the current chain |
+| Externally-attested | Whitelisted attester contract's proof verification | Bridged identity from another chain, VAA, Merkle inclusion, AVS quorum |
+
+An external attester compromise (or owner mistake adding a malicious
+attester) lets the attester link arbitrary accounts to any agent. Owners
+should treat the attester allowlist with the same care as upgrade keys
+and `revokeAttester` immediately on any suspicion. Existing links produced
+by a revoked attester persist and must be removed with `unlinkAccount`.
+
+### Reference attester contract shape
+
+```solidity
+contract WormholeLinkAttester is IAgentLinkAttester {
+    AgentLinkedAccountRegistry public immutable registry;
+    IWormholeReceiver           public immutable wormhole;
+    string  public constant attesterKind = "wormhole";
+
+    /// @notice Off-chain relayer hits this with a signed VAA. The function
+    ///         verifies the VAA against the Wormhole guardian set, decodes
+    ///         (agentId, chainId, accountId, kind, label, permissions), then
+    ///         forwards to the registry. The registry stamps `attestedBy =
+    ///         address(this)` automatically.
+    function submitAttestation(bytes calldata vaa) external {
+        IWormhole.VM memory parsed = wormhole.parseAndVerifyVM(vaa);
+        // ... decode parsed.payload into link arguments ...
+        registry.linkAccountAttested(agentId, chainId, accountId, kind, label, perms);
+    }
+}
+```
+
+A real LayerZero / CCIP / Hyperlane attester follows the same pattern:
+`_lzReceive` / `ccipReceive` / `handle` decodes the cross-chain message
+and forwards. The registry never sees the proof — it only sees the
+post-verification call from a trusted contract.
+
+### Storage-layout safety
+
+v1 is a **fresh deployment** on every chain (testnet + mainnet). There is
+no reinitializer chain — `initialize()` is the single entry point and
+seeds name/symbol, owner, secondary treasury, and the default secondary
+fee in one call. Future upgrades that need to seed new state should add a
+`reinitializer(N)` with a sequentially incremented `N`, and append any new
+storage slots after the existing ones (never reorder).
+
+The authoritative slot map for the proxy lives at
+`docs/storage-layouts/AgentIdentityRegistry.json`. CI guards against any
+in-place reordering of pre-existing slots.
 
 ---
 
