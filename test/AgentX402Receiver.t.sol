@@ -87,7 +87,7 @@ contract AgentX402ReceiverTest is Test {
 
         // Creator mints an agent (10% creator royalty).
         vm.prank(creator);
-        agentId = registry.registerAgentWithRoyalty("AgentA", "ipfs://meta", 1000);
+        agentId = registry.registerAgent("AgentA", "ipfs://meta", 1000, address(0));
 
         usdc.mint(payer, 1_000e6);
     }

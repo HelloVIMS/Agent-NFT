@@ -29,9 +29,9 @@ contract DeployAgentScript is Script {
         AgentIdentityRegistry identityRegistry = AgentIdentityRegistry(address(identityProxy));
         console.log("AgentIdentityRegistry proxy:", address(identityRegistry));
         
-        // 2. Deploy TBA Registry (not upgradeable - it's a factory)
-        // V2: Now linked to identity registry for validation
-        // V3: Added ERC-4337 EntryPoint (Base Sepolia v0.7)
+        // 2. Deploy TBA Registry (not upgradeable - it's a factory).
+        //    Linked to identity registry for validation; bound to the
+        //    canonical ERC-4337 EntryPoint v0.7 deployment.
         address ENTRY_POINT = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
         AgentTBARegistry tbaRegistry = new AgentTBARegistry(address(identityRegistry), ENTRY_POINT);
         console.log("AgentTBARegistry:", address(tbaRegistry));

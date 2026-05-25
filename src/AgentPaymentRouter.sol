@@ -191,6 +191,8 @@ contract AgentPaymentRouter is ReentrancyGuard, Ownable, VimsProvenance {
     error NotExempt();
     error AlreadyWhitelisted();
     error NotWhitelisted();
+    // Subaccount routing
+    error SubaccountNotPermitted();
     error InvalidThreshold();
     
     constructor(address _identityRegistry, address _usdc, address _treasury) Ownable(msg.sender) {
@@ -328,14 +330,70 @@ contract AgentPaymentRouter is ReentrancyGuard, Ownable, VimsProvenance {
         
         _processPayment(agentId, USDC, amount);
     }
-    
+
+    // ============ Pay-to-Subaccount ============
+
+    /**
+     * @notice Pay an agent in ETH but route the recipient share to a
+     *         specific registered subaccount (which must hold `PERM_PAY` for
+     *         this agent) instead of the primary TBA. Creator + system cuts
+     *         are unchanged. Enables 1:Many revenue routing: e.g. a
+     *         sub-TBA dedicated to x402 receipts isolated from the main
+     *         operating TBA.
+     */
+    function payAgentTo(uint256 agentId, address subaccount) external payable nonReentrant {
+        if (msg.value == 0) revert ZeroPayment();
+        _assertSubaccountPermitted(agentId, subaccount);
+        _processPayment(agentId, address(0), msg.value, subaccount);
+    }
+
+    /**
+     * @notice USDC variant of `payAgentTo`.
+     */
+    function payAgentToUSDC(uint256 agentId, uint256 amount, address subaccount) external nonReentrant {
+        if (amount == 0) revert ZeroPayment();
+        _assertSubaccountPermitted(agentId, subaccount);
+        IERC20(USDC).safeTransferFrom(msg.sender, address(this), amount);
+        _processPayment(agentId, USDC, amount, subaccount);
+    }
+
+    /**
+     * @dev Verify `subaccount` is bound to `agentId` and holds `PERM_PAY`.
+     *      Reverts otherwise. The IdentityRegistry's `agentIdOf` already
+     *      collapses primary TBA + subaccounts into one resolution, and
+     *      `hasPermission` returns true for the primary TBA implicitly.
+     */
+    function _assertSubaccountPermitted(uint256 agentId, address subaccount) internal view {
+        (uint256 boundId, bool bound,,,) = identityRegistry.agentIdOf(subaccount);
+        if (!bound || boundId != agentId) revert SubaccountNotPermitted();
+        if (!identityRegistry.hasPermission(subaccount, identityRegistry.PERM_PAY())) {
+            revert SubaccountNotPermitted();
+        }
+    }
+
     /**
      * @dev Internal payment processing with system + creator royalty split
      * Split order: System (0.5%) -> Creator (1-50% of remainder) -> Recipient (rest)
      */
     function _processPayment(uint256 agentId, address token, uint256 amount) internal {
+        _processPayment(agentId, token, amount, address(0));
+    }
+
+    /**
+     * @dev Routed variant: if `recipientOverride != address(0)`, recipient
+     *      cut goes there instead of the primary TBA. Caller is responsible
+     *      for verifying the override is permitted (see
+     *      `_assertSubaccountPermitted`).
+     */
+    function _processPayment(
+        uint256 agentId,
+        address token,
+        uint256 amount,
+        address recipientOverride
+    ) internal {
         // Validate and get agent info
         (address owner, address recipient, address creator, uint256 royaltyBps) = _validateAndGetAgentInfo(agentId);
+        if (recipientOverride != address(0)) recipient = recipientOverride;
         
         // Calculate splits
         uint256 systemCut = (amount * SYSTEM_ROYALTY_BPS) / 10000;
@@ -379,9 +437,9 @@ contract AgentPaymentRouter is ReentrancyGuard, Ownable, VimsProvenance {
         }
         if (owner == address(0)) revert InvalidAgent();
         
-        (, address tbaAddress,, bool active) = identityRegistry.agents(agentId);
+        (, address tbaAddress,, bool active,) = identityRegistry.agents(agentId);
         if (!active) revert InactiveAgent();
-        
+
         recipient = tbaAddress != address(0) ? tbaAddress : owner;
         (creator, royaltyBps) = identityRegistry.getCreatorRoyalty(agentId);
     }
@@ -466,7 +524,7 @@ contract AgentPaymentRouter is ReentrancyGuard, Ownable, VimsProvenance {
         if (owner == address(0)) revert InvalidAgent();
         
         // Check agent is active
-        (, address tbaAddress,, bool active) = identityRegistry.agents(agentId);
+        (, address tbaAddress,, bool active,) = identityRegistry.agents(agentId);
         if (!active) revert InactiveAgent();
         
         // Determine recipient (TBA if exists, otherwise owner)
@@ -551,7 +609,7 @@ contract AgentPaymentRouter is ReentrancyGuard, Ownable, VimsProvenance {
         creatorCut = (afterSystem * royaltyBps) / 10000;
         recipientCut = afterSystem - creatorCut;
         
-        (, address tbaAddress,,) = identityRegistry.agents(agentId);
+        (, address tbaAddress,,,) = identityRegistry.agents(agentId);
         recipient = tbaAddress != address(0) ? tbaAddress : identityRegistry.ownerOf(agentId);
     }
     

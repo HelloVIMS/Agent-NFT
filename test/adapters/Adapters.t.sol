@@ -21,8 +21,7 @@ contract MockLegacyReg is ILegacyReputationRegistry {
         _has[a][f.client] = true;
     }
     function getFeedbackCount(uint256 a) external view returns (uint256) { return fbs[a].length; }
-    function clientHasFeedback(uint256 a, address c) external view returns (bool) { return _has[a][c]; }
-    function feedbacks(uint256 a, uint256 i) external view returns (
+    function getFeedbackAt(uint256 a, uint256 i) external view returns (
         address, int128, uint8, string memory, string memory, string memory, uint256, bool
     ) {
         FB storage f = fbs[a][i];
@@ -40,9 +39,9 @@ contract MockIdentity is IIdentityRegistryView {
         _agents[id] = A({ name: "", tba: tba, createdAt: 1, active: active });
         _owner[id] = holder;
     }
-    function agents(uint256 id) external view returns (string memory, address, uint256, bool) {
+    function agents(uint256 id) external view returns (string memory, address, uint256, bool, address) {
         A storage a = _agents[id];
-        return (a.name, a.tba, a.createdAt, a.active);
+        return (a.name, a.tba, a.createdAt, a.active, address(0));
     }
     function ownerOf(uint256 id) external view returns (address) {
         address o = _owner[id];

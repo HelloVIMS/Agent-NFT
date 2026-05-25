@@ -40,7 +40,7 @@ contract AgentAccountTest is Test {
         
         // Create an agent and its TBA
         vm.prank(user1);
-        agentId = identityRegistry.registerAgent("TestBot", "uri");
+        agentId = identityRegistry.registerAgent("TestBot", "uri", 1000, address(0));
         
         vm.prank(user1);
         address accountAddress = tbaRegistry.createAccount(

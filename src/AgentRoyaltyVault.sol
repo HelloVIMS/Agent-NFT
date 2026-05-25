@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./interfaces/IAgentIdentityRegistry.sol";
 import {VimsProvenance} from "./VimsProvenance.sol";
 
@@ -27,7 +28,7 @@ import {VimsProvenance} from "./VimsProvenance.sol";
  *         arrives before deployment is automatically claimable on first
  *         `release` after deployment, since CREATE2 preserves the address.
  */
-contract AgentRoyaltyVault is VimsProvenance {
+contract AgentRoyaltyVault is VimsProvenance, ReentrancyGuard {
     function _vimsContractName() internal pure override returns (string memory) {
         return "AgentRoyaltyVault";
     }
@@ -60,7 +61,7 @@ contract AgentRoyaltyVault is VimsProvenance {
 
     /// @notice Push accumulated ETH to creator + treasury per current registry bps.
     /// @dev    Permissionless. Anyone may call.
-    function release() external {
+    function release() external nonReentrant {
         uint256 bal = address(this).balance;
         if (bal == 0) revert NothingToRelease();
 
@@ -83,7 +84,7 @@ contract AgentRoyaltyVault is VimsProvenance {
 
     /// @notice Push accumulated ERC20 balance to creator + treasury.
     /// @param  token ERC20 token address (USDC, WETH, ...).
-    function releaseToken(IERC20 token) external {
+    function releaseToken(IERC20 token) external nonReentrant {
         uint256 bal = token.balanceOf(address(this));
         if (bal == 0) revert NothingToRelease();
 

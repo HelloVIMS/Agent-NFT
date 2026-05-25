@@ -48,7 +48,7 @@ contract AgentTBARegistryTest is Test {
     
     function test_ComputeAccountAddress() public {
         vm.prank(user1);
-        uint256 agentId = identityRegistry.registerAgent("TestBot", "uri");
+        uint256 agentId = identityRegistry.registerAgent("TestBot", "uri", 1000, address(0));
         
         bytes32 salt = bytes32(0);
         
@@ -63,7 +63,7 @@ contract AgentTBARegistryTest is Test {
     
     function test_CreateAccount() public {
         vm.prank(user1);
-        uint256 agentId = identityRegistry.registerAgent("TestBot", "uri");
+        uint256 agentId = identityRegistry.registerAgent("TestBot", "uri", 1000, address(0));
         
         bytes32 salt = bytes32(0);
         
@@ -79,7 +79,7 @@ contract AgentTBARegistryTest is Test {
     
     function test_CreateAccountDeterministic() public {
         vm.prank(user1);
-        uint256 agentId = identityRegistry.registerAgent("TestBot", "uri");
+        uint256 agentId = identityRegistry.registerAgent("TestBot", "uri", 1000, address(0));
         
         bytes32 salt = bytes32(0);
         
@@ -103,7 +103,7 @@ contract AgentTBARegistryTest is Test {
     
     function test_IsAccountDeployed() public {
         vm.prank(user1);
-        uint256 agentId = identityRegistry.registerAgent("TestBot", "uri");
+        uint256 agentId = identityRegistry.registerAgent("TestBot", "uri", 1000, address(0));
         
         bytes32 salt = bytes32(0);
         
@@ -128,7 +128,7 @@ contract AgentTBARegistryTest is Test {
     
     function test_CreateAccountReventsOnDuplicate() public {
         vm.prank(user1);
-        uint256 agentId = identityRegistry.registerAgent("TestBot", "uri");
+        uint256 agentId = identityRegistry.registerAgent("TestBot", "uri", 1000, address(0));
         
         bytes32 salt = bytes32(0);
         
@@ -145,7 +145,7 @@ contract AgentTBARegistryTest is Test {
     
     function test_AccountOwner() public {
         vm.prank(user1);
-        uint256 agentId = identityRegistry.registerAgent("TestBot", "uri");
+        uint256 agentId = identityRegistry.registerAgent("TestBot", "uri", 1000, address(0));
         
         bytes32 salt = bytes32(0);
         
@@ -161,7 +161,7 @@ contract AgentTBARegistryTest is Test {
     
     function test_AccountReceiveETH() public {
         vm.prank(user1);
-        uint256 agentId = identityRegistry.registerAgent("TestBot", "uri");
+        uint256 agentId = identityRegistry.registerAgent("TestBot", "uri", 1000, address(0));
         
         bytes32 salt = bytes32(0);
         
@@ -181,7 +181,7 @@ contract AgentTBARegistryTest is Test {
     
     function test_DifferentSaltsCreateDifferentAccounts() public {
         vm.prank(user1);
-        uint256 agentId = identityRegistry.registerAgent("TestBot", "uri");
+        uint256 agentId = identityRegistry.registerAgent("TestBot", "uri", 1000, address(0));
         
         bytes32 salt1 = bytes32(uint256(1));
         bytes32 salt2 = bytes32(uint256(2));

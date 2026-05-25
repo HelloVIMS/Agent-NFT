@@ -839,12 +839,15 @@ Coverage includes:
 ## Standards implemented
 
 - [ERC-721](https://eips.ethereum.org/EIPS/eip-721) — NFT identity.
-- [ERC-2981](https://eips.ethereum.org/EIPS/eip-2981) — soulbound creator royalties.
-- [ERC-4337](https://eips.ethereum.org/EIPS/eip-4337) — account abstraction (TBA validateUserOp).
+- [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) — agent identity / reputation / validation.
 - [ERC-6551](https://eips.ethereum.org/EIPS/eip-6551) — token-bound accounts.
-- [ERC-8004](https://github.com/ChainAgnostic/CAIPs) — agent identity / reputation / validation.
-- [EIP-3009](https://eips.ethereum.org/EIPS/eip-3009) — gasless meta-transfers (USDC).
+- [EIP-712](https://eips.ethereum.org/EIPS/eip-712) — typed structured-data signing (x402 auth, evolution commits, subaccount intents).
+- [EIP-3009](https://eips.ethereum.org/EIPS/eip-3009) — gasless meta-transfers (USDC `transferWithAuthorization`).
+- [ERC-2981](https://eips.ethereum.org/EIPS/eip-2981) — soulbound creator royalties (per-agent CREATE2 vault as receiver).
+- [ERC-4337](https://eips.ethereum.org/EIPS/eip-4337) — account abstraction (TBA `validateUserOp`).
 - [x402](https://github.com/coinbase/x402) — HTTP Payment Required protocol (settlement target).
+- [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) — contract-signature verification (TBAs sign as the agent).
+- [Pixelog (`.pixe`)](https://github.com/arqonai/pixelog) — layered agent memory standard (l0/l1/l2 tiers, typed categories, content-addressed URIs).
 
 ---
 

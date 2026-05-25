@@ -138,8 +138,17 @@ contract AgentContextRegistry is
         identityRegistry = IAgentIdentityRegistry(_identityRegistry);
     }
 
+    /// @dev Authorises either the agent NFT owner or any subaccount/primary
+    ///      TBA bound to `agentId` that holds `PERM_CONTEXT_WRITE`.
     modifier onlyAgentOwner(uint256 agentId) {
-        if (identityRegistry.ownerOf(agentId) != msg.sender) revert NotOwner();
+        if (identityRegistry.ownerOf(agentId) != msg.sender) {
+            if (!identityRegistry.hasPermission(msg.sender, identityRegistry.PERM_CONTEXT_WRITE())) {
+                revert NotOwner();
+            }
+            // Confirm the bound agentId matches.
+            (uint256 boundId, bool bound,,,) = identityRegistry.agentIdOf(msg.sender);
+            if (!bound || boundId != agentId) revert NotOwner();
+        }
         _;
     }
 

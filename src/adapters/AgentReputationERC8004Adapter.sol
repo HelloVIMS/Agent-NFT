@@ -6,7 +6,10 @@ import {IERC8004Reputation} from "../hooks/ReputationLevelHook.sol";
 /// @notice Surface of the existing (non-spec-compliant) AgentReputationRegistry
 ///         this adapter wraps.
 interface ILegacyReputationRegistry {
-    function feedbacks(uint256 agentId, uint256 idx) external view returns (
+    /// @dev Anchor-aware indexed accessor. Resolves through the reputation
+    ///      subject (agentId or anchor) so the adapter doesn't need to know
+    ///      whether feedback is stored under the agentId or an anchor key.
+    function getFeedbackAt(uint256 agentId, uint256 index) external view returns (
         address client,
         int128  value,
         uint8   decimals,
@@ -17,7 +20,6 @@ interface ILegacyReputationRegistry {
         bool    revoked
     );
     function getFeedbackCount(uint256 agentId) external view returns (uint256);
-    function clientHasFeedback(uint256 agentId, address client) external view returns (bool);
 }
 
 /**
@@ -87,7 +89,7 @@ contract AgentReputationERC8004Adapter is IERC8004Reputation {
                 ,
                 ,
                 bool    fbRevoked
-            ) = registry.feedbacks(agentId, i);
+            ) = registry.getFeedbackAt(agentId, i);
 
             if (fbRevoked) continue;
             if (!_clientAllowed(fbClient, clientAddresses)) continue;

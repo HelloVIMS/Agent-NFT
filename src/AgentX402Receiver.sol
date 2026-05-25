@@ -293,7 +293,7 @@ contract AgentX402Receiver is
         }
 
         // 4. Resolve agent recipient: prefer TBA, fall back to NFT owner.
-        (,address tba,,) = identityRegistry.agents(agentId);
+        (,address tba,,,) = identityRegistry.agents(agentId);
         address agentRecipient = tba != address(0) ? tba : identityRegistry.ownerOf(agentId);
 
         // 5. Disburse.

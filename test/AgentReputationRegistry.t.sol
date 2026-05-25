@@ -17,8 +17,8 @@ contract AgentReputationRegistryTest is Test {
     
     uint256 public agentId;
     
-    event FeedbackGiven(uint256 indexed agentId, address indexed client, int128 value, string tag1, string feedbackURI);
-    event FeedbackRevoked(uint256 indexed agentId, address indexed client, uint256 feedbackIndex);
+    event FeedbackGiven(uint256 indexed agentId, address indexed client, bytes32 indexed subject, int128 value, string tag1, string feedbackURI);
+    event FeedbackRevoked(uint256 indexed agentId, address indexed client, bytes32 indexed subject, uint256 feedbackIndex);
     
     function setUp() public {
         vm.startPrank(owner);
@@ -43,7 +43,7 @@ contract AgentReputationRegistryTest is Test {
         
         // Create an agent
         vm.prank(agentOwner);
-        agentId = identityRegistry.registerAgent("TestBot", "uri");
+        agentId = identityRegistry.registerAgent("TestBot", "uri", 1000, address(0));
     }
     
     function test_GiveFeedback() public {

@@ -62,7 +62,7 @@ contract AgentContextRegistryTest is Test {
 
     function _mintAgent(address to) internal returns (uint256 agentId) {
         vm.prank(to);
-        agentId = registry.registerAgent("Agent", "ipfs://meta");
+        agentId = registry.registerAgent("Agent", "ipfs://meta", 1000, address(0));
     }
 
     // ─── happy paths ─────────────────────────────────────────────────────────

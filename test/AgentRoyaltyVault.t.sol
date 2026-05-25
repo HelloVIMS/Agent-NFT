@@ -29,24 +29,26 @@ contract AgentRoyaltyVaultTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), init);
         registry = AgentIdentityRegistry(address(proxy));
 
-        vm.prank(address(this));
+        // Hand ownership to `owner` and reassign the secondary treasury to
+        // the canonical test address. `initialize()` seeded treasury =
+        // deployer (this test contract) — the production deploy script
+        // does the same and then calls `setSecondaryTreasury` to point at
+        // the real treasury.
         registry.transferOwnership(owner);
-
         vm.prank(owner);
-        registry.initializeV7(treasury);
+        registry.setSecondaryTreasury(treasury);
     }
 
     // ============ State / config ============
 
-    function test_V7Initialized() public view {
+    function test_InitializedDefaults() public view {
         assertEq(registry.secondaryTreasury(), treasury);
         assertEq(registry.secondarySystemFeeBps(), DEFAULT_SYSTEM_BPS);
     }
 
-    function test_V7InitializerCannotBeCalledTwice() public {
-        vm.prank(owner);
+    function test_InitializerCannotBeCalledTwice() public {
         vm.expectRevert(); // Initializable: InvalidInitialization
-        registry.initializeV7(treasury);
+        registry.initialize();
     }
 
     function test_OnlyOwnerSetsSecondaryTreasury() public {
@@ -293,6 +295,6 @@ contract AgentRoyaltyVaultTest is Test {
 
     function _mint(address to, uint256 royaltyBps) internal returns (uint256 agentId) {
         vm.prank(to);
-        agentId = registry.registerAgentWithRoyalty("agent", "ipfs://meta", royaltyBps);
+        agentId = registry.registerAgent("agent", "ipfs://meta", royaltyBps, address(0));
     }
 }

@@ -51,7 +51,7 @@ contract AgentPaymentRouterTest is Test {
         
         // Create an agent as creator
         vm.prank(creator);
-        agentId = identityRegistry.registerAgentWithRoyalty("TestBot", "ipfs://test", 1000); // 10% royalty
+        agentId = identityRegistry.registerAgent("TestBot", "ipfs://test", 1000, address(0)); // 10% royalty
         
         // Fund payer with ETH and USDC
         vm.deal(payer, 100 ether);

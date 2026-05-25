@@ -17,11 +17,16 @@ import "./AgentRoyaltyVault.sol";
  * @notice ERC-8004 compliant Identity Registry for Agent AI agents
  * @dev Each Agent is an NFT that can own a Token Bound Account (ERC-6551)
  * @dev UUPS Upgradeable - owner can upgrade implementation
- * @dev V2: On-chain SVG storage
- * @dev V3: Soulbound creator royalties with ERC-2981 support
- * @dev V5: .pixe storage extracted into `AgentPixeMemory` contract (Pixelog-aligned:
+ * @dev On-chain SVG storage.
+ * @dev Soulbound creator royalties with ERC-2981 support.
+ * @dev .pixe storage is extracted into `AgentPixeMemory` (Pixelog-aligned:
  *      typed categories, context tiers, generic storageURI).
- * @dev V6: On-chain Collections for generative minting
+ * @dev On-chain Collections for generative minting.
+ * @dev 1:Many subaccount registry (Option A). Multiple authorised accounts
+ *      (typically salted ERC-6551 sub-TBAs) can act on behalf of a single
+ *      agentId, each with a granular permission bitmap. Reverse lookup
+ *      (`agentIdOf`) lets downstream registries (payments, reputation,
+ *      context) enforce 1:many semantics on-chain.
  */
 import {VimsProvenance} from "./VimsProvenance.sol";
 
@@ -50,6 +55,11 @@ contract AgentIdentityRegistry is
     error CollectionFull();
     error CollectionLocked();
     error NotCollectionCreator();
+    // Subaccount errors
+    error AlreadyBound();
+    error NotBound();
+    error MaxSubaccounts();
+    error PermissionDenied();
     
     uint256 private _nextTokenId;
     uint256 private _nextCollectionId;
@@ -59,6 +69,7 @@ contract AgentIdentityRegistry is
         address tbaAddress;
         uint256 createdAt;
         bool active;
+        address reputationAnchor; // V7: immutable reputation anchor (address(0) = transferable)
     }
     
     // V6: On-chain Collections for generative minting
@@ -74,19 +85,30 @@ contract AgentIdentityRegistry is
     
     mapping(uint256 => AgentMetadata) public agents;
     mapping(address => uint256[]) public ownerAgents;
+
+    // O(1) removal index for `ownerAgents`. Stores `index + 1` so the zero
+    // value naturally encodes "not present". Without this, `_update` would be
+    // O(n) over the owner's full holdings on every transfer — a whale-DoS
+    // vector. With the index, removal is swap-and-pop in O(1).
+    mapping(uint256 => uint256) private _ownerAgentsIndexPlusOne;
+
+    // Anchor reverse index: agents grouped by reputation anchor (V7).
+    // Lets indexers/UI surface "this anchor controls N agents" so buyers can
+    // see the shared-pool semantics of anchored agents at a glance.
+    mapping(address => uint256[]) private _anchorAgents;
     
-    // V2 Storage: On-chain SVG images
+    // On-chain SVG images.
     mapping(uint256 => string) private _svgImages;
     
-    // V5: .pixe storage extracted to AgentPixeMemory contract (Pixelog-aligned)
-    // V5: Skill storage extracted to AgentSkillsExtension contract
-    
-    // V6 Storage: On-chain Collections
+    // .pixe storage extracted to AgentPixeMemory contract (Pixelog-aligned).
+    // Skill storage extracted to AgentSkillsExtension contract.
+
+    // On-chain Collections.
     mapping(uint256 => Collection) public collections;
     mapping(uint256 => uint256) public agentToCollection;   // agentId => collectionId (0 = no collection)
     mapping(uint256 => uint256[]) private _collectionAgents; // collectionId => agentIds[]
     
-    // V3 Storage: Soulbound Creator Royalties
+    // Soulbound creator royalties.
     // Creator address is IMMUTABLE once set - can never be transferred
     mapping(uint256 => address) private _agentCreator;
     mapping(uint256 => uint256) private _creatorRoyaltyBps;  // basis points (100 = 1%)
@@ -95,10 +117,10 @@ contract AgentIdentityRegistry is
     uint256 public constant MAX_CREATOR_ROYALTY_BPS = 5000;      // 50% cap
     uint256 public constant MIN_CREATOR_ROYALTY_BPS = 0;         // 0% allowed (creator can opt out)
     
-    // V2 Storage Limits
+    // On-chain SVG storage limit.
     uint256 public constant MAX_SVG_SIZE = 49152;                // 48KB max for on-chain SVG (aligned with AgentCollectionImpl)
 
-    // V7 Storage: Secondary-market royalty splitter (ERC-2981)
+    // Secondary-market royalty splitter (ERC-2981).
     // Adds an additive system fee on top of the creator royalty so that VIMS
     // captures economics on secondary NFT sales. royaltyInfo() returns the
     // per-agent vault address; the vault (lazily deployed via CREATE2) splits
@@ -108,7 +130,57 @@ contract AgentIdentityRegistry is
     uint256 public constant DEFAULT_SECONDARY_SYSTEM_FEE_BPS = 50;   // 0.5%
     uint256 public constant MAX_SECONDARY_SYSTEM_FEE_BPS     = 500;  // 5% cap
 
-    // V7 Events
+    // ============ Storage: 1:Many Subaccounts ============
+    //
+    // A subaccount is any address (typically a salted ERC-6551 TBA, but the
+    // registry is address-agnostic) authorised to act on behalf of a given
+    // agentId. The primary TBA (set via `setTBAAddress`) is implicitly bound
+    // with `PERM_ALL` and exposed under `agentIdOf` once `bindPrimaryTBA` has
+    // been called (idempotent, permissionless).
+    //
+    // Permission bits are an open-ended bitmap so downstream contracts can
+    // gate writes without requiring a registry upgrade.
+    uint96 public constant PERM_PAY           = 1 << 0;  // route inbound payments to this agentId
+    uint96 public constant PERM_REPUTATION    = 1 << 1;  // record reputation entries
+    uint96 public constant PERM_CONTEXT_WRITE = 1 << 2;  // write to AgentContextRegistry
+    uint96 public constant PERM_MEMORY_WRITE  = 1 << 3;  // write to AgentMemory / .pixe
+    uint96 public constant PERM_TREASURY      = 1 << 4;  // operate royalty vault
+    uint96 public constant PERM_LINK          = 1 << 5;  // manage linked external accounts
+    uint96 public constant PERM_ALL           = type(uint96).max;
+
+    uint256 public constant MAX_SUBACCOUNTS_PER_AGENT = 64;
+
+    struct Subaccount {
+        address account;       // authorised address
+        bytes32 salt;          // CREATE2 salt used to derive the sub-TBA (informational)
+        uint96  permissions;   // bitmap of PERM_* flags
+        uint48  createdAt;
+        bool    active;
+    }
+
+    mapping(uint256 => Subaccount[]) private _subaccounts;
+    // account => agentId+1 (0 == not bound). Covers both primary TBA and subs.
+    mapping(address => uint256) private _accountAgentIdPlusOne;
+    // account => index+1 in _subaccounts[agentId]. 0 == primary TBA (or unbound).
+    mapping(address => uint256) private _accountSubIndexPlusOne;
+
+    // Subaccount events
+    event SubaccountRegistered(
+        uint256 indexed agentId,
+        address indexed account,
+        bytes32 salt,
+        uint96  permissions
+    );
+    event SubaccountPermissionsUpdated(
+        uint256 indexed agentId,
+        address indexed account,
+        uint96  oldPermissions,
+        uint96  newPermissions
+    );
+    event SubaccountRevoked(uint256 indexed agentId, address indexed account);
+    event PrimaryTBABound(uint256 indexed agentId, address indexed account);
+
+    // Secondary-market events
     event SecondaryTreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event SecondarySystemFeeUpdated(uint256 oldBps, uint256 newBps);
     event RoyaltyVaultDeployed(uint256 indexed agentId, address indexed vault);
@@ -143,7 +215,13 @@ contract AgentIdentityRegistry is
         uint256 oldRoyaltyBps, 
         uint256 newRoyaltyBps
     );
-    
+
+    // V7 Events: Reputation anchor
+    event ReputationAnchorSet(
+        uint256 indexed agentId,
+        address indexed anchor
+    );
+
     // V5 Events: Skill files moved to AgentSkillsExtension contract
     
     // V6 Events: On-chain Collections
@@ -168,93 +246,88 @@ contract AgentIdentityRegistry is
         return "AgentIdentityRegistry";
     }
 
+    /**
+     * @notice Single canonical initializer for v1.
+     *         Seeds:
+     *           - ERC-721 name/symbol ("Agent"/"AGENT")
+     *           - URI storage extension
+     *           - Owner = `msg.sender`
+     *           - Secondary treasury = `msg.sender` (owner can later reassign
+     *             via `setSecondaryTreasury`)
+     *           - Secondary system fee = `DEFAULT_SECONDARY_SYSTEM_FEE_BPS`
+     *
+     * @dev   v1 — single-call initializer, no reinitializer chain. The
+     *        contract is fresh-deployed (as a UUPS proxy) on every chain;
+     *        future migrations should use `reinitializer(N)` with a
+     *        sequentially incremented N.
+     */
     function initialize() public initializer {
-        __ERC721_init("Agent", "CLAW");
+        __ERC721_init("Agent", "AGENT");
         __ERC721URIStorage_init();
         __Ownable_init(msg.sender);
-    }
 
-    /**
-     * @notice V7 reinitializer: enable secondary-market 0.5% royalty splitter.
-     * @dev    Call exactly once after upgrading the proxy. Sets the treasury
-     *         and seeds `secondarySystemFeeBps` to the default.
-     * @param  _treasury Treasury address that will receive the secondary fee.
-     */
-    function initializeV7(address _treasury) public reinitializer(7) {
-        if (_treasury == address(0)) revert InvalidAddress();
-        secondaryTreasury    = _treasury;
+        secondaryTreasury     = msg.sender;
         secondarySystemFeeBps = DEFAULT_SECONDARY_SYSTEM_FEE_BPS;
-        emit SecondaryTreasuryUpdated(address(0), _treasury);
+        emit SecondaryTreasuryUpdated(address(0), msg.sender);
         emit SecondarySystemFeeUpdated(0, DEFAULT_SECONDARY_SYSTEM_FEE_BPS);
-    }
-
-    /**
-     * @notice V8 reinitializer: rename the ERC-721 collection (name + symbol).
-     * @dev    The proxy was initially deployed with the legacy "ClawBot"/"CLAW"
-     *         pair before the rebrand. ERC721's name/symbol live in namespaced
-     *         storage and are only written inside `__ERC721_init_unchained`,
-     *         which is `onlyInitializing`. A `reinitializer(8)` lets us call
-     *         it exactly once more to overwrite both fields safely.
-     * @param  name_   New collection name (e.g. "Agent")
-     * @param  symbol_ New collection symbol (e.g. "AGENT")
-     */
-    function initializeV8(string memory name_, string memory symbol_)
-        public
-        reinitializer(8)
-        onlyOwner
-    {
-        if (bytes(name_).length == 0 || bytes(symbol_).length == 0) revert EmptyInput();
-        __ERC721_init_unchained(name_, symbol_);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
     
     /**
-     * @notice Register a new Agent agent with default creator royalty
+     * @notice Register a new Agent agent.
      * @param name Human-readable name for the agent
      * @param agentURI IPFS URI containing agent metadata (ERC-8004 registration file)
+     * @param royaltyBps Creator royalty in basis points (100 = 1%, max 5000 = 50%).
+     *        0 bps is allowed; only the upper bound is enforced.
+     * @param reputationAnchor If non-zero, reputation is permanently keyed to this
+     *        address and does NOT transfer with the NFT. If address(0), reputation
+     *        follows the agentId (transferable).
+     *
+     * @dev SECURITY: `reputationAnchor` MUST be `msg.sender` or `address(0)` —
+     *      enforced to prevent reputation poisoning via foreign anchors. A
+     *      malicious minter cannot seed reviews against an anchor they don't
+     *      control. The anchor commitment is therefore self-attested at mint.
      * @return agentId The token ID of the newly minted agent
      */
     function registerAgent(
         string calldata name,
-        string calldata agentURI
-    ) external returns (uint256 agentId) {
-        return registerAgentWithRoyalty(name, agentURI, DEFAULT_CREATOR_ROYALTY_BPS);
-    }
-    
-    /**
-     * @notice Register a new Agent agent with custom creator royalty
-     * @param name Human-readable name for the agent
-     * @param agentURI IPFS URI containing agent metadata (ERC-8004 registration file)
-     * @param royaltyBps Creator royalty in basis points (100 = 1%, max 5000 = 50%)
-     * @return agentId The token ID of the newly minted agent
-     */
-    function registerAgentWithRoyalty(
-        string calldata name,
         string calldata agentURI,
-        uint256 royaltyBps
+        uint256 royaltyBps,
+        address reputationAnchor
     ) public returns (uint256 agentId) {
-        // V7: 0 bps is allowed; only the upper bound is enforced.
         if (royaltyBps > MAX_CREATOR_ROYALTY_BPS) revert InvalidValue();
-        
+        if (reputationAnchor != address(0) && reputationAnchor != msg.sender) {
+            revert InvalidValue();
+        }
+
         agentId = _nextTokenId++;
-        
-        _safeMint(msg.sender, agentId);
-        _setTokenURI(agentId, agentURI);
-        
+
+        // Checks-Effects-Interactions: write all state BEFORE _safeMint so
+        // the ERC721Received callback (interactions) cannot observe a half-
+        // initialised agent (missing creator, anchor, URI, etc.).
         agents[agentId] = AgentMetadata({
             name: name,
             tbaAddress: address(0),
             createdAt: block.timestamp,
-            active: true
+            active: true,
+            reputationAnchor: reputationAnchor
         });
-        
-        // V3: Set soulbound creator royalty - IMMUTABLE creator address
         _agentCreator[agentId] = msg.sender;
         _creatorRoyaltyBps[agentId] = royaltyBps;
-        
+        if (reputationAnchor != address(0)) {
+            _anchorAgents[reputationAnchor].push(agentId);
+        }
+
         emit AgentRegistered(agentId, msg.sender, name, agentURI);
         emit CreatorRoyaltySet(agentId, msg.sender, royaltyBps);
+        if (reputationAnchor != address(0)) {
+            emit ReputationAnchorSet(agentId, reputationAnchor);
+        }
+
+        // ERC721Received callback fires here; state is fully initialised.
+        _setTokenURI(agentId, agentURI);
+        _safeMint(msg.sender, agentId);
     }
     
     /**
@@ -266,9 +339,19 @@ contract AgentIdentityRegistry is
         if (ownerOf(agentId) != msg.sender) revert NotOwner();
         if (tbaAddress == address(0)) revert InvalidAddress();
         if (agents[agentId].tbaAddress != address(0)) revert AlreadySet();
-        
+
+        // Enforce that the TBA address is not already bound to another
+        // agent before we accept it as the primary surface. We then claim it
+        // as the primary (sub index = 0, full permissions implicit).
+        uint256 plus = _accountAgentIdPlusOne[tbaAddress];
+        if (plus != 0 && plus != agentId + 1) revert AlreadyBound();
+
         agents[agentId].tbaAddress = tbaAddress;
-        
+        if (plus == 0) {
+            _accountAgentIdPlusOne[tbaAddress] = agentId + 1;
+            emit PrimaryTBABound(agentId, tbaAddress);
+        }
+
         emit TBAAddressSet(agentId, tbaAddress);
     }
     
@@ -298,17 +381,6 @@ contract AgentIdentityRegistry is
         emit AgentActivated(agentId);
     }
     
-    /**
-     * @notice Alias for reactivateAgent
-     */
-    function activateAgent(uint256 agentId) external {
-        if (ownerOf(agentId) != msg.sender) revert NotOwner();
-        if (agents[agentId].active) revert InvalidValue();
-        
-        agents[agentId].active = true;
-        
-        emit AgentActivated(agentId);
-    }
     
     /**
      * @notice Update the agent's metadata URI
@@ -338,18 +410,51 @@ contract AgentIdentityRegistry is
         address tbaAddress,
         uint256 createdAt,
         bool active,
-        address owner
+        address owner,
+        address reputationAnchor
     ) {
         if (_ownerOf(agentId) == address(0)) revert NotExists();
-        
+
         AgentMetadata memory agent = agents[agentId];
         return (
             agent.name,
             agent.tbaAddress,
             agent.createdAt,
             agent.active,
-            ownerOf(agentId)
+            ownerOf(agentId),
+            agent.reputationAnchor
         );
+    }
+
+    /**
+     * @notice Get the immutable reputation anchor for an agent.
+     * @dev If address(0), reputation is transferable (follows agentId).
+     *      If non-zero, reputation is permanently keyed to that address.
+     * @param agentId The agent's token ID
+     * @return The reputation anchor address
+     */
+    function reputationAnchorOf(uint256 agentId) external view returns (address) {
+        if (_ownerOf(agentId) == address(0)) revert NotExists();
+        return agents[agentId].reputationAnchor;
+    }
+
+    /**
+     * @notice Enumerate all agentIds that share the same reputation anchor.
+     * @dev    Anchored agents pool reputation by anchor address (per the
+     *         V7 design). Off-chain indexers and marketplace UIs use this to
+     *         surface "this anchor controls N agents" so buyers understand
+     *         that buying an anchored agent does NOT grant them control of
+     *         the reputation. Returns an empty array for unused anchors.
+     */
+    function agentsByAnchor(address anchor) external view returns (uint256[] memory) {
+        return _anchorAgents[anchor];
+    }
+
+    /**
+     * @notice Count of agents sharing a given reputation anchor.
+     */
+    function anchorAgentCount(address anchor) external view returns (uint256) {
+        return _anchorAgents[anchor].length;
     }
     
     /**
@@ -409,7 +514,7 @@ contract AgentIdentityRegistry is
      */
     function updateCreatorRoyalty(uint256 agentId, uint256 newRoyaltyBps) external {
         if (_agentCreator[agentId] != msg.sender) revert NotCreator();
-        // V7: 0 bps is allowed; only the upper bound is enforced.
+        // 0 bps is allowed; only the upper bound is enforced.
         if (newRoyaltyBps > MAX_CREATOR_ROYALTY_BPS) revert InvalidValue();
         if (newRoyaltyBps == _creatorRoyaltyBps[agentId]) revert Unchanged();
         
@@ -419,7 +524,7 @@ contract AgentIdentityRegistry is
         emit CreatorRoyaltyUpdated(agentId, oldRoyalty, newRoyaltyBps);
     }
     
-    // ============ V2: On-chain SVG Storage ============
+    // ============ On-chain SVG Storage ============
     
     /**
      * @notice Set the on-chain SVG image for an agent
@@ -486,48 +591,33 @@ contract AgentIdentityRegistry is
     }
     
     /**
-     * @notice Mint a new agent directly into a collection
+     * @notice Mint a new agent directly into a collection.
      * @param collectionId The collection to mint into
      * @param name Agent name
      * @param agentURI Agent metadata URI
+     * @param royaltyBps Creator royalty in basis points
+     * @param reputationAnchor Optional immutable reputation anchor (address(0) = transferable)
      * @return agentId The token ID of the newly minted agent
      */
     function mintToCollection(
         uint256 collectionId,
         string calldata name,
-        string calldata agentURI
-    ) external returns (uint256 agentId) {
-        return mintToCollectionWithRoyalty(collectionId, name, agentURI, DEFAULT_CREATOR_ROYALTY_BPS);
-    }
-    
-    /**
-     * @notice Mint a new agent into a collection with custom royalty
-     * @param collectionId The collection to mint into
-     * @param name Agent name
-     * @param agentURI Agent metadata URI
-     * @param royaltyBps Creator royalty in basis points
-     * @return agentId The token ID of the newly minted agent
-     */
-    function mintToCollectionWithRoyalty(
-        uint256 collectionId,
-        string calldata name,
         string calldata agentURI,
-        uint256 royaltyBps
-    ) public returns (uint256 agentId) {
+        uint256 royaltyBps,
+        address reputationAnchor
+    ) external returns (uint256 agentId) {
         Collection storage col = collections[collectionId];
         if (col.creator == address(0)) revert NotExists();
         if (col.creator != msg.sender) revert NotCollectionCreator();
         if (col.locked) revert CollectionLocked();
         if (col.maxSupply > 0 && col.mintedCount >= col.maxSupply) revert CollectionFull();
-        
-        // Mint the agent using existing logic
-        agentId = registerAgentWithRoyalty(name, agentURI, royaltyBps);
-        
-        // Link agent to collection
+
+        agentId = registerAgent(name, agentURI, royaltyBps, reputationAnchor);
+
         agentToCollection[agentId] = collectionId;
         _collectionAgents[collectionId].push(agentId);
         col.mintedCount++;
-        
+
         emit AgentAddedToCollection(agentId, collectionId);
     }
     
@@ -630,7 +720,7 @@ contract AgentIdentityRegistry is
         override 
         returns (address receiver, uint256 royaltyAmount) 
     {
-        // V7: receiver is the per-agent royalty vault (CREATE2 deterministic).
+        // Receiver is the per-agent royalty vault (CREATE2 deterministic).
         // The vault accepts the combined royalty and splits it on-chain into
         // creator share (creatorBps) + VIMS share (secondarySystemFeeBps).
         receiver = _royaltyVaultAddress(tokenId);
@@ -638,7 +728,7 @@ contract AgentIdentityRegistry is
         royaltyAmount    = (salePrice * totalBps) / 10000;
     }
 
-    // ============ V7: Secondary-Market Royalty Splitter ============
+    // ============ Secondary-Market Royalty Splitter ============
 
     /**
      * @notice Deterministic address of an agent's royalty vault.
@@ -696,26 +786,202 @@ contract AgentIdentityRegistry is
         secondarySystemFeeBps = newBps;
     }
     
-    // Override transfer to update ownerAgents mapping
+    // ============ 1:Many Subaccount API ============
+
+    /**
+     * @notice Bind the primary-TBA reverse lookup for an agent. Idempotent
+     *         and permissionless. Useful when `setTBAAddress` was called on
+     *         a prior implementation that did not yet seed the reverse map.
+     */
+    function bindPrimaryTBA(uint256 agentId) external {
+        address tba = agents[agentId].tbaAddress;
+        if (tba == address(0)) revert NotBound();
+        uint256 plus = _accountAgentIdPlusOne[tba];
+        if (plus == agentId + 1) return; // already bound
+        if (plus != 0) revert AlreadyBound();
+        _accountAgentIdPlusOne[tba] = agentId + 1;
+        emit PrimaryTBABound(agentId, tba);
+    }
+
+    /**
+     * @notice Register a subaccount authorised to act on behalf of `agentId`.
+     * @dev    Caller must own the agent NFT. The subaccount address must not
+     *         already be bound to any agent. Typically `account` is a salted
+     *         ERC-6551 TBA derived from the agent NFT, but the registry is
+     *         deliberately address-agnostic so non-6551 addresses (e.g. a
+     *         multisig owned by the agent owner) can also be authorised.
+     */
+    function registerSubaccount(
+        uint256 agentId,
+        address account,
+        bytes32 salt,
+        uint96  permissions
+    ) external returns (uint256 index) {
+        if (ownerOf(agentId) != msg.sender) revert NotOwner();
+        if (account == address(0)) revert InvalidAddress();
+        if (_accountAgentIdPlusOne[account] != 0) revert AlreadyBound();
+        if (_subaccounts[agentId].length >= MAX_SUBACCOUNTS_PER_AGENT) revert MaxSubaccounts();
+
+        index = _subaccounts[agentId].length;
+        _subaccounts[agentId].push(Subaccount({
+            account:     account,
+            salt:        salt,
+            permissions: permissions,
+            createdAt:   uint48(block.timestamp),
+            active:      true
+        }));
+        _accountAgentIdPlusOne[account] = agentId + 1;
+        _accountSubIndexPlusOne[account] = index + 1;
+
+        emit SubaccountRegistered(agentId, account, salt, permissions);
+    }
+
+    /**
+     * @notice Update the permission bitmap for an existing subaccount.
+     */
+    function updateSubaccountPermissions(
+        uint256 agentId,
+        address account,
+        uint96  newPermissions
+    ) external {
+        if (ownerOf(agentId) != msg.sender) revert NotOwner();
+        uint256 idxPlus = _accountSubIndexPlusOne[account];
+        if (idxPlus == 0 || _accountAgentIdPlusOne[account] != agentId + 1) revert NotBound();
+
+        Subaccount storage s = _subaccounts[agentId][idxPlus - 1];
+        if (!s.active) revert NotBound();
+        uint96 old = s.permissions;
+        if (old == newPermissions) revert Unchanged();
+        s.permissions = newPermissions;
+        emit SubaccountPermissionsUpdated(agentId, account, old, newPermissions);
+    }
+
+    /**
+     * @notice Revoke a subaccount. The address becomes unbound and may be
+     *         re-registered later (to the same or a different agent).
+     */
+    function revokeSubaccount(uint256 agentId, address account) external {
+        if (ownerOf(agentId) != msg.sender) revert NotOwner();
+        uint256 idxPlus = _accountSubIndexPlusOne[account];
+        if (idxPlus == 0 || _accountAgentIdPlusOne[account] != agentId + 1) revert NotBound();
+
+        Subaccount storage s = _subaccounts[agentId][idxPlus - 1];
+        s.active = false;
+        s.permissions = 0;
+        delete _accountAgentIdPlusOne[account];
+        delete _accountSubIndexPlusOne[account];
+        emit SubaccountRevoked(agentId, account);
+    }
+
+    // ----- views -----
+
+    /**
+     * @notice Resolve any authorised address to its owning agent.
+     * @return agentId      The agent token id (0 if unbound; check `bound`).
+     * @return bound        True if `account` is currently bound to an agent.
+     * @return isPrimary    True if this is the primary TBA (full permissions).
+     * @return permissions  PERM_ALL for primary TBA, otherwise the subaccount bitmap.
+     * @return active       True if both the agent and the binding are active.
+     */
+    function agentIdOf(address account) external view returns (
+        uint256 agentId,
+        bool    bound,
+        bool    isPrimary,
+        uint96  permissions,
+        bool    active
+    ) {
+        uint256 plus = _accountAgentIdPlusOne[account];
+        if (plus == 0) return (0, false, false, 0, false);
+        agentId = plus - 1;
+        bound   = true;
+        uint256 subPlus = _accountSubIndexPlusOne[account];
+        if (subPlus == 0) {
+            return (agentId, true, true, PERM_ALL, agents[agentId].active);
+        }
+        Subaccount memory s = _subaccounts[agentId][subPlus - 1];
+        return (agentId, true, false, s.permissions, s.active && agents[agentId].active);
+    }
+
+    /**
+     * @notice On-chain permission check used by downstream registries.
+     * @dev    Returns true iff `account` is currently bound to *some* agent
+     *         and holds *all* bits in `perm`. Primary TBA always passes.
+     */
+    function hasPermission(address account, uint96 perm) external view returns (bool) {
+        uint256 plus = _accountAgentIdPlusOne[account];
+        if (plus == 0) return false;
+        uint256 agentId = plus - 1;
+        if (!agents[agentId].active) return false;
+        uint256 subPlus = _accountSubIndexPlusOne[account];
+        if (subPlus == 0) return true; // primary TBA
+        Subaccount memory s = _subaccounts[agentId][subPlus - 1];
+        if (!s.active) return false;
+        return (s.permissions & perm) == perm;
+    }
+
+    /**
+     * @notice Strict variant of `hasPermission` that reverts. Useful as a
+     *         single-call guard inside payable / write paths.
+     */
+    function requirePermission(address account, uint96 perm, uint256 expectedAgentId) external view {
+        uint256 plus = _accountAgentIdPlusOne[account];
+        if (plus == 0 || plus - 1 != expectedAgentId) revert NotBound();
+        if (!agents[expectedAgentId].active) revert PermissionDenied();
+        uint256 subPlus = _accountSubIndexPlusOne[account];
+        if (subPlus == 0) return;
+        Subaccount memory s = _subaccounts[expectedAgentId][subPlus - 1];
+        if (!s.active) revert PermissionDenied();
+        if ((s.permissions & perm) != perm) revert PermissionDenied();
+    }
+
+    function getSubaccounts(uint256 agentId) external view returns (Subaccount[] memory) {
+        return _subaccounts[agentId];
+    }
+
+    function subaccountCount(uint256 agentId) external view returns (uint256) {
+        return _subaccounts[agentId].length;
+    }
+
+    // Override transfer to maintain ownerAgents in O(1).
+    // Uses a swap-and-pop pattern indexed by `_ownerAgentsIndexPlusOne` so
+    // gas is constant regardless of holdings — eliminates the whale-DoS
+    // vector on transfer.
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
         address from = super._update(to, tokenId, auth);
-        
+
         if (from != address(0)) {
-            // Remove from previous owner's list
             uint256[] storage fromAgents = ownerAgents[from];
-            for (uint256 i = 0; i < fromAgents.length; i++) {
-                if (fromAgents[i] == tokenId) {
-                    fromAgents[i] = fromAgents[fromAgents.length - 1];
-                    fromAgents.pop();
-                    break;
+            uint256 idxPlus = _ownerAgentsIndexPlusOne[tokenId];
+            // Defensive: idxPlus should always be non-zero for an existing
+            // owner's token, but fall back to no-op rather than reverting
+            // a transfer if storage was ever migrated without the index.
+            if (idxPlus != 0) {
+                uint256 idx  = idxPlus - 1;
+                uint256 last = fromAgents.length - 1;
+                if (idx != last) {
+                    uint256 lastTokenId = fromAgents[last];
+                    fromAgents[idx] = lastTokenId;
+                    _ownerAgentsIndexPlusOne[lastTokenId] = idx + 1;
                 }
+                fromAgents.pop();
+                delete _ownerAgentsIndexPlusOne[tokenId];
             }
         }
-        
+
         if (to != address(0)) {
             ownerAgents[to].push(tokenId);
+            _ownerAgentsIndexPlusOne[tokenId] = ownerAgents[to].length; // index+1
         }
-        
+
         return from;
     }
+
+    // ============ Storage Gap ============
+    //
+    // Reserved slots for future upgrades. Reduce this number by the number of
+    // new storage variables added in a future implementation; never increase
+    // it. Without this, adding any new storage variable after a child contract
+    // is appended in a future inheritance change would shift slots and corrupt
+    // state. Size chosen to absorb ~50 simple slots of future state.
+    uint256[50] private __gap;
 }

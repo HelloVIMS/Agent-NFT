@@ -14,12 +14,31 @@ interface IAgentIdentityRegistry {
         string memory name,
         address tbaAddress,
         uint256 createdAt,
-        bool active
+        bool active,
+        address reputationAnchor
     );
+    function reputationAnchorOf(uint256 agentId) external view returns (address);
 
-    // V7: Secondary-market royalty splitter
+    // Secondary-market royalty splitter
     function secondarySystemFeeBps() external view returns (uint256);
     function secondaryTreasury() external view returns (address);
     function royaltyVaultAddress(uint256 agentId) external view returns (address);
     function deployRoyaltyVault(uint256 agentId) external returns (address);
+
+    // 1:Many subaccount registry
+    function PERM_PAY()           external view returns (uint96);
+    function PERM_REPUTATION()    external view returns (uint96);
+    function PERM_CONTEXT_WRITE() external view returns (uint96);
+    function PERM_MEMORY_WRITE()  external view returns (uint96);
+    function PERM_TREASURY()      external view returns (uint96);
+    function PERM_LINK()          external view returns (uint96);
+    function agentIdOf(address account) external view returns (
+        uint256 agentId,
+        bool    bound,
+        bool    isPrimary,
+        uint96  permissions,
+        bool    active
+    );
+    function hasPermission(address account, uint96 perm) external view returns (bool);
+    function requirePermission(address account, uint96 perm, uint256 expectedAgentId) external view;
 }
