@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" width="100%">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </radialGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bg)"/>
+
+  <!-- Central text -->
+  <g transform="translate(400,130)">
+    <text y="0" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="44" font-weight="800" fill="#f8fafc" letter-spacing="6">
+      AGENT<tspan fill="#10b981">NFT</tspan>
+    </text>
+    <text y="28" text-anchor="middle" font-family="monospace" font-size="12" fill="#64748b">
+      agent.vims.com
+      <animate attributeName="fill" values="#64748b;#10b981;#64748b" dur="4s" repeatCount="indefinite"/>
+    </text>
+  </g>
+
+  <!-- Orbital ring 1 (inner, fast) -->
+  <g transform="translate(400,130)">
+    <ellipse cx="0" cy="0" rx="120" ry="50" fill="none" stroke="#1e293b" stroke-width="0.5" opacity="0.4"/>
+    <ellipse cx="0" cy="0" rx="120" ry="50" fill="none" stroke="#10b981" stroke-width="1.5" opacity="0.3" stroke-dasharray="30 690" filter="url(#glow)">
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="8s" repeatCount="indefinite"/>
+    </ellipse>
+    <!-- Badge on ring 1 -->
+    <g>
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="8s" repeatCount="indefinite"/>
+      <g transform="translate(120,0)">
+        <animateTransform attributeName="transform" type="rotate" from="0" to="-360" dur="8s" repeatCount="indefinite"/>
+        <rect x="-24" y="-10" width="48" height="20" rx="10" fill="#0f172a" stroke="#10b981" stroke-width="1" filter="url(#glow)"/>
+        <text y="4" text-anchor="middle" font-family="monospace" font-size="8" fill="#10b981">ERC-721</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Orbital ring 2 (middle, slower) -->
+  <g transform="translate(400,130)">
+    <ellipse cx="0" cy="0" rx="180" ry="70" fill="none" stroke="#1e293b" stroke-width="0.5" opacity="0.3"/>
+    <ellipse cx="0" cy="0" rx="180" ry="70" fill="none" stroke="#3b82f6" stroke-width="1.5" opacity="0.25" stroke-dasharray="40 1080" filter="url(#glow)">
+      <animateTransform attributeName="transform" type="rotate" from="0" to="-360" dur="12s" repeatCount="indefinite"/>
+    </ellipse>
+    <!-- Badge 1 on ring 2 -->
+    <g>
+      <animateTransform attributeName="transform" type="rotate" from="0" to="-360" dur="12s" repeatCount="indefinite"/>
+      <g transform="translate(180,0)">
+        <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="12s" repeatCount="indefinite"/>
+        <rect x="-24" y="-10" width="48" height="20" rx="10" fill="#0f172a" stroke="#3b82f6" stroke-width="1" filter="url(#glow)"/>
+        <text y="4" text-anchor="middle" font-family="monospace" font-size="8" fill="#3b82f6">ERC-6551</text>
+      </g>
+    </g>
+    <!-- Badge 2 on ring 2 -->
+    <g>
+      <animateTransform attributeName="transform" type="rotate" from="180" to="-180" dur="12s" repeatCount="indefinite"/>
+      <g transform="translate(180,0)">
+        <animateTransform attributeName="transform" type="rotate" from="-180" to="180" dur="12s" repeatCount="indefinite"/>
+        <rect x="-24" y="-10" width="48" height="20" rx="10" fill="#0f172a" stroke="#a855f7" stroke-width="1" filter="url(#glow)"/>
+        <text y="4" text-anchor="middle" font-family="monospace" font-size="8" fill="#a855f7">EIP-712</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Orbital ring 3 (outer, slowest) -->
+  <g transform="translate(400,130)">
+    <ellipse cx="0" cy="0" rx="240" ry="90" fill="none" stroke="#1e293b" stroke-width="0.5" opacity="0.2"/>
+    <ellipse cx="0" cy="0" rx="240" ry="90" fill="none" stroke="#f59e0b" stroke-width="1.5" opacity="0.2" stroke-dasharray="50 1450" filter="url(#glow)">
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="16s" repeatCount="indefinite"/>
+    </ellipse>
+    <!-- Badge 1 on ring 3 -->
+    <g>
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="16s" repeatCount="indefinite"/>
+      <g transform="translate(240,0)">
+        <animateTransform attributeName="transform" type="rotate" from="0" to="-360" dur="16s" repeatCount="indefinite"/>
+        <rect x="-24" y="-10" width="48" height="20" rx="10" fill="#0f172a" stroke="#f59e0b" stroke-width="1" filter="url(#glow)"/>
+        <text y="4" text-anchor="middle" font-family="monospace" font-size="8" fill="#f59e0b">EIP-3009</text>
+      </g>
+    </g>
+    <!-- Badge 2 on ring 3 -->
+    <g>
+      <animateTransform attributeName="transform" type="rotate" from="120" to="480" dur="16s" repeatCount="indefinite"/>
+      <g transform="translate(240,0)">
+        <animateTransform attributeName="transform" type="rotate" from="-120" to="-480" dur="16s" repeatCount="indefinite"/>
+        <rect x="-24" y="-10" width="48" height="20" rx="10" fill="#0f172a" stroke="#ec4899" stroke-width="1" filter="url(#glow)"/>
+        <text y="4" text-anchor="middle" font-family="monospace" font-size="8" fill="#ec4899">ERC-2981</text>
+      </g>
+    </g>
+    <!-- Badge 3 on ring 3 -->
+    <g>
+      <animateTransform attributeName="transform" type="rotate" from="240" to="600" dur="16s" repeatCount="indefinite"/>
+      <g transform="translate(240,0)">
+        <animateTransform attributeName="transform" type="rotate" from="-240" to="-600" dur="16s" repeatCount="indefinite"/>
+        <rect x="-24" y="-10" width="48" height="20" rx="10" fill="#0f172a" stroke="#06b6d4" stroke-width="1" filter="url(#glow)"/>
+        <text y="4" text-anchor="middle" font-family="monospace" font-size="8" fill="#06b6d4">ERC-4337</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Floating particles -->
+  <g opacity="0.3">
+    <circle cx="100" cy="60" r="1.5" fill="#10b981">
+      <animate attributeName="cy" values="60;240;60" dur="15s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;0.5;0" dur="15s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="700" cy="220" r="1" fill="#3b82f6">
+      <animate attributeName="cy" values="220;50;220" dur="18s" repeatCount="indefinite" begin="3s"/>
+      <animate attributeName="opacity" values="0;0.4;0" dur="18s" repeatCount="indefinite" begin="3s"/>
+    </circle>
+  </g>
+</svg>

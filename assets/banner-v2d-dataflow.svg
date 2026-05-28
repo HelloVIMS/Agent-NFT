@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 240" width="100%">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#0c0a1a"/>
+      <stop offset="100%" stop-color="#05040a"/>
+    </radialGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bg)"/>
+
+  <!-- Network nodes and connections -->
+  <g stroke-width="0.6" opacity="0.25" fill="none">
+    <path d="M 120,200 L 200,140 L 320,160 L 400,100 L 480,160 L 600,140 L 680,200" stroke="#3b82f6">
+      <animate attributeName="stroke-dasharray" values="0,600;30,570;0,600" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="stroke-dashoffset" values="0;-600" dur="3s" repeatCount="indefinite"/>
+    </path>
+    <path d="M 80,100 L 160,120 L 280,80 L 400,100 L 520,80 L 640,120 L 720,100" stroke="#10b981">
+      <animate attributeName="stroke-dasharray" values="0,700;40,660;0,700" dur="4s" repeatCount="indefinite" begin="1s"/>
+      <animate attributeName="stroke-dashoffset" values="0;-700" dur="4s" repeatCount="indefinite" begin="1s"/>
+    </path>
+    <path d="M 200,140 L 280,80" stroke="#a855f7" opacity="0.2"/>
+    <path d="M 600,140 L 520,80" stroke="#a855f7" opacity="0.2"/>
+    <path d="M 320,160 L 280,200" stroke="#f59e0b" opacity="0.15"/>
+    <path d="M 480,160 L 520,200" stroke="#f59e0b" opacity="0.15"/>
+  </g>
+
+  <!-- Nodes -->
+  <g>
+    <!-- Central hub -->
+    <circle cx="400" cy="100" r="6" fill="#10b981" opacity="0.8">
+      <animate attributeName="r" values="6;8;6" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <!-- Satellite nodes -->
+    <circle cx="200" cy="140" r="3" fill="#3b82f6" opacity="0.5">
+      <animate attributeName="opacity" values="0.3;0.8;0.3" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="600" cy="140" r="3" fill="#3b82f6" opacity="0.5">
+      <animate attributeName="opacity" values="0.3;0.8;0.3" dur="3.5s" repeatCount="indefinite" begin="0.5s"/>
+    </circle>
+    <circle cx="280" cy="80" r="3" fill="#a855f7" opacity="0.4">
+      <animate attributeName="opacity" values="0.2;0.7;0.2" dur="2.5s" repeatCount="indefinite" begin="1s"/>
+    </circle>
+    <circle cx="520" cy="80" r="3" fill="#a855f7" opacity="0.4">
+      <animate attributeName="opacity" values="0.2;0.7;0.2" dur="2.8s" repeatCount="indefinite" begin="1.5s"/>
+    </circle>
+    <circle cx="120" cy="200" r="2" fill="#f59e0b" opacity="0.3"/>
+    <circle cx="680" cy="200" r="2" fill="#f59e0b" opacity="0.3"/>
+    <circle cx="80" cy="100" r="2" fill="#ec4899" opacity="0.3"/>
+    <circle cx="720" cy="100" r="2" fill="#ec4899" opacity="0.3"/>
+  </g>
+
+  <!-- Title -->
+  <text x="400" y="105" text-anchor="middle" font-family="monospace" font-size="36" font-weight="700" fill="#f8fafc" letter-spacing="8">
+    AGENT<tspan fill="#10b981">NFT</tspan>
+  </text>
+
+  <!-- URL -->
+  <text x="400" y="135" text-anchor="middle" font-family="monospace" font-size="12" fill="#64748b" letter-spacing="2">
+    agent.vims.com
+  </text>
+
+  <!-- Standard pills as nodes -->
+  <g transform="translate(400, 185)" text-anchor="middle" font-family="monospace" font-size="9">
+    <g transform="translate(-240, 0)">
+      <circle r="2" fill="#e2e8f0" opacity="0.5"/>
+      <text y="14" fill="#475569">ERC-721</text>
+    </g>
+    <g transform="translate(-160, 0)">
+      <circle r="2" fill="#10b981" opacity="0.5"/>
+      <text y="14" fill="#475569">8004</text>
+    </g>
+    <g transform="translate(-80, 0)">
+      <circle r="2" fill="#3b82f6" opacity="0.5"/>
+      <text y="14" fill="#475569">6551</text>
+    </g>
+    <g transform="translate(0, 0)">
+      <circle r="2" fill="#a855f7" opacity="0.5"/>
+      <text y="14" fill="#475569">712</text>
+    </g>
+    <g transform="translate(80, 0)">
+      <circle r="2" fill="#f59e0b" opacity="0.5"/>
+      <text y="14" fill="#475569">3009</text>
+    </g>
+    <g transform="translate(160, 0)">
+      <circle r="2" fill="#ec4899" opacity="0.5"/>
+      <text y="14" fill="#475569">2981</text>
+    </g>
+    <g transform="translate(240, 0)">
+      <circle r="2" fill="#06b6d4" opacity="0.5"/>
+      <text y="14" fill="#475569">4337</text>
+    </g>
+  </g>
+</svg>

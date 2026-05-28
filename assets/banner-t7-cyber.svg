@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 280" width="100%">
+  <defs>
+    <pattern id="scan7" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="2" fill="#000" opacity="0.4"/>
+    </pattern>
+    <filter id="glow7"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="100%" height="100%" fill="#0d0221"/>
+  <rect width="100%" height="100%" fill="url(#scan7)"/>
+
+  <g font-family="monospace" font-size="9" fill="#ff3864" opacity="0.05" text-anchor="middle">
+    <text x="100" y="0"><animate attributeName="y" values="-40;320" dur="4s" repeatCount="indefinite"/>01001110 01000110 01010100</text>
+    <text x="700" y="0"><animate attributeName="y" values="-40;320" dur="5s" repeatCount="indefinite" begin="1s"/>11010010 01100101 01100011</text>
+  </g>
+
+  <g transform="translate(400,135)">
+    <rect x="-310" y="-95" width="620" height="190" rx="6" fill="#12062d" stroke="#2d1b4e" stroke-width="1"/>
+    <rect x="-310" y="-95" width="620" height="24" rx="6" fill="#1a0a3a"/>
+    <rect x="-310" y="-79" width="620" height="10" fill="#1a0a3a"/>
+    <circle cx="-290" cy="-83" r="5" fill="#ff3864"/>
+    <circle cx="-270" cy="-83" r="5" fill="#f9c80e"/>
+    <circle cx="-250" cy="-83" r="5" fill="#2de2e6"/>
+    <text x="-220" y="-79" font-family="monospace" font-size="10" fill="#4a357a">agent-nft — cyberpunk deployment</text>
+
+    <text x="-300" y="-50" font-family="monospace" font-size="11" fill="#4a357a">$ forge create AgentIdentityRegistry --verify</text>
+
+    <text x="-300" y="-28" font-family="monospace" font-size="11" fill="#ff3864">
+      <animate attributeName="opacity" values="0;1;1;1;1;1;0" dur="4s" repeatCount="indefinite"/>>> Initializing neural contract template...
+    </text>
+    <text x="-300" y="-8" font-family="monospace" font-size="11" fill="#f9c80e">
+      <animate attributeName="opacity" values="0;0;1;1;1;1;0" dur="4s" repeatCount="indefinite"/>>> Injecting ERC-721 identity payload...
+    </text>
+    <text x="-300" y="12" font-family="monospace" font-size="11" fill="#2de2e6">
+      <animate attributeName="opacity" values="0;0;0;1;1;1;0" dur="4s" repeatCount="indefinite"/>>> Binding ERC-6551 TBA interface...
+    </text>
+    <text x="-300" y="32" font-family="monospace" font-size="11" fill="#ff3864">
+      <animate attributeName="opacity" values="0;0;0;0;1;1;0" dur="4s" repeatCount="indefinite"/>>> Configuring x402 payment settlement rails
+    </text>
+    <text x="-300" y="52" font-family="monospace" font-size="11" fill="#f9c80e">
+      <animate attributeName="opacity" values="0;0;0;0;0;1;0" dur="4s" repeatCount="indefinite"/>>> Writing .pixe memory genesis block #0
+    </text>
+    <text x="-300" y="72" font-family="monospace" font-size="11" fill="#2de2e6">
+      <animate attributeName="opacity" values="0;0;0;0;0;0;1" dur="4s" repeatCount="indefinite"/>>> AGENT #1337 SYNCHRONIZED. UPLINK: agent.vims.com
+    </text>
+
+    <rect x="-300" y="78" width="8" height="14" fill="#2de2e6">
+      <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite"/>
+    </rect>
+
+    <g transform="translate(180, -10)">
+      <rect x="0" y="-35" width="120" height="90" rx="4" fill="#0d0221" stroke="#2d1b4e" stroke-width="1" opacity="0.95"/>
+      <text x="60" y="-8" text-anchor="middle" font-family="monospace" font-size="26" font-weight="700" fill="#ff3864" filter="url(#glow7)">AGENT</text>
+      <text x="60" y="18" text-anchor="middle" font-family="monospace" font-size="26" font-weight="700" fill="#2de2e6" filter="url(#glow7)">NFT</text>
+      <text x="60" y="40" text-anchor="middle" font-family="monospace" font-size="11" fill="#4a357a">agent.vims.com</text>
+    </g>
+  </g>
+
+  <g transform="translate(400, 250)" text-anchor="middle" font-family="monospace" font-size="10" fill="#2d1b4e">
+    <text x="-315" y="0">ERC-721</text>
+    <text x="-252" y="0" fill="#ff3864">ERC-8004</text>
+    <text x="-189" y="0" fill="#f9c80e">ERC-6551</text>
+    <text x="-126" y="0" fill="#2de2e6">EIP-712</text>
+    <text x="-63" y="0" fill="#ff3864">EIP-3009</text>
+    <text x="0" y="0" fill="#f9c80e">ERC-2981</text>
+    <text x="63" y="0" fill="#2de2e6">ERC-4337</text>
+    <text x="126" y="0" fill="#ff3864">x402</text>
+    <text x="189" y="0" fill="#f9c80e">ERC-1271</text>
+    <text x="252" y="0" fill="#2de2e6">.pixe</text>
+  </g>
+
+  <line x1="200" y1="268" x2="600" y2="268" stroke="#2d1b4e" stroke-width="1">
+    <animate attributeName="stroke" values="#2d1b4e;#2de2e6;#2d1b4e" dur="6s" repeatCount="indefinite"/>
+  </line>
+</svg>

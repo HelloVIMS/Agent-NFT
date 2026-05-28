@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" width="100%">
+  <defs>
+    <radialGradient id="space" cx="50%" cy="50%" r="80%">
+      <stop offset="0%" stop-color="#0c1445"/>
+      <stop offset="100%" stop-color="#02040a"/>
+    </radialGradient>
+    <filter id="star-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#space)"/>
+
+  <!-- Distant stars -->
+  <g fill="#fff" opacity="0.3">
+    <circle cx="80" cy="50" r="1"><animate attributeName="opacity" values="0.1;0.8;0.1" dur="3s" repeatCount="indefinite"/></circle>
+    <circle cx="180" cy="120" r="0.8"><animate attributeName="opacity" values="0.2;0.6;0.2" dur="4s" repeatCount="indefinite" begin="1s"/></circle>
+    <circle cx="720" cy="80" r="1"><animate attributeName="opacity" values="0.1;0.7;0.1" dur="5s" repeatCount="indefinite" begin="2s"/></circle>
+    <circle cx="680" cy="200" r="0.8"><animate attributeName="opacity" values="0.2;0.5;0.2" dur="3.5s" repeatCount="indefinite" begin="0.5s"/></circle>
+    <circle cx="320" cy="40" r="0.6"><animate attributeName="opacity" values="0.1;0.6;0.1" dur="6s" repeatCount="indefinite" begin="3s"/></circle>
+    <circle cx="520" cy="250" r="0.8"><animate attributeName="opacity" values="0.2;0.7;0.2" dur="4.5s" repeatCount="indefinite" begin="1.5s"/></circle>
+  </g>
+
+  <!-- Constellation lines (animated drawing) -->
+  <g fill="none" stroke="#60a5fa" stroke-width="0.6" opacity="0.25">
+    <line x1="180" y1="110" x2="300" y2="90">
+      <animate attributeName="stroke-dasharray" values="0,150;150,0" dur="3s" repeatCount="indefinite"/>
+    </line>
+    <line x1="300" y1="90" x2="400" y2="130">
+      <animate attributeName="stroke-dasharray" values="0,120;120,0" dur="2.5s" repeatCount="indefinite" begin="0.5s"/>
+    </line>
+    <line x1="400" y1="130" x2="500" y2="90">
+      <animate attributeName="stroke-dasharray" values="0,120;120,0" dur="3s" repeatCount="indefinite" begin="1s"/>
+    </line>
+    <line x1="500" y1="90" x2="620" y2="110">
+      <animate attributeName="stroke-dasharray" values="0,150;150,0" dur="2.8s" repeatCount="indefinite" begin="1.5s"/>
+    </line>
+    <line x1="400" y1="130" x2="400" y2="210">
+      <animate attributeName="stroke-dasharray" values="0,100;100,0" dur="2s" repeatCount="indefinite" begin="2s"/>
+    </line>
+    <line x1="300" y1="90" x2="250" y2="190">
+      <animate attributeName="stroke-dasharray" values="0,130;130,0" dur="3.2s" repeatCount="indefinite" begin="0.8s"/>
+    </line>
+    <line x1="500" y1="90" x2="550" y2="190">
+      <animate attributeName="stroke-dasharray" values="0,130;130,0" dur="2.7s" repeatCount="indefinite" begin="1.2s"/>
+    </line>
+  </g>
+
+  <!-- Central star (AGENT NFT) -->
+  <g transform="translate(400,130)">
+    <circle r="40" fill="#1e1b4b" opacity="0.5" filter="url(#star-glow)"/>
+    <circle r="25" fill="#312e81" opacity="0.4" filter="url(#star-glow)">
+      <animate attributeName="r" values="25;30;25" dur="4s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.4;0.6;0.4" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <text y="6" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="800" fill="#f8fafc" letter-spacing="2">
+      AGENT<tspan fill="#60a5fa">NFT</tspan>
+    </text>
+    <text y="28" text-anchor="middle" font-family="monospace" font-size="10" fill="#94a3b8">
+      agent.vims.com
+      <animate attributeName="opacity" values="0.4;0.9;0.4" dur="3s" repeatCount="indefinite"/>
+    </text>
+  </g>
+
+  <!-- Orbiting standard stars -->
+  <g>
+    <g transform="translate(180,110)">
+      <circle r="14" fill="#0f172a" stroke="#e2e8f0" stroke-width="0.8" filter="url(#star-glow)"/>
+      <text y="4" text-anchor="middle" font-family="monospace" font-size="7" fill="#e2e8f0">721</text>
+    </g>
+    <g transform="translate(300,90)">
+      <circle r="14" fill="#0f172a" stroke="#34d399" stroke-width="0.8" filter="url(#star-glow)"/>
+      <text y="4" text-anchor="middle" font-family="monospace" font-size="7" fill="#34d399">8004</text>
+    </g>
+    <g transform="translate(500,90)">
+      <circle r="14" fill="#0f172a" stroke="#60a5fa" stroke-width="0.8" filter="url(#star-glow)"/>
+      <text y="4" text-anchor="middle" font-family="monospace" font-size="7" fill="#60a5fa">6551</text>
+    </g>
+    <g transform="translate(620,110)">
+      <circle r="14" fill="#0f172a" stroke="#a78bfa" stroke-width="0.8" filter="url(#star-glow)"/>
+      <text y="4" text-anchor="middle" font-family="monospace" font-size="7" fill="#a78bfa">712</text>
+    </g>
+    <g transform="translate(250,190)">
+      <circle r="14" fill="#0f172a" stroke="#fbbf24" stroke-width="0.8" filter="url(#star-glow)"/>
+      <text y="4" text-anchor="middle" font-family="monospace" font-size="7" fill="#fbbf24">3009</text>
+    </g>
+    <g transform="translate(400,210)">
+      <circle r="14" fill="#0f172a" stroke="#f472b6" stroke-width="0.8" filter="url(#star-glow)"/>
+      <text y="4" text-anchor="middle" font-family="monospace" font-size="7" fill="#f472b6">2981</text>
+    </g>
+    <g transform="translate(550,190)">
+      <circle r="14" fill="#0f172a" stroke="#22d3ee" stroke-width="0.8" filter="url(#star-glow)"/>
+      <text y="4" text-anchor="middle" font-family="monospace" font-size="7" fill="#22d3ee">4337</text>
+    </g>
+  </g>
+
+  <!-- Shooting star -->
+  <g>
+    <line x1="-20" y1="30" x2="80" y2="30" stroke="#fff" stroke-width="1" opacity="0.6">
+      <animate attributeName="x1" values="-20;900" dur="4s" repeatCount="indefinite"/>
+      <animate attributeName="x2" values="80;1000" dur="4s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;0.8;0" dur="4s" repeatCount="indefinite"/>
+    </line>
+    <line x1="700" y1="250" x2="780" y2="250" stroke="#60a5fa" stroke-width="1" opacity="0.4">
+      <animate attributeName="x1" values="700;-100" dur="5s" repeatCount="indefinite" begin="2s"/>
+      <animate attributeName="x2" values="780;-20" dur="5s" repeatCount="indefinite" begin="2s"/>
+      <animate attributeName="opacity" values="0;0.6;0" dur="5s" repeatCount="indefinite" begin="2s"/>
+    </line>
+  </g>
+</svg>

@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 280" width="100%">
+  <defs>
+    <pattern id="scan9" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="2" fill="#000" opacity="0.4"/>
+    </pattern>
+    <filter id="glow9"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="100%" height="100%" fill="#0c0c0c"/>
+  <rect width="100%" height="100%" fill="url(#scan9)"/>
+
+  <g font-family="monospace" font-size="9" fill="#22c55e" opacity="0.05" text-anchor="middle">
+    <text x="150" y="0"><animate attributeName="y" values="-40;320" dur="4s" repeatCount="indefinite"/>mintAgentNFT(1337,0x7a23)</text>
+    <text x="650" y="0"><animate attributeName="y" values="-40;320" dur="5s" repeatCount="indefinite" begin="1s"/>deployTBA(1337,registry)</text>
+  </g>
+
+  <g transform="translate(400,135)">
+    <rect x="-310" y="-95" width="620" height="190" rx="6" fill="#141414" stroke="#27272a" stroke-width="1"/>
+    <rect x="-310" y="-95" width="620" height="24" rx="6" fill="#1a1a1a"/>
+    <rect x="-310" y="-79" width="620" height="10" fill="#1a1a1a"/>
+    <circle cx="-290" cy="-83" r="5" fill="#ef4444"/>
+    <circle cx="-270" cy="-83" r="5" fill="#eab308"/>
+    <circle cx="-250" cy="-83" r="5" fill="#22c55e"/>
+    <text x="-220" y="-79" font-family="monospace" font-size="10" fill="#525252">agent-nft — etherscan — tx receipt</text>
+
+    <text x="-300" y="-50" font-family="monospace" font-size="11" fill="#525252">Transaction Hash: 0x9f8e7d6c...b2a1</text>
+
+    <text x="-300" y="-28" font-family="monospace" font-size="11" fill="#a1a1aa">
+      <animate attributeName="opacity" values="0;1;1;1;1;1;0" dur="4s" repeatCount="indefinite"/>  Status:          Success
+    </text>
+    <text x="-300" y="-8" font-family="monospace" font-size="11" fill="#a1a1aa">
+      <animate attributeName="opacity" values="0;0;1;1;1;1;0" dur="4s" repeatCount="indefinite"/>  Block:           18672341 (186 confirms)
+    </text>
+    <text x="-300" y="12" font-family="monospace" font-size="11" fill="#a1a1aa">
+      <animate attributeName="opacity" values="0;0;0;1;1;1;0" dur="4s" repeatCount="indefinite"/>  From:            0x7a23...0x1f3
+    </text>
+    <text x="-300" y="32" font-family="monospace" font-size="11" fill="#a1a1aa">
+      <animate attributeName="opacity" values="0;0;0;0;1;1;0" dur="4s" repeatCount="indefinite"/>  To:              AgentIdentityRegistry
+    </text>
+    <text x="-300" y="52" font-family="monospace" font-size="11" fill="#a1a1aa">
+      <animate attributeName="opacity" values="0;0;0;0;0;1;0" dur="4s" repeatCount="indefinite"/>  Token Minted:    #1337 → 0x9f8e...0x5a7
+    </text>
+    <text x="-300" y="72" font-family="monospace" font-size="11" fill="#22c55e">
+      <animate attributeName="opacity" values="0;0;0;0;0;0;1" dur="4s" repeatCount="indefinite"/>  Event:           Transfer(0x0, 0xUser, 1337)
+    </text>
+
+    <rect x="-300" y="78" width="8" height="14" fill="#22c55e">
+      <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite"/>
+    </rect>
+
+    <g transform="translate(180, -10)">
+      <rect x="0" y="-35" width="120" height="90" rx="4" fill="#0c0c0c" stroke="#27272a" stroke-width="1" opacity="0.95"/>
+      <text x="60" y="-8" text-anchor="middle" font-family="monospace" font-size="26" font-weight="700" fill="#e4e4e7" filter="url(#glow9)">AGENT</text>
+      <text x="60" y="18" text-anchor="middle" font-family="monospace" font-size="26" font-weight="700" fill="#22c55e" filter="url(#glow9)">NFT</text>
+      <text x="60" y="40" text-anchor="middle" font-family="monospace" font-size="11" fill="#525252">agent.vims.com</text>
+    </g>
+  </g>
+
+  <g transform="translate(400, 250)" text-anchor="middle" font-family="monospace" font-size="10" fill="#3f3f46">
+    <text x="-315" y="0">ERC-721</text>
+    <text x="-252" y="0" fill="#e4e4e7">ERC-8004</text>
+    <text x="-189" y="0" fill="#22c55e">ERC-6551</text>
+    <text x="-126" y="0" fill="#e4e4e7">EIP-712</text>
+    <text x="-63" y="0" fill="#22c55e">EIP-3009</text>
+    <text x="0" y="0" fill="#e4e4e7">ERC-2981</text>
+    <text x="63" y="0" fill="#22c55e">ERC-4337</text>
+    <text x="126" y="0" fill="#e4e4e7">x402</text>
+    <text x="189" y="0" fill="#22c55e">ERC-1271</text>
+    <text x="252" y="0" fill="#e4e4e7">.pixe</text>
+  </g>
+
+  <line x1="200" y1="268" x2="600" y2="268" stroke="#27272a" stroke-width="1">
+    <animate attributeName="stroke" values="#27272a;#22c55e;#27272a" dur="6s" repeatCount="indefinite"/>
+  </line>
+</svg>

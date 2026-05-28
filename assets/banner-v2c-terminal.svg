@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 260" width="100%">
+  <defs>
+    <pattern id="scanlines" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="2" fill="#000" opacity="0.5"/>
+    </pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="#0c0c0c"/>
+  <rect width="100%" height="100%" fill="url(#scanlines)"/>
+
+  <!-- Matrix rain columns -->
+  <g font-family="monospace" font-size="10" fill="#0a0" opacity="0.1" text-anchor="middle">
+    <text x="40" y="0">
+      01001011 11001100 00110011
+      <animate attributeName="y" values="-50;300" dur="3s" repeatCount="indefinite"/>
+    </text>
+    <text x="120" y="0">
+      0xDEAD 0xBEEF 0xCAFE 0xBABE
+      <animate attributeName="y" values="-50;300" dur="4s" repeatCount="indefinite" begin="1s"/>
+    </text>
+    <text x="200" y="0">
+      10110101 01101001 10101010
+      <animate attributeName="y" values="-50;300" dur="3.5s" repeatCount="indefinite" begin="0.5s"/>
+    </text>
+    <text x="680" y="0">
+      0xFF00 0x8BAD 0xF00D 0xFACE
+      <animate attributeName="y" values="-50;300" dur="4.5s" repeatCount="indefinite" begin="1.5s"/>
+    </text>
+    <text x="760" y="0">
+      11110000 00001111 10101010
+      <animate attributeName="y" values="-50;300" dur="3.2s" repeatCount="indefinite" begin="0.8s"/>
+    </text>
+  </g>
+
+  <!-- Terminal window -->
+  <g transform="translate(400,110)">
+    <!-- Window chrome -->
+    <rect x="-280" y="-70" width="560" height="140" rx="4" fill="#141414" stroke="#333" stroke-width="1"/>
+    <!-- Title bar -->
+    <rect x="-280" y="-70" width="560" height="20" rx="4" fill="#1a1a1a"/>
+    <rect x="-280" y="-54" width="560" height="4" fill="#1a1a1a"/>
+    <!-- Buttons -->
+    <circle cx="-260" cy="-60" r="4" fill="#ff5f56"/>
+    <circle cx="-245" cy="-60" r="4" fill="#ffbd2e"/>
+    <circle cx="-230" cy="-60" r="4" fill="#27c93f"/>
+    <text x="-200" y="-56" font-family="monospace" font-size="9" fill="#666">agent-nft — foundry</text>
+
+    <!-- Terminal content -->
+    <text x="-268" y="-35" font-family="monospace" font-size="11" fill="#666">$ forge test --watch</text>
+    <text x="-268" y="-18" font-family="monospace" font-size="11" fill="#27c93f">
+      <animate attributeName="opacity" values="0;1;1;1;1;1;0" dur="3s" repeatCount="indefinite"/>
+      [PASS] test_MintAgent()
+    </text>
+    <text x="-268" y="-1" font-family="monospace" font-size="11" fill="#27c93f">
+      <animate attributeName="opacity" values="0;0;1;1;1;1;0" dur="3s" repeatCount="indefinite"/>
+      [PASS] test_TBACreation()
+    </text>
+    <text x="-268" y="16" font-family="monospace" font-size="11" fill="#27c93f">
+      <animate attributeName="opacity" values="0;0;0;1;1;1;0" dur="3s" repeatCount="indefinite"/>
+      [PASS] test_x402Settlement()
+    </text>
+    <text x="-268" y="33" font-family="monospace" font-size="11" fill="#27c93f">
+      <animate attributeName="opacity" values="0;0;0;0;1;1;0" dur="3s" repeatCount="indefinite"/>
+      [PASS] test_MemoryConsolidation()
+    </text>
+    <text x="-268" y="50" font-family="monospace" font-size="11" fill="#0a0">
+      <animate attributeName="opacity" values="0;0;0;0;0;1;0" dur="3s" repeatCount="indefinite"/>
+      Test result: 137 passed. 0 failed.
+    </text>
+
+    <!-- Right side: title overlay -->
+    <text x="-40" y="-15" font-family="monospace" font-size="28" font-weight="700" fill="#0f0" opacity="0.9">
+      <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite"/>
+      AGENT
+    </text>
+    <text x="40" y="-15" font-family="monospace" font-size="28" font-weight="700" fill="#0f0" opacity="0.9">
+      <animate attributeName="opacity" values="0.7;1;0.7" dur="2s" repeatCount="indefinite" begin="0.3s"/>
+      NFT
+    </text>
+    <text x="0" y="12" text-anchor="middle" font-family="monospace" font-size="12" fill="#666">
+      agent.vims.com
+      <animate attributeName="fill" values="#666;#0f0;#666" dur="5s" repeatCount="indefinite"/>
+    </text>
+
+    <!-- Blinking cursor -->
+    <rect x="-268" y="55" width="8" height="14" fill="#0f0">
+      <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+
+  <!-- Standards as terminal status bar -->
+  <g transform="translate(400, 220)" text-anchor="middle" font-family="monospace" font-size="9">
+    <text fill="#0a0">
+      <animate attributeName="opacity" values="0.3;0.8;0.3" dur="4s" repeatCount="indefinite"/>
+      ERC-721  ERC-8004  ERC-6551  EIP-712  EIP-3009  ERC-2981  ERC-4337  x402  ERC-1271  .pixe
+    </text>
+  </g>
+
+  <!-- Bottom scanline sweep -->
+  <line x1="0" y1="0" x2="800" y2="0" stroke="#0f0" stroke-width="1" opacity="0.05">
+    <animate attributeName="y1" values="0;260;0" dur="8s" repeatCount="indefinite"/>
+    <animate attributeName="y2" values="0;260;0" dur="8s" repeatCount="indefinite"/>
+  </line>
+</svg>

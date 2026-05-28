@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 280" width="100%">
+  <defs>
+    <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="2" fill="#000" opacity="0.4"/>
+    </pattern>
+    <filter id="glow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="100%" height="100%" fill="#0c0c0c"/>
+  <rect width="100%" height="100%" fill="url(#scan)"/>
+
+  <!-- Matrix rain background -->
+  <g font-family="monospace" font-size="9" fill="#0f0" opacity="0.06" text-anchor="middle">
+    <text x="60" y="0"><animate attributeName="y" values="-40;320" dur="4s" repeatCount="indefinite"/>0x4a 0x67 0x65 0x6e 0x74</text>
+    <text x="140" y="0"><animate attributeName="y" values="-40;320" dur="5s" repeatCount="indefinite" begin="1s"/>01001110 01000110 01010100</text>
+    <text x="220" y="0"><animate attributeName="y" values="-40;320" dur="3.5s" repeatCount="indefinite" begin="0.5s"/>0xDEAD 0xBEEF 0xCAFE</text>
+    <text x="580" y="0"><animate attributeName="y" values="-40;320" dur="4.5s" repeatCount="indefinite" begin="1.5s"/>0x721 0x6551 0x712</text>
+    <text x="660" y="0"><animate attributeName="y" values="-40;320" dur="3s" repeatCount="indefinite" begin="0.8s"/>10101010 11110000</text>
+    <text x="740" y="0"><animate attributeName="y" values="-40;320" dur="5.5s" repeatCount="indefinite" begin="2s"/>0x3009 0x2981 0x4337</text>
+  </g>
+
+  <!-- Terminal window -->
+  <g transform="translate(400,135)">
+    <rect x="-310" y="-95" width="620" height="190" rx="6" fill="#141414" stroke="#27272a" stroke-width="1"/>
+    <rect x="-310" y="-95" width="620" height="24" rx="6" fill="#1a1a1a"/>
+    <rect x="-310" y="-79" width="620" height="10" fill="#1a1a1a"/>
+    <circle cx="-290" cy="-83" r="5" fill="#ff5f56"/>
+    <circle cx="-270" cy="-83" r="5" fill="#ffbd2e"/>
+    <circle cx="-250" cy="-83" r="5" fill="#27c93f"/>
+    <text x="-220" y="-79" font-family="monospace" font-size="10" fill="#666">agent-nft — foundry test — 137 passing</text>
+
+    <!-- Terminal content -->
+    <text x="-300" y="-50" font-family="monospace" font-size="11" fill="#666">$ forge script script/MintAgent.s.sol --rpc-url base-sepolia --broadcast</text>
+
+    <text x="-300" y="-28" font-family="monospace" font-size="11" fill="#7ee787">
+      <animate attributeName="opacity" values="0;1;1;1;1;1;0" dur="4s" repeatCount="indefinite"/>[⠊] Compiling 24 files with Solc 0.8.20
+    </text>
+    <text x="-300" y="-8" font-family="monospace" font-size="11" fill="#7ee787">
+      <animate attributeName="opacity" values="0;0;1;1;1;1;0" dur="4s" repeatCount="indefinite"/>[⠒] Deploying AgentIdentityRegistry at 0x7a23...
+    </text>
+    <text x="-300" y="12" font-family="monospace" font-size="11" fill="#7ee787">
+      <animate attributeName="opacity" values="0;0;0;1;1;1;0" dur="4s" repeatCount="indefinite"/>[⠢] Minting Agent NFT #1337 → tokenId: 1337
+    </text>
+    <text x="-300" y="32" font-family="monospace" font-size="11" fill="#7ee787">
+      <animate attributeName="opacity" values="0;0;0;0;1;1;0" dur="4s" repeatCount="indefinite"/>[⠰] Creating ERC-6551 TBA at 0x9f8e...
+    </text>
+    <text x="-300" y="52" font-family="monospace" font-size="11" fill="#56d364">
+      <animate attributeName="opacity" values="0;0;0;0;0;1;0" dur="4s" repeatCount="indefinite"/>✓ Script ran successfully. Gas used: 284,932
+    </text>
+    <text x="-300" y="72" font-family="monospace" font-size="11" fill="#56d364">
+      <animate attributeName="opacity" values="0;0;0;0;0;0;1" dur="4s" repeatCount="indefinite"/>✓ Agent #1337 live at agent.vims.com/1337
+    </text>
+
+    <!-- Blinking cursor -->
+    <rect x="-300" y="78" width="8" height="14" fill="#7ee787">
+      <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite"/>
+    </rect>
+
+    <!-- Title overlay -->
+    <g transform="translate(180, -10)">
+      <rect x="0" y="-35" width="120" height="90" rx="4" fill="#0c0c0c" stroke="#333" stroke-width="1" opacity="0.92"/>
+      <text x="60" y="-8" text-anchor="middle" font-family="monospace" font-size="26" font-weight="700" fill="#7ee787" filter="url(#glow)">AGENT</text>
+      <text x="60" y="18" text-anchor="middle" font-family="monospace" font-size="26" font-weight="700" fill="#56d364" filter="url(#glow)">NFT</text>
+      <text x="60" y="40" text-anchor="middle" font-family="monospace" font-size="11" fill="#666">agent.vims.com</text>
+    </g>
+  </g>
+
+  <!-- Standards row -->
+  <g transform="translate(400, 250)" text-anchor="middle" font-family="monospace" font-size="10" fill="#525252">
+    <text x="-315" y="0">ERC-721</text>
+    <text x="-252" y="0" fill="#7ee787">ERC-8004</text>
+    <text x="-189" y="0" fill="#56d364">ERC-6551</text>
+    <text x="-126" y="0" fill="#7ee787">EIP-712</text>
+    <text x="-63" y="0" fill="#56d364">EIP-3009</text>
+    <text x="0" y="0" fill="#7ee787">ERC-2981</text>
+    <text x="63" y="0" fill="#56d364">ERC-4337</text>
+    <text x="126" y="0" fill="#7ee787">x402</text>
+    <text x="189" y="0" fill="#56d364">ERC-1271</text>
+    <text x="252" y="0" fill="#7ee787">.pixe</text>
+  </g>
+
+  <!-- Bottom status line -->
+  <line x1="200" y1="268" x2="600" y2="268" stroke="#27272a" stroke-width="1">
+    <animate attributeName="stroke" values="#27272a;#7ee787;#27272a" dur="6s" repeatCount="indefinite"/>
+  </line>
+</svg>
