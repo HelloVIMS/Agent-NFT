@@ -84,22 +84,26 @@ contract DeployForE2EScript is Script {
         MockE2EUSDC usdc = new MockE2EUSDC();
 
         // ── Wire trust ───────────────────────────────────────────────────
-        identity.setTrustedTBARegistry(address(tbaRegistry));
-        identity.setLinkedX402Receiver(address(x402));
-        x402.setTrustedAgentRegistry(address(identity));
+        // Post-audit: Identity↔TBA↔X402 trust is enforced via ownerOf checks
+        // and constructor wiring (TBARegistry stores identityRegistry at
+        // deploy; X402 stores identityRegistry at initialize). The only
+        // remaining runtime setter is the X402 token allowlist.
         x402.setTokenAllowed(address(usdc), true);
 
-        // ── Seed: mint a solo agent + register a service ─────────────────
-        (uint256 agentId, address tba) = identity.mintWithFullStack(
+        // ── Seed: mint a solo agent + deploy its TBA + register a service ─
+        // Audited registry exposes these as three explicit calls. The TBA
+        // registry auto-calls identity.setTBAAddress(...) inside createAccount
+        // when the caller is the token owner, so no extra wire-up is needed.
+        uint256 agentId = identity.registerAgent(
             "Pixel",
             "ipfs://pixel/agent.json",
             500,            // 5% creator royalty
-            address(0),     // no reputation anchor override
-            TBA_SALT,
-            SERVICE_ID,
-            address(usdc),
-            SERVICE_PRICE
+            address(0)      // no reputation anchor override
         );
+
+        address tba = tbaRegistry.createAccount(agentId, TBA_SALT);
+
+        x402.registerService(agentId, SERVICE_ID, address(usdc), SERVICE_PRICE);
 
         vm.stopBroadcast();
 
