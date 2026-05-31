@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 220" width="100%">
+  <defs>
+    <radialGradient id="g1" cx="30%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#0d3b2e"/>
+      <stop offset="50%" stop-color="#0a1f1a"/>
+      <stop offset="100%" stop-color="#050a08"/>
+    </radialGradient>
+    <radialGradient id="cloud1" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#059669" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#059669" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="cloud2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="cloud3" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="15"/>
+    </filter>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#g1)"/>
+
+  <!-- Drifting clouds -->
+  <ellipse cx="250" cy="80" rx="200" ry="100" fill="url(#cloud1)" filter="url(#blur)">
+    <animate attributeName="cx" values="250;300;250" dur="20s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="80;120;80" dur="15s" repeatCount="indefinite"/>
+  </ellipse>
+  <ellipse cx="550" cy="140" rx="180" ry="90" fill="url(#cloud2)" filter="url(#blur)">
+    <animate attributeName="cx" values="550;500;550" dur="18s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="140;100;140" dur="12s" repeatCount="indefinite"/>
+  </ellipse>
+  <ellipse cx="400" cy="60" rx="150" ry="80" fill="url(#cloud3)" filter="url(#blur)">
+    <animate attributeName="cx" values="400;450;400" dur="22s" repeatCount="indefinite"/>
+  </ellipse>
+
+  <!-- Floating particles -->
+  <g fill="#e2e8f0" opacity="0.4">
+    <circle cx="200" cy="100" r="1.5">
+      <animate attributeName="cy" values="100;50;100" dur="12s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.2;0.6;0.2" dur="12s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="600" cy="80" r="1">
+      <animate attributeName="cy" values="80;130;80" dur="10s" repeatCount="indefinite" begin="2s"/>
+      <animate attributeName="opacity" values="0.1;0.5;0.1" dur="10s" repeatCount="indefinite" begin="2s"/>
+    </circle>
+    <circle cx="350" cy="150" r="2">
+      <animate attributeName="cy" values="150;100;150" dur="14s" repeatCount="indefinite" begin="4s"/>
+      <animate attributeName="opacity" values="0.1;0.4;0.1" dur="14s" repeatCount="indefinite" begin="4s"/>
+    </circle>
+    <circle cx="450" cy="60" r="1.2">
+      <animate attributeName="cy" values="60;110;60" dur="16s" repeatCount="indefinite" begin="1s"/>
+      <animate attributeName="opacity" values="0.2;0.5;0.2" dur="16s" repeatCount="indefinite" begin="1s"/>
+    </circle>
+  </g>
+
+  <!-- Title -->
+  <text x="400" y="108" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="44" font-weight="300" fill="#f8fafc" letter-spacing="16" opacity="0.95">
+    AGENT<tspan font-weight="700" fill="#34d399">NFT</tspan>
+  </text>
+
+  <!-- URL -->
+  <text x="400" y="145" text-anchor="middle" font-family="monospace" font-size="12" fill="#94a3b8" letter-spacing="4">
+    agent.vims.com
+    <animate attributeName="opacity" values="0.3;0.7;0.3" dur="5s" repeatCount="indefinite"/>
+  </text>
+
+  <!-- Soft standards line -->
+  <text x="400" y="175" text-anchor="middle" font-family="monospace" font-size="9" fill="#475569" letter-spacing="3">
+    ERC-721 · ERC-8004 · ERC-6551 · EIP-712 · EIP-3009
+  </text>
+</svg>

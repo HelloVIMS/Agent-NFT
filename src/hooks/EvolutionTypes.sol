@@ -34,6 +34,7 @@ library EvolutionTypes {
     bytes32 internal constant TRIGGER_ORACLE_UPDATE  = keccak256("oracle.update");
     bytes32 internal constant TRIGGER_REPUTATION     = keccak256("reputation.update");
     bytes32 internal constant TRIGGER_CUSTOM         = keccak256("custom");
+    bytes32 internal constant TRIGGER_STATUS_CHANGE  = keccak256("status.change");
 
     /**
      * @notice Result of a hook lifecycle callback or trigger evaluation.

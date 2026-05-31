@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 260" width="100%">
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e3a5f" stroke-width="0.5" opacity="0.4"/>
+    </pattern>
+    <marker id="arrow" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6" fill="#3b82f6"/>
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="#0a1628"/>
+  <rect width="100%" height="100%" fill="url(#grid)"/>
+
+  <!-- Blueprint circles -->
+  <circle cx="400" cy="110" r="80" fill="none" stroke="#3b82f6" stroke-width="0.6" opacity="0.3"/>
+  <circle cx="400" cy="110" r="120" fill="none" stroke="#3b82f6" stroke-width="0.4" opacity="0.15" stroke-dasharray="8,4"/>
+  <line x1="280" y1="110" x2="520" y2="110" stroke="#3b82f6" stroke-width="0.4" opacity="0.3"/>
+  <line x1="400" y1="-10" x2="400" y2="230" stroke="#3b82f6" stroke-width="0.4" opacity="0.3"/>
+
+  <!-- Dimension lines -->
+  <g stroke="#3b82f6" stroke-width="0.5" opacity="0.5">
+    <line x1="150" y1="50" x2="650" y2="50" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+    <line x1="150" y1="45" x2="150" y2="55"/>
+    <line x1="650" y1="45" x2="650" y2="55"/>
+    <text x="400" y="42" text-anchor="middle" font-family="monospace" font-size="9" fill="#3b82f6">800px</text>
+  </g>
+
+  <!-- Main title -->
+  <text x="400" y="120" text-anchor="middle" font-family="monospace" font-size="48" font-weight="700" fill="#e0f2fe" letter-spacing="8" opacity="0.9">
+    AGENT<tspan fill="#3b82f6">NFT</tspan>
+  </text>
+
+  <!-- Leader lines to standards -->
+  <g font-family="monospace" font-size="10" fill="#60a5fa">
+    <!-- Left side callouts -->
+    <g transform="translate(180,80)">
+      <line x1="0" y1="0" x2="80" y2="30" stroke="#3b82f6" stroke-width="0.5" opacity="0.6"/>
+      <circle cx="0" cy="0" r="2" fill="#3b82f6"/>
+      <text x="-5" y="-5" text-anchor="end">ERC-8004</text>
+    </g>
+    <g transform="translate(160,130)">
+      <line x1="0" y1="0" x2="100" y2="-15" stroke="#3b82f6" stroke-width="0.5" opacity="0.6"/>
+      <circle cx="0" cy="0" r="2" fill="#3b82f6"/>
+      <text x="-5" y="5" text-anchor="end">ERC-6551</text>
+    </g>
+    <!-- Right side callouts -->
+    <g transform="translate(620,85)">
+      <line x1="0" y1="0" x2="-80" y2="25" stroke="#3b82f6" stroke-width="0.5" opacity="0.6"/>
+      <circle cx="0" cy="0" r="2" fill="#3b82f6"/>
+      <text x="5" y="-5" text-anchor="start">EIP-712</text>
+    </g>
+    <g transform="translate(640,135)">
+      <line x1="0" y1="0" x2="-100" y2="-20" stroke="#3b82f6" stroke-width="0.5" opacity="0.6"/>
+      <circle cx="0" cy="0" r="2" fill="#3b82f6"/>
+      <text x="5" y="5" text-anchor="start">EIP-3009</text>
+    </g>
+  </g>
+
+  <!-- Bottom info block -->
+  <rect x="280" y="170" width="240" height="60" rx="2" fill="none" stroke="#3b82f6" stroke-width="0.5" opacity="0.4"/>
+  <text x="300" y="190" font-family="monospace" font-size="10" fill="#93c5fd">REV: V2.0</text>
+  <text x="300" y="205" font-family="monospace" font-size="10" fill="#93c5fd">URL: agent.vims.com</text>
+  <text x="300" y="220" font-family="monospace" font-size="10" fill="#93c5fd">STD: ERC-721,2981,4337,1271,.pixe</text>
+  <text x="300" y="190" font-family="monospace" font-size="10" fill="#3b82f6">
+    <animate attributeName="opacity" values="0.3;1;0.3" dur="3s" repeatCount="indefinite"/>
+    ◊
+  </text>
+</svg>

@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 280" width="100%">
+  <defs>
+    <pattern id="scan2" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="2" fill="#000" opacity="0.5"/>
+    </pattern>
+    <filter id="glow2"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="100%" height="100%" fill="#0a0600"/>
+  <rect width="100%" height="100%" fill="url(#scan2)"/>
+
+  <g font-family="monospace" font-size="9" fill="#ffb000" opacity="0.06" text-anchor="middle">
+    <text x="80" y="0"><animate attributeName="y" values="-40;320" dur="4.5s" repeatCount="indefinite"/>MINT_AGENT_NFT()</text>
+    <text x="200" y="0"><animate attributeName="y" values="-40;320" dur="5s" repeatCount="indefinite" begin="1s"/>CREATE2_TBA_DEPLOY()</text>
+    <text x="600" y="0"><animate attributeName="y" values="-40;320" dur="3.5s" repeatCount="indefinite" begin="0.5s"/>x402_SETTLEMENT()</text>
+    <text x="720" y="0"><animate attributeName="y" values="-40;320" dur="5.5s" repeatCount="indefinite" begin="2s"/>MEMORY_CONSOLIDATE()</text>
+  </g>
+
+  <g transform="translate(400,135)">
+    <rect x="-310" y="-95" width="620" height="190" rx="6" fill="#0f0800" stroke="#331a00" stroke-width="1"/>
+    <rect x="-310" y="-95" width="620" height="24" rx="6" fill="#1a0f00"/>
+    <rect x="-310" y="-79" width="620" height="10" fill="#1a0f00"/>
+    <circle cx="-290" cy="-83" r="5" fill="#ff4444"/>
+    <circle cx="-270" cy="-83" r="5" fill="#ffaa00"/>
+    <circle cx="-250" cy="-83" r="5" fill="#00aa00"/>
+    <text x="-220" y="-79" font-family="monospace" font-size="10" fill="#664400">agent-nft — cast send — base-sepolia</text>
+
+    <text x="-300" y="-50" font-family="monospace" font-size="11" fill="#664400">$ cast send 0x7a23... "mintAgent(address)" 0xUser...</text>
+
+    <text x="-300" y="-28" font-family="monospace" font-size="11" fill="#ff9900">
+      <animate attributeName="opacity" values="0;1;1;1;1;1;0" dur="4s" repeatCount="indefinite"/>blockHash      0xabc123...
+    </text>
+    <text x="-300" y="-8" font-family="monospace" font-size="11" fill="#ff9900">
+      <animate attributeName="opacity" values="0;0;1;1;1;1;0" dur="4s" repeatCount="indefinite"/>blockNumber    18672341
+    </text>
+    <text x="-300" y="12" font-family="monospace" font-size="11" fill="#ff9900">
+      <animate attributeName="opacity" values="0;0;0;1;1;1;0" dur="4s" repeatCount="indefinite"/>txHash         0x9f8e7d6c...
+    </text>
+    <text x="-300" y="32" font-family="monospace" font-size="11" fill="#ff9900">
+      <animate attributeName="opacity" values="0;0;0;0;1;1;0" dur="4s" repeatCount="indefinite"/>tokenId        1337
+    </text>
+    <text x="-300" y="52" font-family="monospace" font-size="11" fill="#ffb000">
+      <animate attributeName="opacity" values="0;0;0;0;0;1;0" dur="4s" repeatCount="indefinite"/>TBA            0x3e4f5a6b... [ERC-6551]
+    </text>
+    <text x="-300" y="72" font-family="monospace" font-size="11" fill="#ffb000">
+      <animate attributeName="opacity" values="0;0;0;0;0;0;1" dur="4s" repeatCount="indefinite"/>✓ Mint confirmed. Agent live.
+    </text>
+
+    <rect x="-300" y="78" width="8" height="14" fill="#ff9900">
+      <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite"/>
+    </rect>
+
+    <g transform="translate(180, -10)">
+      <rect x="0" y="-35" width="120" height="90" rx="4" fill="#0a0600" stroke="#331a00" stroke-width="1" opacity="0.95"/>
+      <text x="60" y="-8" text-anchor="middle" font-family="monospace" font-size="26" font-weight="700" fill="#ff9900" filter="url(#glow2)">AGENT</text>
+      <text x="60" y="18" text-anchor="middle" font-family="monospace" font-size="26" font-weight="700" fill="#ffb000" filter="url(#glow2)">NFT</text>
+      <text x="60" y="40" text-anchor="middle" font-family="monospace" font-size="11" fill="#664400">agent.vims.com</text>
+    </g>
+  </g>
+
+  <g transform="translate(400, 250)" text-anchor="middle" font-family="monospace" font-size="10" fill="#664400">
+    <text x="-315" y="0">ERC-721</text>
+    <text x="-252" y="0" fill="#ff9900">ERC-8004</text>
+    <text x="-189" y="0" fill="#ffb000">ERC-6551</text>
+    <text x="-126" y="0" fill="#ff9900">EIP-712</text>
+    <text x="-63" y="0" fill="#ffb000">EIP-3009</text>
+    <text x="0" y="0" fill="#ff9900">ERC-2981</text>
+    <text x="63" y="0" fill="#ffb000">ERC-4337</text>
+    <text x="126" y="0" fill="#ff9900">x402</text>
+    <text x="189" y="0" fill="#ffb000">ERC-1271</text>
+    <text x="252" y="0" fill="#ff9900">.pixe</text>
+  </g>
+
+  <line x1="200" y1="268" x2="600" y2="268" stroke="#331a00" stroke-width="1">
+    <animate attributeName="stroke" values="#331a00;#ff9900;#331a00" dur="6s" repeatCount="indefinite"/>
+  </line>
+</svg>

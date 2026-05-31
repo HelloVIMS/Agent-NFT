@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 260" width="100%">
+  <defs>
+    <linearGradient id="sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#sky)"/>
+
+  <!-- Animated wave background -->
+  <path d="M0,160 Q200,100 400,160 T800,160 L800,260 L0,260 Z" fill="#1e1b4b" opacity="0.3">
+    <animate attributeName="d" values="M0,160 Q200,100 400,160 T800,160 L800,260 L0,260 Z;M0,160 Q200,220 400,160 T800,160 L800,260 L0,260 Z;M0,160 Q200,100 400,160 T800,160 L800,260 L0,260 Z" dur="6s" repeatCount="indefinite"/>
+  </path>
+  <path d="M0,180 Q200,140 400,180 T800,180 L800,260 L0,260 Z" fill="#312e81" opacity="0.2">
+    <animate attributeName="d" values="M0,180 Q200,140 400,180 T800,180 L800,260 L0,260 Z;M0,180 Q200,220 400,180 T800,180 L800,260 L0,260 Z;M0,180 Q200,140 400,180 T800,180 L800,260 L0,260 Z" dur="8s" repeatCount="indefinite" begin="1s"/>
+  </path>
+
+  <!-- Floating orbs -->
+  <circle cx="150" cy="80" r="4" fill="#60a5fa" opacity="0.4" filter="url(#glow)">
+    <animate attributeName="cy" values="80;60;80" dur="5s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.4;0.8;0.4" dur="5s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="650" cy="100" r="3" fill="#a78bfa" opacity="0.3" filter="url(#glow)">
+    <animate attributeName="cy" values="100;120;100" dur="6s" repeatCount="indefinite" begin="2s"/>
+    <animate attributeName="opacity" values="0.3;0.7;0.3" dur="6s" repeatCount="indefinite" begin="2s"/>
+  </circle>
+  <circle cx="400" cy="50" r="2" fill="#34d399" opacity="0.5" filter="url(#glow)">
+    <animate attributeName="cy" values="50;40;50" dur="4s" repeatCount="indefinite" begin="1s"/>
+  </circle>
+
+  <!-- Title with letter-spacing wave -->
+  <text x="400" y="110" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="52" font-weight="800" fill="#f8fafc" letter-spacing="4">
+    <tspan>AGENT</tspan><tspan fill="#34d399">NFT</tspan>
+    <animate attributeName="letter-spacing" values="4;8;4" dur="4s" repeatCount="indefinite"/>
+  </text>
+
+  <!-- URL -->
+  <text x="400" y="150" text-anchor="middle" font-family="monospace" font-size="13" fill="#94a3b8" letter-spacing="2">
+    agent.vims.com
+    <animate attributeName="fill" values="#94a3b8;#34d399;#94a3b8" dur="4s" repeatCount="indefinite"/>
+  </text>
+
+  <!-- Standards with dot indicators -->
+  <g transform="translate(400, 195)" text-anchor="middle" font-family="monospace" font-size="10" fill="#475569">
+    <g transform="translate(-280, 0)">
+      <circle cx="0" cy="-6" r="2" fill="#e2e8f0"><animate attributeName="opacity" values="0.2;1;0.2" dur="2s" repeatCount="indefinite"/></circle>
+      <text y="10">ERC-721</text>
+    </g>
+    <g transform="translate(-196, 0)">
+      <circle cx="0" cy="-6" r="2" fill="#34d399"><animate attributeName="opacity" values="0.2;1;0.2" dur="2.3s" repeatCount="indefinite"/></circle>
+      <text y="10">ERC-8004</text>
+    </g>
+    <g transform="translate(-112, 0)">
+      <circle cx="0" cy="-6" r="2" fill="#60a5fa"><animate attributeName="opacity" values="0.2;1;0.2" dur="2.6s" repeatCount="indefinite"/></circle>
+      <text y="10">ERC-6551</text>
+    </g>
+    <g transform="translate(-36, 0)">
+      <circle cx="0" cy="-6" r="2" fill="#a78bfa"><animate attributeName="opacity" values="0.2;1;0.2" dur="2.9s" repeatCount="indefinite"/></circle>
+      <text y="10">EIP-712</text>
+    </g>
+    <g transform="translate(36, 0)">
+      <circle cx="0" cy="-6" r="2" fill="#fbbf24"><animate attributeName="opacity" values="0.2;1;0.2" dur="3.2s" repeatCount="indefinite"/></circle>
+      <text y="10">EIP-3009</text>
+    </g>
+    <g transform="translate(112, 0)">
+      <circle cx="0" cy="-6" r="2" fill="#f472b6"><animate attributeName="opacity" values="0.2;1;0.2" dur="3.5s" repeatCount="indefinite"/></circle>
+      <text y="10">ERC-2981</text>
+    </g>
+    <g transform="translate(196, 0)">
+      <circle cx="0" cy="-6" r="2" fill="#22d3ee"><animate attributeName="opacity" values="0.2;1;0.2" dur="3.8s" repeatCount="indefinite"/></circle>
+      <text y="10">ERC-4337</text>
+    </g>
+    <g transform="translate(280, 0)">
+      <circle cx="0" cy="-6" r="2" fill="#fb923c"><animate attributeName="opacity" values="0.2;1;0.2" dur="4.1s" repeatCount="indefinite"/></circle>
+      <text y="10">x402</text>
+    </g>
+  </g>
+
+  <!-- Bottom line pulse -->
+  <line x1="300" y1="240" x2="500" y2="240" stroke="#34d399" stroke-width="1" opacity="0.3">
+    <animate attributeName="opacity" values="0.1;0.5;0.1" dur="3s" repeatCount="indefinite"/>
+    <animate attributeName="x1" values="300;280;300" dur="5s" repeatCount="indefinite"/>
+    <animate attributeName="x2" values="500;520;500" dur="5s" repeatCount="indefinite"/>
+  </line>
+</svg>

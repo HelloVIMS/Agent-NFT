@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 280" width="100%">
+  <defs>
+    <pattern id="scan5" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="2" fill="#000" opacity="0.5"/>
+    </pattern>
+    <filter id="glow5"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="100%" height="100%" fill="#000"/>
+  <rect width="100%" height="100%" fill="url(#scan5)"/>
+
+  <g transform="translate(400,135)">
+    <rect x="-310" y="-95" width="620" height="190" rx="6" fill="#050505" stroke="#1a1a1a" stroke-width="1"/>
+    <rect x="-310" y="-95" width="620" height="24" rx="6" fill="#0a0a0a"/>
+    <rect x="-310" y="-79" width="620" height="10" fill="#0a0a0a"/>
+    <circle cx="-290" cy="-83" r="5" fill="#333"/>
+    <circle cx="-270" cy="-83" r="5" fill="#333"/>
+    <circle cx="-250" cy="-83" r="5" fill="#333"/>
+    <text x="-220" y="-79" font-family="monospace" font-size="10" fill="#333">VIMS AGENT OS v2.0 — BOOT</text>
+
+    <text x="-300" y="-50" font-family="monospace" font-size="11" fill="#333">AGENT NFT KERNEL v2.0.1 [Solidity 0.8.20]</text>
+
+    <text x="-300" y="-28" font-family="monospace" font-size="11" fill="#0f0">
+      <animate attributeName="opacity" values="0;1;1;1;1;1;0" dur="4s" repeatCount="indefinite"/>[ OK ] Loaded ERC-721 Identity Module
+    </text>
+    <text x="-300" y="-8" font-family="monospace" font-size="11" fill="#0f0">
+      <animate attributeName="opacity" values="0;0;1;1;1;1;0" dur="4s" repeatCount="indefinite"/>[ OK ] Mounted ERC-6551 Token Bound Account
+    </text>
+    <text x="-300" y="12" font-family="monospace" font-size="11" fill="#0f0">
+      <animate attributeName="opacity" values="0;0;0;1;1;1;0" dur="4s" repeatCount="indefinite"/>[ OK ] Connected .pixe Memory Subsystem
+    </text>
+    <text x="-300" y="32" font-family="monospace" font-size="11" fill="#0f0">
+      <animate attributeName="opacity" values="0;0;0;0;1;1;0" dur="4s" repeatCount="indefinite"/>[ OK ] EIP-712 Signing Engine initialized
+    </text>
+    <text x="-300" y="52" font-family="monospace" font-size="11" fill="#0f0">
+      <animate attributeName="opacity" values="0;0;0;0;0;1;0" dur="4s" repeatCount="indefinite"/>[ OK ] x402 Payment Router active on Base Sepolia
+    </text>
+    <text x="-300" y="72" font-family="monospace" font-size="11" fill="#0f0">
+      <animate attributeName="opacity" values="0;0;0;0;0;0;1" dur="4s" repeatCount="indefinite"/>[ OK ] Agent #1337 minted. TBA: 0x9f8e... READY
+    </text>
+
+    <rect x="-300" y="78" width="8" height="14" fill="#0f0">
+      <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite"/>
+    </rect>
+
+    <g transform="translate(180, -10)">
+      <rect x="0" y="-35" width="120" height="90" rx="4" fill="#000" stroke="#1a1a1a" stroke-width="1" opacity="0.95"/>
+      <text x="60" y="-8" text-anchor="middle" font-family="monospace" font-size="26" font-weight="700" fill="#0f0" filter="url(#glow5)">AGENT</text>
+      <text x="60" y="18" text-anchor="middle" font-family="monospace" font-size="26" font-weight="700" fill="#0f0" filter="url(#glow5)">NFT</text>
+      <text x="60" y="40" text-anchor="middle" font-family="monospace" font-size="11" fill="#333">agent.vims.com</text>
+    </g>
+  </g>
+
+  <g transform="translate(400, 250)" text-anchor="middle" font-family="monospace" font-size="10" fill="#333">
+    <text x="-315" y="0">ERC-721</text>
+    <text x="-252" y="0" fill="#0f0">ERC-8004</text>
+    <text x="-189" y="0" fill="#0c0">ERC-6551</text>
+    <text x="-126" y="0" fill="#0f0">EIP-712</text>
+    <text x="-63" y="0" fill="#0c0">EIP-3009</text>
+    <text x="0" y="0" fill="#0f0">ERC-2981</text>
+    <text x="63" y="0" fill="#0c0">ERC-4337</text>
+    <text x="126" y="0" fill="#0f0">x402</text>
+    <text x="189" y="0" fill="#0c0">ERC-1271</text>
+    <text x="252" y="0" fill="#0f0">.pixe</text>
+  </g>
+
+  <line x1="200" y1="268" x2="600" y2="268" stroke="#1a1a1a" stroke-width="1">
+    <animate attributeName="stroke" values="#1a1a1a;#0f0;#1a1a1a" dur="6s" repeatCount="indefinite"/>
+  </line>
+</svg>
