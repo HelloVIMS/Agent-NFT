@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/Foundry-passing-green?style=flat-square" alt="Foundry"/>
   <img src="https://img.shields.io/badge/tests-137%20passing-green?style=flat-square" alt="Tests"/>
   <img src="https://img.shields.io/badge/Base%20Sepolia-deployed-blue?style=flat-square" alt="Base Sepolia"/>
-  <img src="https://img.shields.io/badge/audited-INQTEL%20%2B%20ClawBot-orange?style=flat-square" alt="Audit"/>
+  
   <img src="https://img.shields.io/badge/ERC--721-identity-10b981?style=flat-square" alt="ERC-721"/>
   <img src="https://img.shields.io/badge/ERC--6551-TBA-3b82f6?style=flat-square" alt="ERC-6551"/>
   <img src="https://img.shields.io/badge/EIP--712-signing-a855f7?style=flat-square" alt="EIP-712"/>
