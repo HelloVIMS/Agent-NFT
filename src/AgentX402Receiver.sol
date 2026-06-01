@@ -331,4 +331,63 @@ contract AgentX402Receiver is
             creatorCut = 0;
         }
     }
+
+    // ============ Trusted-registrar atomic mint path =====================
+
+    /// @notice The `AgentIdentityRegistry` allowed to register services for
+    ///         freshly minted agents on behalf of the owner during the
+    ///         atomic `mintWithFullStack` flow. address(0) disables.
+    address public trustedAgentRegistry;
+
+    /// @notice Emitted when the trusted agent registry pointer changes.
+    event TrustedAgentRegistryUpdated(address indexed oldRegistry, address indexed newRegistry);
+
+    /// @notice Emitted when a service is registered via the identity-trusted
+    ///         path (distinct event so off-chain indexers can distinguish
+    ///         user-initiated from mint-bundled registrations).
+    event ServiceRegisteredViaIdentity(
+        uint256 indexed agentId,
+        bytes32 indexed serviceId,
+        address indexed agentOwner,
+        address token,
+        uint256 price
+    );
+
+    error NotTrustedRegistry();
+
+    /// @notice Owner-only setter for the trusted agent registry.
+    function setTrustedAgentRegistry(address newRegistry) external onlyOwner {
+        address old = trustedAgentRegistry;
+        trustedAgentRegistry = newRegistry;
+        emit TrustedAgentRegistryUpdated(old, newRegistry);
+    }
+
+    /// @notice Register a service on behalf of an agent owner. Only callable
+    ///         by `trustedAgentRegistry` — the identity contract uses this
+    ///         during `mintWithFullStack` so the atomic mint can include a
+    ///         priced service without a second tx.
+    /// @dev    Validates `agentOwner` matches the on-chain `ownerOf` so a
+    ///         compromised registry cannot register for an unrelated owner.
+    function registerServiceFromIdentity(
+        uint256 agentId,
+        address agentOwner,
+        bytes32 serviceId,
+        address token,
+        uint256 price
+    ) external whenNotPaused {
+        if (msg.sender != trustedAgentRegistry) revert NotTrustedRegistry();
+        if (token == address(0)) revert ZeroAddress();
+        if (!allowedTokens[token]) revert TokenNotAllowed();
+        if (price == 0) revert InvalidPrice();
+        // Defence in depth: the registry should always pass the true owner,
+        // but we re-derive the check via identityRegistry to fail closed if
+        // the linked registry is ever swapped without a corresponding
+        // trusted-registry update.
+        if (identityRegistry.ownerOf(agentId) != agentOwner) revert NotOwner();
+        if (services[agentId][serviceId].token != address(0)) revert ServiceAlreadyExists();
+
+        services[agentId][serviceId] = Service({token: token, price: price, active: true});
+        emit ServiceRegistered(agentId, serviceId, token, price);
+        emit ServiceRegisteredViaIdentity(agentId, serviceId, agentOwner, token, price);
+    }
 }

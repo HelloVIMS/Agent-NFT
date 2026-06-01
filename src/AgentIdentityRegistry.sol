@@ -12,6 +12,27 @@ import "@openzeppelin/contracts/utils/Create2.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 import "./AgentRoyaltyVault.sol";
 
+/// @dev Minimal surface the registry needs from the linked TBA registry.
+///      Kept local so the identity contract doesn't depend on the full
+///      `AgentTBARegistry` artefact.
+interface IAgentTBARegistryLike {
+    function createAccount(uint256 tokenId, bytes32 salt) external returns (address account);
+    function account(address tokenContract, uint256 tokenId, bytes32 salt) external view returns (address);
+}
+
+/// @dev Minimal surface the registry needs from the linked x402 receiver
+///      so it can register a service atomically during `mintWithFullStack`.
+///      The receiver checks msg.sender == trustedAgentRegistry to authorise.
+interface IAgentX402ReceiverLike {
+    function registerServiceFromIdentity(
+        uint256 agentId,
+        address agentOwner,
+        bytes32 serviceId,
+        address token,
+        uint256 price
+    ) external;
+}
+
 /**
  * @title AgentIdentityRegistry
  * @notice ERC-8004 compliant Identity Registry for Agent AI agents
@@ -63,7 +84,7 @@ contract AgentIdentityRegistry is
     
     uint256 private _nextTokenId;
     uint256 private _nextCollectionId;
-    
+
     struct AgentMetadata {
         string name;
         address tbaAddress;
@@ -976,12 +997,164 @@ contract AgentIdentityRegistry is
         return from;
     }
 
+    // ============ Full-stack mint wiring (appended after audit) ============
+
+    /// @notice Owner-only setter for the trusted TBA registry. Pass address(0)
+    ///         to disable the atomic TBA leg of `mintWithFullStack`.
+    function setTrustedTBARegistry(address newRegistry) external onlyOwner {
+        address old = trustedTBARegistry;
+        trustedTBARegistry = newRegistry;
+        emit TrustedTBARegistryUpdated(old, newRegistry);
+    }
+
+    /// @notice Owner-only setter for the linked x402 receiver. Pass address(0)
+    ///         to disable the atomic service-registration leg of
+    ///         `mintWithFullStack`.
+    function setLinkedX402Receiver(address newReceiver) external onlyOwner {
+        address old = linkedX402Receiver;
+        linkedX402Receiver = newReceiver;
+        emit LinkedX402ReceiverUpdated(old, newReceiver);
+    }
+
+    /// @notice Internal helper that binds a TBA to an agent without the
+    ///         per-caller ownership check used by the public `setTBAAddress`.
+    ///         Used exclusively by `mintWithFullStack` where the registry is
+    ///         itself the orchestrator and the binding precedes any external
+    ///         hand-off of the NFT.
+    function _bindTBAUnchecked(uint256 agentId, address tbaAddress) internal {
+        if (tbaAddress == address(0)) revert InvalidAddress();
+        if (agents[agentId].tbaAddress != address(0)) revert AlreadySet();
+
+        uint256 plus = _accountAgentIdPlusOne[tbaAddress];
+        if (plus != 0 && plus != agentId + 1) revert AlreadyBound();
+
+        agents[agentId].tbaAddress = tbaAddress;
+        if (plus == 0) {
+            _accountAgentIdPlusOne[tbaAddress] = agentId + 1;
+            emit PrimaryTBABound(agentId, tbaAddress);
+        }
+        emit TBAAddressSet(agentId, tbaAddress);
+    }
+
+    /**
+     * @notice Atomic full-stack mint: registers the agent NFT, deploys + binds
+     *         its token-bound account, and optionally registers an x402
+     *         service — all in a single transaction.
+     *
+     *         Each leg is independent: pass address(0) for `collection` to
+     *         mint standalone (currently the only mode), pass bytes32(0)
+     *         for `serviceId` (or 0 for `price` / address(0) for `token`)
+     *         to skip the service-registration leg.
+     *
+     * @dev    Service registration is performed via the trusted-registrar
+     *         path on the linked receiver, which authorises this registry
+     *         as msg.sender. The receiver MUST set `trustedAgentRegistry`
+     *         to this contract or the leg will revert.
+     *
+     * @param  name        Agent display name.
+     * @param  agentURI    Metadata URI (IPFS/Arweave/HTTPS).
+     * @param  royaltyBps  Creator royalty in bps (0–`MAX_CREATOR_ROYALTY_BPS`).
+     * @param  collection  Reserved for future collection-bound mints; pass
+     *                     address(0) for a standalone mint.
+     * @param  tbaSalt     Salt forwarded to the TBA registry's `createAccount`.
+     * @param  serviceId   bytes32 service identifier; pass bytes32(0) to skip.
+     * @param  token       ERC-20 token used to charge for the service.
+     * @param  price       Service price in `token` base units.
+     * @return agentId     Newly minted token id.
+     * @return tba         Deployed token-bound account address.
+     */
+    function mintWithFullStack(
+        string calldata name,
+        string calldata agentURI,
+        uint256 royaltyBps,
+        address collection,
+        bytes32 tbaSalt,
+        bytes32 serviceId,
+        address token,
+        uint256 price
+    ) external returns (uint256 agentId, address tba) {
+        // Pattern A first: only standalone mints supported.
+        if (collection != address(0)) revert InvalidValue();
+
+        // Leg 1 — register the agent under the caller. `registerAgent` is
+        // public and performs all the standard validation; reputation anchor
+        // is left as address(0) so it's transferable by default.
+        agentId = registerAgent(name, agentURI, royaltyBps, address(0));
+
+        // Leg 2 — TBA. Optional only because tests can poke the legs in
+        // isolation; production callers should always wire a registry.
+        if (trustedTBARegistry != address(0)) {
+            tba = IAgentTBARegistryLike(trustedTBARegistry).createAccount(agentId, tbaSalt);
+            // The TBA registry attempts setTBAAddress via try/catch which
+            // fails here (registry, not owner, calls setTBAAddress). Bind
+            // unconditionally via the privileged internal path.
+            if (agents[agentId].tbaAddress == address(0)) {
+                _bindTBAUnchecked(agentId, tba);
+            }
+        }
+
+        // Leg 3 — x402 service. Skipped when any of the inputs are zero.
+        if (
+            serviceId != bytes32(0) &&
+            token != address(0) &&
+            price > 0 &&
+            linkedX402Receiver != address(0)
+        ) {
+            IAgentX402ReceiverLike(linkedX402Receiver).registerServiceFromIdentity(
+                agentId, msg.sender, serviceId, token, price
+            );
+        }
+    }
+
+    /**
+     * @notice Convenience wrapper around `mintToCollection` matching the SDK
+     *         signature `(collectionId, name, uri, royaltyBps)`. Reputation
+     *         anchor is fixed to address(0) (transferable). Body is inlined —
+     *         not a `this.mintToCollection(...)` external call — to preserve
+     *         `msg.sender` for the `registerAgent` ownership stamp.
+     */
+    function mintToCollectionWithRoyalty(
+        uint256 collectionId,
+        string calldata name,
+        string calldata agentURI,
+        uint256 royaltyBps
+    ) external returns (uint256 agentId) {
+        Collection storage col = collections[collectionId];
+        if (col.creator == address(0)) revert NotExists();
+        if (col.creator != msg.sender) revert NotCollectionCreator();
+        if (col.locked) revert CollectionLocked();
+        if (col.maxSupply > 0 && col.mintedCount >= col.maxSupply) revert CollectionFull();
+
+        agentId = registerAgent(name, agentURI, royaltyBps, address(0));
+
+        agentToCollection[agentId] = collectionId;
+        _collectionAgents[collectionId].push(agentId);
+        col.mintedCount++;
+
+        emit AgentAddedToCollection(agentId, collectionId);
+    }
+
+    // ============ Full-stack mint storage (appended after audit) ============
+
+    /// @notice Trusted ERC-6551 TBA registry used by `mintWithFullStack`.
+    address public trustedTBARegistry;
+
+    /// @notice Linked x402 settlement receiver used by `mintWithFullStack`.
+    address public linkedX402Receiver;
+
+    /// @notice Emitted when the trusted TBA registry pointer changes.
+    event TrustedTBARegistryUpdated(address indexed oldRegistry, address indexed newRegistry);
+    /// @notice Emitted when the linked x402 receiver pointer changes.
+    event LinkedX402ReceiverUpdated(address indexed oldReceiver, address indexed newReceiver);
+
     // ============ Storage Gap ============
     //
     // Reserved slots for future upgrades. Reduce this number by the number of
     // new storage variables added in a future implementation; never increase
     // it. Without this, adding any new storage variable after a child contract
     // is appended in a future inheritance change would shift slots and corrupt
-    // state. Size chosen to absorb ~50 simple slots of future state.
-    uint256[50] private __gap;
+    // state.
+    // Shrunk from 50 → 48 when `trustedTBARegistry` + `linkedX402Receiver`
+    // were appended for the atomic full-stack mint path.
+    uint256[48] private __gap;
 }
