@@ -21,13 +21,16 @@ import {AgentCollectionPaymentLib} from "./AgentCollectionPaymentLib.sol";
  * @dev Protected against reentrancy attacks on payment functions
  */
 import {VimsProvenance} from "./VimsProvenance.sol";
+import {IAgentNFTAdapter} from "./interfaces/IAgentNFTAdapter.sol";
+import {AgentCollectionAtomicLib} from "./AgentCollectionAtomicLib.sol";
 
 contract AgentCollectionImpl is 
     Initializable, 
     ERC721Upgradeable, 
     ERC721URIStorageUpgradeable,
     VimsProvenance,
-    IERC2981
+    IERC2981,
+    IAgentNFTAdapter
 {
     function _vimsContractName() internal pure override returns (string memory) {
         return "AgentCollectionImpl";
@@ -1101,4 +1104,127 @@ contract AgentCollectionImpl is
         return from;
     }
 
+    // ============ Phase C: atomic full-stack mint + adapter ===============
+    //
+    // Wires this collection into {AgentX402Receiver}'s V2 NFT-scoped surface:
+    //
+    //   1. {IAgentNFTAdapter} — serviceRoyaltyOf / tbaOf views the receiver
+    //      uses at settlement time to compute the 3-way split. `ownerOf` is
+    //      satisfied by the inherited ERC-721 implementation.
+    //
+    //   2. `linkedX402Receiver` — once the collection creator wires this
+    //      pointer AND calls {AgentX402Receiver.selfRegisterCollection}, the
+    //      `mintAgentWithFullStack` path can register a priced service in
+    //      the same tx as the mint. The receiver authorises the call because
+    //      it sees `msg.sender == address(this) == trustedRegistrarFor[this]`.
+
+    /// @inheritdoc IAgentNFTAdapter
+    /// @dev Returns the *collection-level* financial recipient + the
+    ///      per-token service royalty bps. See {IAgentNFTAdapter} for the
+    ///      "creator vs minter" rationale: the splitter (or
+    ///      `collectionCreator` if no splitter is wired) is the canonical
+    ///      service-side royalty recipient — NOT the per-token minter.
+    function serviceRoyaltyOf(uint256 tokenId)
+        external
+        view
+        override
+        returns (address creator, uint256 bps)
+    {
+        // Reverts on non-existent ids — matches IAgentNFTAdapter contract.
+        ownerOf(tokenId);
+        creator = _financialRecipient();
+        bps     = _serviceRoyaltyBps[tokenId];
+    }
+
+    /// @inheritdoc IAgentNFTAdapter
+    /// @dev Disambiguates ERC721Upgradeable.ownerOf vs IAgentNFTAdapter.ownerOf
+    ///      (diamond resolution). The base ERC-721 implementation already
+    ///      performs the existence check (reverts on unowned ids), which
+    ///      satisfies IAgentNFTAdapter's "MUST revert" contract.
+    function ownerOf(uint256 tokenId)
+        public
+        view
+        override(ERC721Upgradeable, IERC721, IAgentNFTAdapter)
+        returns (address)
+    {
+        return super.ownerOf(tokenId);
+    }
+
+    /// @inheritdoc IAgentNFTAdapter
+    function tbaOf(uint256 tokenId) external view override returns (address) {
+        ownerOf(tokenId); // existence check
+        return agents[tokenId].tbaAddress;
+    }
+
+    /**
+     * @notice Atomic mint + x402 service register. Same payment + supply +
+     *         allowlist gating as `mintAgent`, plus an optional service-
+     *         registration leg. Reverts if the allowlist phase is still
+     *         active — mirrors `mintAgent`.
+     *
+     * @dev    For the service leg to land:
+     *           - `linkedX402Receiver` must be set (creator-only setter)
+     *           - the collection must have been onboarded via
+     *             {AgentX402Receiver.selfRegisterCollection}
+     *           - all of (serviceId, token, price) must be non-zero
+     *
+     *         If any precondition fails, the mint still succeeds and the
+     *         service leg is silently skipped — matches the additive
+     *         semantics of {AgentIdentityRegistry.mintWithFullStack}.
+     *
+     * @param  name_      Agent display name.
+     * @param  agentURI   Metadata URI (empty ⇒ generative path uses
+     *                    `collectionBaseURI + tokenId + .json`).
+     * @param  tbaSalt    Reserved for a future collection-side TBA wiring
+     *                    leg. Currently unused.
+     * @param  serviceId  bytes32(0) to skip the service leg.
+     * @param  token      ERC-20 (must be allowlisted on the receiver).
+     * @param  price      Service price in `token` base units.
+     * @return agentId    Newly minted token id.
+     * @return tba        Always address(0) in this iteration; reserved for
+     *                    the collection-side TBA leg follow-up.
+     */
+    function mintAgentWithFullStack(
+        string calldata name_,
+        string calldata agentURI,
+        bytes32 tbaSalt,
+        bytes32 serviceId,
+        address token,
+        uint256 price
+    ) external payable nonReentrant returns (uint256 agentId, address tba) {
+        // ─── Same gating as `mintAgent` ─────────────────────────────────
+        // Mirrored verbatim — pulling it into a helper would force
+        // `_executeMint` to grow new params and risk diverging from the
+        // audited path.
+        if (allowlistRoot != bytes32(0)) {
+            if (allowlistEndTime == 0 || block.timestamp <= allowlistEndTime) {
+                revert AllowlistPhaseActive();
+            }
+        }
+        if (locked) revert CollectionLocked();
+        if (mintingPaused) revert MintingIsPaused();
+        if (mintStartTime > 0 && block.timestamp < mintStartTime) revert MintingNotActive();
+        if (mintEndTime   > 0 && block.timestamp > mintEndTime)   revert MintingNotActive();
+        if (maxSupply > 0 && _nextTokenId > maxSupply) revert MaxSupplyReached();
+        if (maxPerWallet > 0 && mintedPerWallet[msg.sender] >= maxPerWallet) revert MaxPerWalletReached();
+        if (msg.value < mintPrice) revert InsufficientPayment();
+
+        agentId = _nextTokenId++;
+        mintedPerWallet[msg.sender]++;
+        _executeMint(agentId, name_, agentURI);
+
+        // ─── Atomic TBA + x402 service ──────────────────────────────────
+        // Delegates to {AgentCollectionAtomicLib} which holds the pinned
+        // ERC-6551 registry + receiver addresses (see lib for rationale).
+        // The lib returns the deterministic TBA whether or not it was
+        // freshly created (idempotent at the registry layer); we mirror
+        // the binding into our own `agents[id].tbaAddress` slot so the
+        // {tbaOf} adapter view + downstream consumers stay coherent.
+        tba = AgentCollectionAtomicLib.deployTBAAndRegisterService(
+            agentId, tbaSalt, serviceId, token, price
+        );
+
+        agents[agentId].tbaAddress = tba;
+        emit TBAAddressSet(agentId, tba);
+    }
 }
