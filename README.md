@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/license-MIT-emerald?style=flat-square" alt="License"/>
   <img src="https://img.shields.io/badge/Solidity-0.8.20-blue?style=flat-square&logo=solidity&logoColor=white" alt="Solidity"/>
   <img src="https://img.shields.io/badge/Foundry-passing-green?style=flat-square" alt="Foundry"/>
-  <img src="https://img.shields.io/badge/tests-137%20passing-green?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/tests-579%20passing-green?style=flat-square" alt="Tests"/>
   <img src="https://img.shields.io/badge/Base%20Sepolia-deployed-blue?style=flat-square" alt="Base Sepolia"/>
   
   <img src="https://img.shields.io/badge/ERC--721-identity-10b981?style=flat-square" alt="ERC-721"/>
@@ -344,7 +344,10 @@ identity, plus first-class storage for the two things every agent needs:
 | **`AgentContextRegistry`**   | Typed context files (md/json/yaml/txt). UUPS.                   |
 | **`AgentMemory`**            | Pixelog `.pixe` capsule memory. UUPS.                           |
 | **`AgentX402Receiver`**      | Atomic on-chain settler for [x402](https://github.com/coinbase/x402) (EIP-3009 → split). UUPS. |
-| `AgentCollectionFactory`     | On-chain collection factory for generative drops.               |
+| `AgentCollectionFactory`     | On-chain collection factory for generative drops (EIP-1167 minimal-proxy clones). |
+| `AgentCollectionImpl`        | Per-collection ERC-721 impl. Targets the factory's beacon. Holds the `IAgentNFTAdapter` views the x402 receiver consumes (`ownerOf` / `serviceRoyaltyOf` / `tbaOf`). |
+| `AgentEncryptionRegistry`    | Per-agent X25519 keystore for end-to-end encrypted capsule deliveries (KEK-wrapped privkey, owner-rotatable). UUPS. |
+| `AgentRoyaltyVault`          | Per-agent CREATE2 splitter that releases secondary-sale royalties to creator + treasury. |
 | `hyperlane/AgentBridge`      | Hyperlane cross-chain bridge for agent NFTs.                    |
 | `AgentRegistry`              | Non-upgradeable ERC-8004 reference identity registry.           |
 | `ReputationRegistry`         | Non-upgradeable ERC-8004 reference reputation registry.         |
@@ -811,6 +814,32 @@ Each module is independently deployable, independently upgradeable (where
 upgradeable), and references the identity registry only through
 `IAgentIdentityRegistry` — composable by construction.
 
+### Library architecture (EIP-170)
+
+The two largest contracts host heavy code paths in external libraries that
+are DELEGATECALLed at runtime. This keeps every impl under the 24,576-byte
+runtime ceiling without sacrificing features:
+
+| Library                      | Hosts                                                              | Consumer impl                  |
+| ---------------------------- | ------------------------------------------------------------------ | ------------------------------ |
+| `AgentIdentityFullStackLib`  | TBA-create + x402 service-register legs of `mintWithFullStack`     | `AgentIdentityRegistry`        |
+| `AgentIdentityURILib`        | Base64 + JSON construction for the on-chain `tokenURI` data URI    | `AgentIdentityRegistry`        |
+| `AgentCollectionAtomicLib`   | Pinned ERC-6551 registry + x402 receiver dispatch for collection mints | `AgentCollectionImpl`     |
+| `AgentCollectionPaymentLib`  | Mint-payment splitter (protocol fee + creator revenue)             | `AgentCollectionImpl`         |
+
+Libraries are deployed once per chain and shared by every proxy. They are
+never upgraded in place — a bug fix means deploying a new library and
+pointing a fresh impl at it via the standard UUPS upgrade flow.
+
+### Atomic mint flows (Phase A + Phase C)
+
+Two paths now compress what used to take three transactions into one each:
+
+- **Standalone agent mint** — `AgentIdentityRegistry.mintWithFullStack(name, uri, royaltyBps, address(0), tbaSalt, serviceId, token, price)` registers the NFT, deploys the ERC-6551 TBA, and registers an x402 service in a single transaction. The receiver authorises the service-register leg because `msg.sender == trustedAgentRegistry`.
+- **Collection mint** — `AgentCollectionImpl.mintAgentWithFullStack(name, uri, tbaSalt, serviceId, token, price)` does the same for a collection token. Onboarding is permissionless: the collection creator calls `AgentX402Receiver.selfRegisterCollection(coll)` once, after which the receiver treats the collection address as both the `IAgentNFTAdapter` and the trusted registrar for that NFT.
+
+In both flows, the service leg is **silently skipped** when any of `serviceId`, `token`, or `price` is zero — callers can use the same selector for "mint only" and "mint + monetize" without branching.
+
 ---
 
 ## Test suite
@@ -832,22 +861,33 @@ Coverage includes:
 - x402 receiver: EIP-3009 + EIP-712 dual-sig settle, commit redirection blocked, ERC-2981 split, TBA fallback, token allowlist, pause, nonce replay, expiry, fuzz
 - Hyperlane bridge: lock / handle / handle-back / domain validation
 
-**255/255 tests pass** (10 suites). All `M`/`L`/`I` audit findings closed; see `docs/AUDIT.md`.
+**579/579 tests pass** (36 suites). All `M`/`L`/`I` audit findings closed; see `docs/AUDIT.md`.
 
 ---
 
 ## Standards implemented
 
-- [ERC-721](https://eips.ethereum.org/EIPS/eip-721) — NFT identity.
-- [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) — agent identity / reputation / validation.
-- [ERC-6551](https://eips.ethereum.org/EIPS/eip-6551) — token-bound accounts.
-- [EIP-712](https://eips.ethereum.org/EIPS/eip-712) — typed structured-data signing (x402 auth, evolution commits, subaccount intents).
-- [EIP-3009](https://eips.ethereum.org/EIPS/eip-3009) — gasless meta-transfers (USDC `transferWithAuthorization`).
-- [ERC-2981](https://eips.ethereum.org/EIPS/eip-2981) — soulbound creator royalties (per-agent CREATE2 vault as receiver).
-- [ERC-4337](https://eips.ethereum.org/EIPS/eip-4337) — account abstraction (TBA `validateUserOp`).
-- [x402](https://github.com/coinbase/x402) — HTTP Payment Required protocol (settlement target).
-- [ERC-1271](https://eips.ethereum.org/EIPS/eip-1271) — contract-signature verification (TBAs sign as the agent).
-- [Pixelog (`.pixe`)](https://github.com/arqonai/pixelog) — layered agent memory standard (l0/l1/l2 tiers, typed categories, content-addressed URIs).
+Listed in strict numerical order. Every line is a constraint the deployed
+bytecode actually satisfies — no aspirational entries.
+
+- [ERC-20](https://eips.ethereum.org/EIPS/eip-20) — the payment surface (USDC, treasury balances, every service-fee path).
+- [ERC-165](https://eips.ethereum.org/EIPS/eip-165) — interface introspection on `AgentIdentityRegistry`, `AgentCollectionImpl` (advertises `ERC-2981`, `ERC-6551`, `ERC-8004`).
+- [EIP-170](https://eips.ethereum.org/EIPS/eip-170) — the **24,576-byte runtime ceiling** every impl is held under. The two largest contracts (`AgentIdentityRegistry`, `AgentCollectionImpl`) extract heavy logic into 4 external libraries (`AgentIdentityFullStackLib`, `AgentIdentityURILib`, `AgentCollectionAtomicLib`, `AgentCollectionPaymentLib`) so the proxy targets stay deployable. See *Library architecture* below.
+- [EIP-191](https://eips.ethereum.org/EIPS/eip-191) — prefixed-message signing for legacy off-chain signatures (`\x19Ethereum Signed Message:`).
+- [EIP-712](https://eips.ethereum.org/EIPS/eip-712) — typed structured-data signing for x402 `PaymentCommitment`, evolution commits, subaccount intents, and linked-account self-attestations.
+- [ERC-721](https://eips.ethereum.org/EIPS/eip-721) — NFT identity layer for both standalone agents (`AgentIdentityRegistry`) and per-collection drops (`AgentCollectionImpl`).
+- [EIP-1167](https://eips.ethereum.org/EIPS/eip-1167) — minimal-proxy clones for the collection factory (cheap per-collection deploys against the upgradeable beacon impl).
+- [EIP-1271](https://eips.ethereum.org/EIPS/eip-1271) — contract-signature verification (TBAs sign as the agent; linked-account attestations accept ERC-1271 signers).
+- [EIP-1822](https://eips.ethereum.org/EIPS/eip-1822) / [EIP-1967](https://eips.ethereum.org/EIPS/eip-1967) — UUPS upgradeability with the standard implementation slot. All registries (identity, TBA, reputation, context, memory, x402, encryption) are UUPS proxies with `_authorizeUpgrade` gated by owner.
+- [ERC-2981](https://eips.ethereum.org/EIPS/eip-2981) — soulbound creator royalties; per-agent CREATE2 vault is the on-chain receiver.
+- [EIP-3009](https://eips.ethereum.org/EIPS/eip-3009) — gasless meta-transfers (USDC `receiveWithAuthorization` is the pull mechanic for every x402 settlement).
+- [ERC-4337](https://eips.ethereum.org/EIPS/eip-4337) — account abstraction; `AgentAccount` (the TBA implementation) implements `validateUserOp` against EntryPoint v0.7.
+- [ERC-6551](https://eips.ethereum.org/EIPS/eip-6551) — token-bound accounts; one TBA per agent NFT, deterministically deployed via CREATE2.
+- [EIP-7521](https://eips.ethereum.org/EIPS/eip-7521) — referenced as the design target for future agent intent / mandate flows; not yet active in the deployed contracts.
+- [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702) — the EOA-to-smart-account upgrade path the SDK accepts as an alternative to the TBA route; on-chain checks (subaccount permissions, agent ownership) are signer-agnostic.
+- [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) — agent identity / reputation / validation. `AgentIdentityRegistry`, `AgentReputationRegistry`, `ValidationRegistry`.
+- [x402](https://github.com/coinbase/x402) — HTTP-402 payment protocol; `AgentX402Receiver` is the canonical on-chain settlement target. Two surfaces in production: V1 (agentId-keyed) and V2 (NFT+tokenId-keyed via `IAgentNFTAdapter` + `selfRegisterCollection`).
+- [Pixelog (`.pixe`)](https://github.com/arqonai/pixelog) — layered agent memory standard (L0/L1/L2 tiers, typed categories, content-addressed URIs).
 
 ---
 
