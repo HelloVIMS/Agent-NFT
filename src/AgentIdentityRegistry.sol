@@ -12,26 +12,8 @@ import "@openzeppelin/contracts/utils/Create2.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 import "./AgentRoyaltyVault.sol";
 
-/// @dev Minimal surface the registry needs from the linked TBA registry.
-///      Kept local so the identity contract doesn't depend on the full
-///      `AgentTBARegistry` artefact.
-interface IAgentTBARegistryLike {
-    function createAccount(uint256 tokenId, bytes32 salt) external returns (address account);
-    function account(address tokenContract, uint256 tokenId, bytes32 salt) external view returns (address);
-}
-
-/// @dev Minimal surface the registry needs from the linked x402 receiver
-///      so it can register a service atomically during `mintWithFullStack`.
-///      The receiver checks msg.sender == trustedAgentRegistry to authorise.
-interface IAgentX402ReceiverLike {
-    function registerServiceFromIdentity(
-        uint256 agentId,
-        address agentOwner,
-        bytes32 serviceId,
-        address token,
-        uint256 price
-    ) external;
-}
+import {AgentIdentityFullStackLib} from "./AgentIdentityFullStackLib.sol";
+import {AgentIdentityURILib} from "./AgentIdentityURILib.sol";
 
 /**
  * @title AgentIdentityRegistry
@@ -694,29 +676,19 @@ contract AgentIdentityRegistry is
     }
     
     /**
-     * @dev Internal helper to build token URI (reduces stack depth)
+     * @dev Internal helper to build token URI. Delegates to the external
+     *      library {AgentIdentityURILib} so the ~1 KB Base64 + JSON
+     *      concatenation lives outside the impl bytecode (EIP-170 ceiling).
+     *      Output is byte-identical to the prior in-impl version.
      */
     function _buildTokenURI(uint256 tokenId) internal view returns (string memory) {
-        string memory svgBase64 = Base64.encode(bytes(_svgImages[tokenId]));
-        
-        // Build JSON in parts to avoid stack too deep
-        bytes memory jsonPart1 = abi.encodePacked(
-            '{"name":"', agents[tokenId].name, '",',
-            '"description":"Agent AI Agent #', tokenId.toString(), '",',
-            '"image":"data:image/svg+xml;base64,', svgBase64, '",'
+        return AgentIdentityURILib.buildOnChainTokenURI(
+            tokenId,
+            agents[tokenId].name,
+            _svgImages[tokenId],
+            agents[tokenId].active,
+            agents[tokenId].tbaAddress != address(0)
         );
-        
-        bytes memory jsonPart2 = abi.encodePacked(
-            '"attributes":[',
-            '{"trait_type":"Active","value":"', agents[tokenId].active ? "true" : "false", '"},',
-            '{"trait_type":"Has TBA","value":"', agents[tokenId].tbaAddress != address(0) ? "true" : "false", '"}',
-            ']}'
-        );
-        
-        return string(abi.encodePacked(
-            "data:application/json;base64,",
-            Base64.encode(abi.encodePacked(jsonPart1, jsonPart2))
-        ));
     }
     
     function supportsInterface(bytes4 interfaceId) public view override(ERC721Upgradeable, ERC721URIStorageUpgradeable, IERC165) returns (bool) {
@@ -1073,37 +1045,22 @@ contract AgentIdentityRegistry is
         address token,
         uint256 price
     ) external returns (uint256 agentId, address tba) {
-        // Pattern A first: only standalone mints supported.
         if (collection != address(0)) revert InvalidValue();
 
-        // Leg 1 — register the agent under the caller. `registerAgent` is
-        // public and performs all the standard validation; reputation anchor
-        // is left as address(0) so it's transferable by default.
+        // Leg 1 — register the agent under the caller (transferable anchor).
         agentId = registerAgent(name, agentURI, royaltyBps, address(0));
 
-        // Leg 2 — TBA. Optional only because tests can poke the legs in
-        // isolation; production callers should always wire a registry.
-        if (trustedTBARegistry != address(0)) {
-            tba = IAgentTBARegistryLike(trustedTBARegistry).createAccount(agentId, tbaSalt);
-            // The TBA registry attempts setTBAAddress via try/catch which
-            // fails here (registry, not owner, calls setTBAAddress). Bind
-            // unconditionally via the privileged internal path.
-            if (agents[agentId].tbaAddress == address(0)) {
-                _bindTBAUnchecked(agentId, tba);
-            }
+        // Leg 2 — TBA via library (delegatecall). Library returns address(0)
+        // when no trusted registry is wired.
+        tba = AgentIdentityFullStackLib.tbaLeg(trustedTBARegistry, agentId, tbaSalt);
+        if (tba != address(0) && agents[agentId].tbaAddress == address(0)) {
+            _bindTBAUnchecked(agentId, tba);
         }
 
-        // Leg 3 — x402 service. Skipped when any of the inputs are zero.
-        if (
-            serviceId != bytes32(0) &&
-            token != address(0) &&
-            price > 0 &&
-            linkedX402Receiver != address(0)
-        ) {
-            IAgentX402ReceiverLike(linkedX402Receiver).registerServiceFromIdentity(
-                agentId, msg.sender, serviceId, token, price
-            );
-        }
+        // Leg 3 — x402 service via library. Skipped silently when inputs zero.
+        AgentIdentityFullStackLib.serviceLeg(
+            linkedX402Receiver, agentId, msg.sender, serviceId, token, price
+        );
     }
 
     /**

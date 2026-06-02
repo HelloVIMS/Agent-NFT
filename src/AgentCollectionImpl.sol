@@ -21,7 +21,6 @@ import {AgentCollectionPaymentLib} from "./AgentCollectionPaymentLib.sol";
  * @dev Protected against reentrancy attacks on payment functions
  */
 import {VimsProvenance} from "./VimsProvenance.sol";
-import {IAgentNFTAdapter} from "./interfaces/IAgentNFTAdapter.sol";
 import {AgentCollectionAtomicLib} from "./AgentCollectionAtomicLib.sol";
 
 contract AgentCollectionImpl is 
@@ -29,8 +28,7 @@ contract AgentCollectionImpl is
     ERC721Upgradeable, 
     ERC721URIStorageUpgradeable,
     VimsProvenance,
-    IERC2981,
-    IAgentNFTAdapter
+    IERC2981
 {
     function _vimsContractName() internal pure override returns (string memory) {
         return "AgentCollectionImpl";
@@ -282,22 +280,37 @@ contract AgentCollectionImpl is
         if (serviceBps > MAX_ROYALTY_BPS) revert InvalidValue();
 
         agentId = _nextTokenId++;
+        _writeAgentRecord(agentId, name_, agentURI, salesBps, serviceBps, true);
+    }
+
+    /// @dev Storage-write + hook + event block shared by the free
+    ///      `registerAgentWithRoyalty` path and the paid `_executeMint` path.
+    ///      `forceSetTokenURI=true` always writes the URI (free path);
+    ///      `forceSetTokenURI=false` writes only when non-empty (paid path's
+    ///      generative-drop fallback). Centralising avoids the two paths
+    ///      drifting apart and keeps the impl under EIP-170.
+    function _writeAgentRecord(
+        uint256 agentId,
+        string calldata name_,
+        string calldata agentURI,
+        uint256 salesBps,
+        uint256 serviceBps,
+        bool forceSetTokenURI
+    ) private {
         _callBeforeMint(agentId, msg.sender, "");
-
         _safeMint(msg.sender, agentId);
-        _setTokenURI(agentId, agentURI);
-
+        if (forceSetTokenURI || bytes(agentURI).length > 0) {
+            _setTokenURI(agentId, agentURI);
+        }
         agents[agentId] = AgentMetadata({
             name: name_,
             tbaAddress: address(0),
             createdAt: block.timestamp,
             active: true
         });
-
-        _agentCreator[agentId] = msg.sender;
-        _salesRoyaltyBps[agentId] = salesBps;
+        _agentCreator[agentId]      = msg.sender;
+        _salesRoyaltyBps[agentId]   = salesBps;
         _serviceRoyaltyBps[agentId] = serviceBps;
-
         emit AgentRegistered(agentId, msg.sender, name_, agentURI);
         emit CreatorRoyaltySet(agentId, msg.sender, salesBps, serviceBps);
         _callAfterMint(agentId, msg.sender, "");
@@ -314,19 +327,28 @@ contract AgentCollectionImpl is
         string calldata name_,
         string calldata agentURI
     ) external payable nonReentrant returns (uint256 agentId) {
-        // Allowlist phase blocks public mints. Semantics of allowlistEndTime:
-        //   - 0           → allowlist runs forever (public mint stays closed)
-        //   - >block.ts   → allowlist still active (public mint blocked)
-        //   - <=block.ts  → allowlist ended (public mint open)
-        // Mirrors `mintAgentAllowlist`'s `endTime > 0 && block.timestamp > endTime`
-        // termination check so both paths agree on what "no end time" means.
+        _assertStandardMintGate();
+        agentId = _nextTokenId++;
+        mintedPerWallet[msg.sender]++;
+        _executeMint(agentId, name_, agentURI);
+    }
+
+    /// @dev Shared validation for the public mint paths (`mintAgent` and
+    ///      `mintAgentWithFullStack`). Pulled out to keep the two paths
+    ///      in lock-step and to reclaim bytecode under EIP-170.
+    ///
+    ///      `allowlistEndTime` semantics:
+    ///        - 0           → allowlist runs forever (public mint stays closed)
+    ///        - >block.ts   → allowlist still active (public mint blocked)
+    ///        - <=block.ts  → allowlist ended (public mint open)
+    ///      Mirrors `mintAgentAllowlist`'s termination check so both paths
+    ///      agree on what "no end time" means.
+    function _assertStandardMintGate() private view {
         if (allowlistRoot != bytes32(0)) {
             if (allowlistEndTime == 0 || block.timestamp <= allowlistEndTime) {
                 revert AllowlistPhaseActive();
             }
         }
-
-        // Check mint conditions
         if (locked) revert CollectionLocked();
         if (mintingPaused) revert MintingIsPaused();
         if (mintStartTime > 0 && block.timestamp < mintStartTime) revert MintingNotActive();
@@ -334,10 +356,6 @@ contract AgentCollectionImpl is
         if (maxSupply > 0 && _nextTokenId > maxSupply) revert MaxSupplyReached();
         if (maxPerWallet > 0 && mintedPerWallet[msg.sender] >= maxPerWallet) revert MaxPerWalletReached();
         if (msg.value < mintPrice) revert InsufficientPayment();
-
-        agentId = _nextTokenId++;
-        mintedPerWallet[msg.sender]++;
-        _executeMint(agentId, name_, agentURI);
     }
 
     /// @dev Common path shared by `mintAgent` and `mintAgentAllowlist`. Writes
@@ -347,36 +365,22 @@ contract AgentCollectionImpl is
     ///      impl bytecode under EIP-170 and ensure the two mint paths cannot
     ///      drift apart silently.
     function _executeMint(uint256 agentId, string calldata name_, string calldata agentURI) private {
-        _callBeforeMint(agentId, msg.sender, "");
-
-        _safeMint(msg.sender, agentId);
         // Empty `agentURI` signals "resolve via collectionBaseURI + id + .json"
-        // in the tokenURI() override below. This is the generative-drop path
-        // where the creator has pre-uploaded all metadata to a shared folder.
-        if (bytes(agentURI).length > 0) {
-            _setTokenURI(agentId, agentURI);
-        }
-
-        agents[agentId] = AgentMetadata({
-            name: name_,
-            tbaAddress: address(0),
-            createdAt: block.timestamp,
-            active: true
-        });
-
-        _agentCreator[agentId] = msg.sender;
-        _salesRoyaltyBps[agentId] = defaultSalesRoyaltyBps;
-        _serviceRoyaltyBps[agentId] = defaultServiceRoyaltyBps;
+        // in the tokenURI() override below — the generative-drop path where
+        // the creator pre-uploads all metadata to a shared folder. The
+        // `_writeAgentRecord` helper handles that conditional + the rest of
+        // the storage writes + before/after-mint hooks + events.
+        _writeAgentRecord(
+            agentId, name_, agentURI,
+            defaultSalesRoyaltyBps, defaultServiceRoyaltyBps,
+            /* forceSetTokenURI */ false
+        );
 
         AgentCollectionPaymentLib.splitMintPayment(
             protocolFeeRecipient,
             protocolPrimaryFeeBps,
             _financialRecipient()
         );
-
-        emit AgentRegistered(agentId, msg.sender, name_, agentURI);
-        emit CreatorRoyaltySet(agentId, msg.sender, defaultSalesRoyaltyBps, defaultServiceRoyaltyBps);
-        _callAfterMint(agentId, msg.sender, "");
     }
 
     /**
@@ -1118,41 +1122,25 @@ contract AgentCollectionImpl is
     //      the same tx as the mint. The receiver authorises the call because
     //      it sees `msg.sender == address(this) == trustedRegistrarFor[this]`.
 
-    /// @inheritdoc IAgentNFTAdapter
-    /// @dev Returns the *collection-level* financial recipient + the
-    ///      per-token service royalty bps. See {IAgentNFTAdapter} for the
-    ///      "creator vs minter" rationale: the splitter (or
-    ///      `collectionCreator` if no splitter is wired) is the canonical
-    ///      service-side royalty recipient — NOT the per-token minter.
+    /// @notice {IAgentNFTAdapter} adapter view — collection-level financial
+    ///         recipient + per-token service royalty bps. Matches the
+    ///         {IAgentNFTAdapter} ABI by selector; the interface is NOT in
+    ///         the inheritance tree because doing so forces a diamond-
+    ///         resolution `ownerOf` override that bloats bytecode without
+    ///         improving ABI compatibility.
     function serviceRoyaltyOf(uint256 tokenId)
         external
         view
-        override
         returns (address creator, uint256 bps)
     {
-        // Reverts on non-existent ids — matches IAgentNFTAdapter contract.
-        ownerOf(tokenId);
+        ownerOf(tokenId); // existence revert
         creator = _financialRecipient();
         bps     = _serviceRoyaltyBps[tokenId];
     }
 
-    /// @inheritdoc IAgentNFTAdapter
-    /// @dev Disambiguates ERC721Upgradeable.ownerOf vs IAgentNFTAdapter.ownerOf
-    ///      (diamond resolution). The base ERC-721 implementation already
-    ///      performs the existence check (reverts on unowned ids), which
-    ///      satisfies IAgentNFTAdapter's "MUST revert" contract.
-    function ownerOf(uint256 tokenId)
-        public
-        view
-        override(ERC721Upgradeable, IERC721, IAgentNFTAdapter)
-        returns (address)
-    {
-        return super.ownerOf(tokenId);
-    }
-
-    /// @inheritdoc IAgentNFTAdapter
-    function tbaOf(uint256 tokenId) external view override returns (address) {
-        ownerOf(tokenId); // existence check
+    /// @notice {IAgentNFTAdapter} adapter view — token-bound account address.
+    function tbaOf(uint256 tokenId) external view returns (address) {
+        ownerOf(tokenId); // existence revert
         return agents[tokenId].tbaAddress;
     }
 
@@ -1192,22 +1180,9 @@ contract AgentCollectionImpl is
         address token,
         uint256 price
     ) external payable nonReentrant returns (uint256 agentId, address tba) {
-        // ─── Same gating as `mintAgent` ─────────────────────────────────
-        // Mirrored verbatim — pulling it into a helper would force
-        // `_executeMint` to grow new params and risk diverging from the
-        // audited path.
-        if (allowlistRoot != bytes32(0)) {
-            if (allowlistEndTime == 0 || block.timestamp <= allowlistEndTime) {
-                revert AllowlistPhaseActive();
-            }
-        }
-        if (locked) revert CollectionLocked();
-        if (mintingPaused) revert MintingIsPaused();
-        if (mintStartTime > 0 && block.timestamp < mintStartTime) revert MintingNotActive();
-        if (mintEndTime   > 0 && block.timestamp > mintEndTime)   revert MintingNotActive();
-        if (maxSupply > 0 && _nextTokenId > maxSupply) revert MaxSupplyReached();
-        if (maxPerWallet > 0 && mintedPerWallet[msg.sender] >= maxPerWallet) revert MaxPerWalletReached();
-        if (msg.value < mintPrice) revert InsufficientPayment();
+        // Same gating as `mintAgent` — centralised in `_assertStandardMintGate`
+        // so both paths can never drift apart silently.
+        _assertStandardMintGate();
 
         agentId = _nextTokenId++;
         mintedPerWallet[msg.sender]++;
