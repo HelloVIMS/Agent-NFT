@@ -5,7 +5,7 @@
 # Agent NFT
 
 <p align="center">
-  <img src="https://img.shields.io/badge/license-MIT-emerald?style=flat-square" alt="License"/>
+  <img src="https://img.shields.io/badge/license-AGPL--3.0-emerald?style=flat-square" alt="License"/>
   <img src="https://img.shields.io/badge/Solidity-0.8.20-blue?style=flat-square&logo=solidity&logoColor=white" alt="Solidity"/>
   <img src="https://img.shields.io/badge/Foundry-passing-green?style=flat-square" alt="Foundry"/>
   <img src="https://img.shields.io/badge/tests-579%20passing-green?style=flat-square" alt="Tests"/>
@@ -893,4 +893,8 @@ bytecode actually satisfies — no aspirational entries.
 
 ## License
 
-MIT. See [LICENSE](./LICENSE).
+GNU Affero General Public License v3.0 or later (`AGPL-3.0-or-later`). See [LICENSE](./LICENSE).
+
+The contracts are open source under the AGPL. The companion SDK
+(`vimsbot-sdk`) and marketplace (`vimsbot-marketplace`) are proprietary and
+not covered by this license; contact support@vims.com for licensing terms.
