@@ -62,6 +62,7 @@ contract RevenueLevelHook is BaseEvolutionHook {
 
     function onTrigger(uint256 agentId, bytes32 triggerKind, bytes calldata)
         external
+        view
         override
         returns (EvolutionTypes.EvolutionResult memory r)
     {

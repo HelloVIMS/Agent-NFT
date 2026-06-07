@@ -150,6 +150,7 @@ contract AgentStatusHook is BaseEvolutionHook, VimsProvenance {
     ///         {onTrigger}; mutations happen in {setStatus}.
     function onTrigger(uint256 agentId, bytes32 triggerKind, bytes calldata)
         external
+        view
         override
         returns (EvolutionTypes.EvolutionResult memory r)
     {

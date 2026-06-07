@@ -391,8 +391,10 @@ contract AgentPaymentRouter is ReentrancyGuard, Ownable, VimsProvenance {
         uint256 amount,
         address recipientOverride
     ) internal {
-        // Validate and get agent info
-        (address owner, address recipient, address creator, uint256 royaltyBps) = _validateAndGetAgentInfo(agentId);
+        // Validate and get agent info (owner is only required for the
+        // validation side-effect; the recipient + creator splits are what
+        // we actually use downstream).
+        (, address recipient, address creator, uint256 royaltyBps) = _validateAndGetAgentInfo(agentId);
         if (recipientOverride != address(0)) recipient = recipientOverride;
         
         // Calculate splits
