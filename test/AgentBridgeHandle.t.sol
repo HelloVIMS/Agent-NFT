@@ -142,6 +142,7 @@ contract AgentBridgeHandleTest is Test {
     function test_bridgeBack_revertsForNonOwnerOfMirror() public {
         uint256 mirrorId = 555;
         _seedMirror(mirrorId, user);
+        vm.deal(attacker, 1 ether);
 
         vm.prank(attacker);
         vm.expectRevert(AgentBridge.NotTokenOwner.selector);
