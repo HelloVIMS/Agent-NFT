@@ -81,6 +81,27 @@ contract HookCoverageSweepTest is Test {
         assertGt(r.newSvgInline.length, 50);
     }
 
+    function test_oracle_onTrigger_rendersAllThreeBands() public {
+        OracleMock om = new OracleMock();
+        OracleHook h = new OracleHook(address(om), 40_000 * 1e8, 60_000 * 1e8);
+
+        om.setAnswer(30_000 * 1e8); // Bear → down arrow
+        EvolutionTypes.EvolutionResult memory rBear = h.onTrigger(1, TRIG_ORACLE, "");
+        assertTrue(rBear.svgChanged);
+
+        om.setAnswer(50_000 * 1e8); // Neutral → bar
+        EvolutionTypes.EvolutionResult memory rNeutral = h.onTrigger(1, TRIG_ORACLE, "");
+        assertTrue(rNeutral.svgChanged);
+
+        om.setAnswer(70_000 * 1e8); // Bull → up arrow
+        EvolutionTypes.EvolutionResult memory rBull = h.onTrigger(1, TRIG_ORACLE, "");
+        assertTrue(rBull.svgChanged);
+
+        // Distinct SVG outputs.
+        assertTrue(keccak256(rBear.newSvgInline) != keccak256(rNeutral.newSvgInline));
+        assertTrue(keccak256(rNeutral.newSvgInline) != keccak256(rBull.newSvgInline));
+    }
+
     function test_oracle_readBand_bearAndNeutralAndBull() public {
         OracleMock om = new OracleMock();
         OracleHook h = new OracleHook(address(om), 40_000 * 1e8, 60_000 * 1e8);
