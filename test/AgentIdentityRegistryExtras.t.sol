@@ -45,7 +45,7 @@ contract AgentIdentityRegistryExtrasTest is Test {
     function test_registerAgent_revertsForNonSelfAnchor() public {
         vm.prank(alice);
         vm.expectRevert(AgentIdentityRegistry.InvalidValue.selector);
-        registry.registerAgent("X", "ipfs://x", 500, anchor);
+        registry.registerAgent("X", "ipfs://x", 500, anchor); // anchor != alice
     }
 
     // ─── tokenURI fallback (no on-chain SVG) ─────────────────────────────
