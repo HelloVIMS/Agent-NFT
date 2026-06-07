@@ -260,13 +260,26 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
         require(value <= key.maxValuePerTx, "Exceeds per-tx value limit");
         require(key.usedValue + value <= key.maxTotalValue, "Exceeds total value limit");
         
-        // Verify signature (includes chain ID to prevent cross-chain replay)
-        bytes32 messageHash = keccak256(abi.encodePacked(
+        // Verify signature.
+        //
+        // We use abi.encode (NOT abi.encodePacked) because two of the inputs
+        // are dynamic — `data` (bytes) is followed by `state` (uint256) under
+        // the hash. With encodePacked the dynamic field has no length prefix,
+        // so a crafted (data', state') tuple where data' = data || extraBytes
+        // can produce the same packed pre-image as (data, state) for some
+        // data', extraBytes. abi.encode prefixes dynamic fields with their
+        // length and disambiguates each argument by ABI position, eliminating
+        // collision-via-padding.
+        //
+        // Chain ID is included in the message to prevent cross-chain replay.
+        // `state` is the per-account nonce — incremented after the call —
+        // and prevents same-chain replay of a successful execution.
+        bytes32 messageHash = keccak256(abi.encode(
             address(this),
-            block.chainid,  // V2: Added chain ID for cross-chain replay protection
+            block.chainid,
             to,
             value,
-            data,
+            keccak256(data),
             state
         ));
         bytes32 ethSignedHash = keccak256(abi.encodePacked(

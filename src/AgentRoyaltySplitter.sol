@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {VimsProvenance} from "./VimsProvenance.sol";
 
 /**
@@ -20,7 +21,12 @@ import {VimsProvenance} from "./VimsProvenance.sol";
  *         Release is permissionless and idempotent. Anyone can call
  *         {release} or {release(IERC20)} to flush the per-payee balance.
  */
-contract AgentRoyaltySplitter is VimsProvenance {
+// Defense-in-depth: ReentrancyGuard. The contract is already CEI-correct
+// (state writes precede external calls), but a future maintainer adding
+// a side-effect after the call site would silently introduce a re-entrancy
+// vector that audit-suite tests aren't guaranteed to catch. Guard the four
+// release entry points unconditionally.
+contract AgentRoyaltySplitter is VimsProvenance, ReentrancyGuard {
     function _vimsContractName() internal pure override returns (string memory) {
         return "AgentRoyaltySplitter";
     }
@@ -122,7 +128,7 @@ contract AgentRoyaltySplitter is VimsProvenance {
      * @notice Release pending ETH for `account`. Anyone can call.
      * @param  account A registered payee.
      */
-    function release(address payable account) public {
+    function release(address payable account) public nonReentrant {
         if (sharesBps[account] == 0) revert NotAPayee();
 
         uint256 payment = releasableEth(account);
@@ -141,7 +147,7 @@ contract AgentRoyaltySplitter is VimsProvenance {
      * @param  token   ERC20 token to release.
      * @param  account A registered payee.
      */
-    function release(IERC20 token, address account) public {
+    function release(IERC20 token, address account) public nonReentrant {
         if (sharesBps[account] == 0) revert NotAPayee();
 
         uint256 payment = releasableErc20(token, account);
@@ -162,7 +168,7 @@ contract AgentRoyaltySplitter is VimsProvenance {
      *         individually via {release(address)} once they fix their receiver
      *         (e.g., upgrade their wallet contract).
      */
-    function releaseAll() external {
+    function releaseAll() external nonReentrant {
         uint256 len = _payees.length;
         for (uint256 i = 0; i < len; ++i) {
             address payable acct = payable(_payees[i]);
@@ -185,7 +191,7 @@ contract AgentRoyaltySplitter is VimsProvenance {
     /**
      * @notice Convenience: release `token` to all payees in one call.
      */
-    function releaseAll(IERC20 token) external {
+    function releaseAll(IERC20 token) external nonReentrant {
         uint256 len = _payees.length;
         for (uint256 i = 0; i < len; ++i) {
             address acct = _payees[i];
