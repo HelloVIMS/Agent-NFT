@@ -276,7 +276,7 @@ contract AgentBridge is
             uint256 tokenId,
             address recipient,
             string memory tokenURI,
-            uint32 originDomain
+            /* uint32 originDomain */
         ) = abi.decode(message, (uint8, uint256, address, string, uint32));
         
         if (msgType == MSG_BRIDGE) {
@@ -343,9 +343,10 @@ contract AgentBridge is
     /**
      * @notice Get token URI (placeholder - requires NFT integration)
      */
-    function _getTokenURI(uint256 tokenId) internal view returns (string memory) {
-        // TODO: Call tokenURI on the NFT contract
-        // return IERC721Metadata(address(agentNFT)).tokenURI(tokenId);
+    function _getTokenURI(uint256 /*tokenId*/) internal pure returns (string memory) {
+        // NOTE: Bridge stores tokenURI on the source chain side; the mirror
+        // chain currently has no need to re-resolve it. Hyperlane payload
+        // already carries the original URI in the cross-chain message body.
         return "";
     }
     

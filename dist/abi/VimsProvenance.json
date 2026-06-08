@@ -1,0 +1,94 @@
+[
+  {
+    "type": "function",
+    "name": "VIMS_AUTHOR",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "VIMS_LICENSE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "VIMS_REPO",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "VIMS_VERSION",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "vimsAttest",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "vimsProvenance",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "author",
+        "type": "bytes32"
+      },
+      {
+        "name": "repo",
+        "type": "bytes32"
+      },
+      {
+        "name": "license",
+        "type": "bytes32"
+      },
+      {
+        "name": "version",
+        "type": "string"
+      },
+      {
+        "name": "contractName",
+        "type": "string"
+      },
+      {
+        "name": "magic",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  }
+]

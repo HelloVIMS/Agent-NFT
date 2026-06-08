@@ -48,12 +48,12 @@ contract AgentTBARegistry is VimsProvenance {
      * @dev Only creates TBAs for valid Agent tokens from the linked IdentityRegistry
      * @param tokenId The Agent token ID
      * @param salt Additional salt for address derivation
-     * @return account The created account address
+     * @return newAccount The created account address
      */
     function createAccount(
         uint256 tokenId,
         bytes32 salt
-    ) external returns (address account) {
+    ) external returns (address newAccount) {
         // Validate token exists in our identity registry
         address tokenOwner;
         try IAgentIdentityRegistry(identityRegistry).ownerOf(tokenId) returns (address _owner) {
@@ -73,7 +73,7 @@ contract AgentTBARegistry is VimsProvenance {
         );
         if (existingAccount.code.length > 0) revert TBAAlreadyExists();
         
-        account = _createAccount(
+        newAccount = _createAccount(
             implementation,
             salt,
             block.chainid,
@@ -84,14 +84,14 @@ contract AgentTBARegistry is VimsProvenance {
         // Auto-register TBA address back to identity registry
         // Note: This will only work if called by token owner (registry checks ownership)
         // If caller is not owner, they can manually call setTBAAddress later
-        try IAgentIdentityRegistry(identityRegistry).setTBAAddress(tokenId, account) {
+        try IAgentIdentityRegistry(identityRegistry).setTBAAddress(tokenId, newAccount) {
             // Successfully registered
         } catch {
             // Caller not owner - TBA still created, just not auto-registered
         }
         
         emit AccountCreated(
-            account,
+            newAccount,
             implementation,
             salt,
             block.chainid,
@@ -105,16 +105,16 @@ contract AgentTBARegistry is VimsProvenance {
      * @param tokenContract The token contract address (must match identityRegistry)
      * @param tokenId The Agent token ID
      * @param salt Additional salt for address derivation
-     * @return account The created account address
+     * @return newAccount The created account address
      */
     function createAccountLegacy(
         address tokenContract,
         uint256 tokenId,
         bytes32 salt
-    ) external returns (address account) {
+    ) external returns (address newAccount) {
         require(tokenContract == identityRegistry, "Must use linked registry");
         
-        account = _createAccount(
+        newAccount = _createAccount(
             implementation,
             salt,
             block.chainid,
@@ -123,7 +123,7 @@ contract AgentTBARegistry is VimsProvenance {
         );
         
         emit AccountCreated(
-            account,
+            newAccount,
             implementation,
             salt,
             block.chainid,
@@ -188,13 +188,13 @@ contract AgentTBARegistry is VimsProvenance {
         
         bytes32 salt = keccak256(abi.encodePacked(_salt, chainId, tokenContract, tokenId));
         
-        address _account = Create2.computeAddress(salt, keccak256(code));
+        address predicted = Create2.computeAddress(salt, keccak256(code));
         
-        if (_account.code.length != 0) return _account;
+        if (predicted.code.length != 0) return predicted;
         
-        _account = Create2.deploy(0, salt, code);
+        predicted = Create2.deploy(0, salt, code);
         
-        return _account;
+        return predicted;
     }
     
     function _account(
