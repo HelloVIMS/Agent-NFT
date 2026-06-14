@@ -21,7 +21,7 @@
     "AgentRoyaltySplitterFactory":"0x785d63DE8d3EE714A5F550f1FcE2593154B98393"
   },
   "implementations": {
-    "AgentIdentityRegistry":  "0xf04A33b2f9DD5fE9B8248Af134fa502D468D8397",
+    "AgentIdentityRegistry":  "0xF04A33b2f9dd5fE9B8248Af134fa502d468d8397",
     "AgentReputationRegistry":"0x4198D94008A348261DcceCeeed6711B10eb60519",
     "AgentContextRegistry":   "0x5a31595F915dC8e2b67A1397BaDdA19D1d734ca3",
     "AgentMemory":            "0xEE3B214e08d54042Ae72991DF8D67D9Abb839F6A",
@@ -29,9 +29,9 @@
     "AgentCollectionImpl":    "0x9A0E93F14385e94F50284Ab4D973fbCBa3746f9d"
   },
   "agentCollectionLibraries": {
-    "AgentCollectionRenderer":   "0x167655252e710533083c12e0EA48c10d1f92F2fa",
-    "AgentCollectionEIP712":     "0xc8C233ceA8D2D6edCcE00bF6744e4aA8d4F5B8C7",
-    "AgentCollectionPaymentLib": "0x14C2B4259155cA4179a547064D977C8CA42BefBE",
+    "AgentCollectionRenderer":   "0x167655252e710533083C12e0Ea48c10d1F92f2FA",
+    "AgentCollectionEIP712":     "0xc8c233Cea8d2d6EDCce00Bf6744e4aA8d4F5b8C7",
+    "AgentCollectionPaymentLib": "0x14c2b4259155CA4179A547064d977c8CA42BeFBe",
     "deployedAt":                "2026-05-10T05:15:00Z",
     "notes":                     "Linked external libraries for AgentCollectionImpl. PaymentLib added to keep impl bytecode under EIP-170 once collectionBaseURI / Pattern B was added; EIP712 grew a verifyCommit() entry that consolidates the keeper signature verification block."
   },
@@ -56,8 +56,8 @@
   "implementationHistory": {
     "AgentIdentityRegistry": [
       { "version": "v1", "address": "0xE55E549d0e4D7cF99f4EFc1a28Bb760997fC54cD", "deployedAt": "2026-04-29T17:00:00Z" },
-      { "version": "v7",   "address": "0xf6658189b7e48945f3fE648EE41ac833e24A0D4c", "deployedAt": "2026-04-30T17:00:00Z", "notes": "Adds secondary-market royalty splitter (ERC-2981 vault)" },
-      { "version": "v7.1", "address": "0xf04A33b2f9DD5fE9B8248Af134fa502D468D8397", "deployedAt": "2026-04-30T17:10:00Z", "notes": "Lowers MIN_CREATOR_ROYALTY_BPS from 100 to 0 (creators may opt out of royalties)" }
+      { "version": "v7",   "address": "0xf6658189B7e48945f3fE648eE41ac833E24A0d4c", "deployedAt": "2026-04-30T17:00:00Z", "notes": "Adds secondary-market royalty splitter (ERC-2981 vault)" },
+      { "version": "v7.1", "address": "0xF04A33b2f9dd5fE9B8248Af134fa502d468d8397", "deployedAt": "2026-04-30T17:10:00Z", "notes": "Lowers MIN_CREATOR_ROYALTY_BPS from 100 to 0 (creators may opt out of royalties)" }
     ]
   },
   "secondaryRoyalty": {
