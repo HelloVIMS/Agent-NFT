@@ -11,6 +11,7 @@ import {EvolutionTypes} from "./hooks/EvolutionTypes.sol";
 import {AgentCollectionRenderer} from "./AgentCollectionRenderer.sol";
 import {AgentCollectionEIP712} from "./AgentCollectionEIP712.sol";
 import {AgentCollectionPaymentLib} from "./AgentCollectionPaymentLib.sol";
+import {AgentCollectionPixeLib} from "./AgentCollectionPixeLib.sol";
 
 /**
  * @title AgentCollectionImpl
@@ -657,27 +658,21 @@ contract AgentCollectionImpl is
         string calldata description
     ) external returns (uint256 version) {
         if (ownerOf(agentId) != msg.sender) revert NotOwner();
-        if (bytes(arweaveTxId).length == 0) revert EmptyInput();
-        if (contentHash == bytes32(0)) revert EmptyInput();
-        if (_pixeVersions[agentId].length >= MAX_PIXE_VERSIONS) revert MaxReached();
-
-        version = _pixeVersions[agentId].length;
-        uint16 baseVer = version > 0 ? uint16(version - 1) : 0;
-
-        _pixeVersions[agentId].push(PixeVersion({
-            arweaveTxId: arweaveTxId,
-            contentHash: contentHash,
-            versionType: version == 0 ? 1 : 0,
-            timestamp: uint48(block.timestamp),
-            baseVersion: baseVer,
-            description: description
-        }));
-
-        if (version == 0) {
-            latestConsolidatedVersion[agentId] = 0;
-        }
-
-        emit PixeVersionAdded(agentId, version, contentHash, version == 0 ? 1 : 0, arweaveTxId);
+        // Delegate to library — DELEGATECALL preserves storage, msg.sender,
+        // and emits events as if they fired from this impl. Bytecode budget:
+        // ~1 KB recovered vs the inlined block (audit P0 invariant B.2).
+        version = AgentCollectionPixeLib.addPixeVersion(
+            // Cast our local PixeVersion[] storage map to the lib's matching
+            // type. The two struct definitions have identical layout (kept
+            // in lockstep by `audit/INVARIANTS.md` §J.2).
+            _pixeVersionsForLib(),
+            latestConsolidatedVersion,
+            MAX_PIXE_VERSIONS,
+            agentId,
+            arweaveTxId,
+            contentHash,
+            description
+        );
     }
 
     function consolidateVersions(
@@ -688,39 +683,40 @@ contract AgentCollectionImpl is
         string calldata description
     ) external returns (uint256 version) {
         if (ownerOf(agentId) != msg.sender) revert NotOwner();
-        if (bytes(arweaveTxId).length == 0) revert EmptyInput();
-        if (contentHash == bytes32(0)) revert EmptyInput();
-        if (merkleRoot == bytes32(0)) revert EmptyInput();
-        if (_pixeVersions[agentId].length >= MAX_PIXE_VERSIONS) revert MaxReached();
-        if (_pixeVersions[agentId].length == 0) revert NotExists();
+        version = AgentCollectionPixeLib.consolidateVersions(
+            _pixeVersionsForLib(),
+            _consolidationsForLib(),
+            latestConsolidatedVersion,
+            MAX_PIXE_VERSIONS,
+            agentId,
+            arweaveTxId,
+            contentHash,
+            merkleRoot,
+            description
+        );
+    }
 
-        uint16 fromVer = latestConsolidatedVersion[agentId];
-        uint16 toVer = uint16(_pixeVersions[agentId].length - 1);
-        if (toVer <= fromVer) revert InvalidValue();
+    /// @dev Type-cast helper — the impl's `PixeVersion` and the library's
+    ///      have identical storage layout, so we expose the storage map to
+    ///      the library through assembly without copying. This keeps the
+    ///      types decoupled at the source level while sharing one storage
+    ///      slot tree.
+    function _pixeVersionsForLib()
+        private
+        view
+        returns (mapping(uint256 => AgentCollectionPixeLib.PixeVersion[]) storage s)
+    {
+        mapping(uint256 => PixeVersion[]) storage src = _pixeVersions;
+        assembly { s.slot := src.slot }
+    }
 
-        version = _pixeVersions[agentId].length;
-
-        _pixeVersions[agentId].push(PixeVersion({
-            arweaveTxId: arweaveTxId,
-            contentHash: contentHash,
-            versionType: 1,
-            timestamp: uint48(block.timestamp),
-            baseVersion: toVer,
-            description: description
-        }));
-
-        _consolidations[agentId].push(ConsolidationRecord({
-            fromVersion: fromVer,
-            toVersion: toVer,
-            merkleRoot: merkleRoot,
-            resultVersion: uint16(version),
-            consolidatedAt: uint48(block.timestamp)
-        }));
-
-        latestConsolidatedVersion[agentId] = uint16(version);
-
-        emit PixeConsolidated(agentId, fromVer, toVer, uint16(version), merkleRoot);
-        emit PixeVersionAdded(agentId, version, contentHash, 1, arweaveTxId);
+    function _consolidationsForLib()
+        private
+        view
+        returns (mapping(uint256 => AgentCollectionPixeLib.ConsolidationRecord[]) storage s)
+    {
+        mapping(uint256 => ConsolidationRecord[]) storage src = _consolidations;
+        assembly { s.slot := src.slot }
     }
 
     function getPixeVersion(uint256 agentId, uint256 version) external view returns (
