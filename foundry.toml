@@ -19,6 +19,27 @@ optimizer_runs = 1
 via_ir = true
 bytecode_hash = "none"
 
+# Fast iteration profile. Keeps `via_ir = true` (required — without it
+# `AgentContextRegistry` hits Stack-Too-Deep) but bumps `optimizer_runs`
+# to 200 so the IR pipeline skips the aggressive size-shrinking passes
+# that runs=1 triggers. Cuts clean build from ~5 min to ~2 min and
+# incrementals to <30 s. DOES NOT respect the EIP-170 budget — the
+# bytecode-size audit test is expected to fail under this profile.
+# Use ONLY for local TDD. CI + mainnet deploy MUST use the default profile.
+#
+# Usage:
+#   FOUNDRY_PROFILE=dev forge build
+#   FOUNDRY_PROFILE=dev forge test --match-test <pattern>
+[profile.dev]
+src = "src"
+out = "out-dev"          # separate cache so it never poisons release artifacts
+libs = ["lib"]
+solc = "0.8.24"
+optimizer = true
+optimizer_runs = 200
+via_ir = true
+bytecode_hash = "none"
+
 [rpc_endpoints]
 base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
 base = "${BASE_RPC_URL}"

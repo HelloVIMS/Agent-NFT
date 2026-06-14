@@ -34,10 +34,10 @@ covered.
 - **B.2 — Critical contracts (`AgentCollectionImpl`, `AgentIdentityRegistry`)
   emit a warning when within 1 KB of the ceiling.**
   → same suite, console-only warning
-  - **Current margins:** `AgentCollectionImpl` **1,250 B** (recovered from
-    145 B by extracting Pixelog versioning to `AgentCollectionPixeLib`),
-    `AgentIdentityRegistry` 348 B. Tracked in `MAINNET_READINESS.md` —
-    `AgentIdentityRegistry` margin is the remaining open item.
+  - **Current margins:** `AgentCollectionImpl` **680 B** (after Pixelog
+    extraction + per-token metadata-mode lock + shared `_commitAgent`
+    helper; mode lock cost ~570 B from the 1,250 B post-Pixelog margin),
+    `AgentIdentityRegistry` 348 B. Tracked in `MAINNET_READINESS.md`.
 
 ## C. Payment routing (AgentPaymentRouter)
 

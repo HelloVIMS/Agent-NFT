@@ -66,6 +66,11 @@ contract AgentCollectionImpl is
     error HookSignatureInvalid();
     error HookNonceUsed();
     error HookAddressInvalid();
+    /// @dev Setter does not match the token's locked-at-mint metadata mode.
+    error MetadataModeLocked();
+    /// @dev `mintAgent('','')` invoked but `collectionBaseURI` was never set.
+    ///      Modes are locked at mint — no silent fallback to empty URI.
+    error CollectionBaseURINotSet();
 
     // Reentrancy guard
     uint256 private constant _NOT_ENTERED = 1;
@@ -119,6 +124,16 @@ contract AgentCollectionImpl is
         uint16 resultVersion;
         uint48 consolidatedAt;
     }
+
+    /// @notice Per-token metadata source. Locked at mint — a token's
+    ///         resolution path is determined exactly once and can never
+    ///         change. No fallbacks, no precedence chain in `tokenURI()`.
+    enum MetadataMode {
+        ExplicitURI,  // 0 — default; URI stored via ERC-721URIStorage
+        BaseURI,      // 1 — sequential composed from `collectionBaseURI`
+        OnChainSVG    // 2 — rendered from `_svgImages[id]`
+    }
+    mapping(uint256 => MetadataMode) public metadataMode;
 
     mapping(uint256 => AgentMetadata) public agents;
     mapping(address => uint256[]) public ownerAgents;
@@ -296,13 +311,40 @@ contract AgentCollectionImpl is
         string calldata agentURI,
         uint256 salesBps,
         uint256 serviceBps,
-        bool forceSetTokenURI
+        bool /* unused, kept for ABI continuity */
+    ) private {
+        // Lock the metadata resolution mode at mint. Either an explicit
+        // per-token URI was provided (ExplicitURI — enum default 0, no
+        // SSTORE) or the collection has pre-configured `collectionBaseURI`
+        // (BaseURI). OnChainSVG mode is reachable only via
+        // `mintAgentWithSVG` so the SVG bytes are committed atomically.
+        // No silent fallbacks.
+        bool explicit = bytes(agentURI).length > 0;
+        if (!explicit && bytes(collectionBaseURI).length == 0) revert CollectionBaseURINotSet();
+
+        _commitAgent(agentId, name_, salesBps, serviceBps);
+        if (explicit) {
+            _setTokenURI(agentId, agentURI);
+        } else {
+            metadataMode[agentId] = MetadataMode.BaseURI;
+        }
+        emit AgentRegistered(agentId, msg.sender, name_, agentURI);
+        emit CreatorRoyaltySet(agentId, msg.sender, salesBps, serviceBps);
+        _callAfterMint(agentId, msg.sender, "");
+    }
+
+    /// @dev Shared mint-time storage write: hooks, ERC-721 mint, agent
+    ///      record, soulbound creator + royalty bps. Callers append the
+    ///      mode-specific writes (URI / SVG / nothing-for-BaseURI) and
+    ///      emit the canonical events.
+    function _commitAgent(
+        uint256 agentId,
+        string calldata name_,
+        uint256 salesBps,
+        uint256 serviceBps
     ) private {
         _callBeforeMint(agentId, msg.sender, "");
         _safeMint(msg.sender, agentId);
-        if (forceSetTokenURI || bytes(agentURI).length > 0) {
-            _setTokenURI(agentId, agentURI);
-        }
         agents[agentId] = AgentMetadata({
             name: name_,
             tbaAddress: address(0),
@@ -312,8 +354,28 @@ contract AgentCollectionImpl is
         _agentCreator[agentId]      = msg.sender;
         _salesRoyaltyBps[agentId]   = salesBps;
         _serviceRoyaltyBps[agentId] = serviceBps;
-        emit AgentRegistered(agentId, msg.sender, name_, agentURI);
-        emit CreatorRoyaltySet(agentId, msg.sender, salesBps, serviceBps);
+    }
+
+    /// @notice Mint an agent and atomically commit its on-chain SVG.
+    ///         Mode locked to `OnChainSVG`; mutation restricted to the
+    ///         same mode via {setSVGImage}.
+    function mintAgentWithSVG(
+        string calldata name_,
+        string calldata svg
+    ) external returns (uint256 agentId) {
+        if (locked) revert CollectionLocked();
+        if (maxSupply > 0 && _nextTokenId > maxSupply) revert MaxSupplyReached();
+        if (bytes(svg).length == 0) revert EmptyInput();
+        if (bytes(svg).length > MAX_SVG_SIZE) revert TooLarge();
+
+        agentId = _nextTokenId++;
+        _commitAgent(agentId, name_, defaultSalesRoyaltyBps, defaultServiceRoyaltyBps);
+        metadataMode[agentId] = MetadataMode.OnChainSVG;
+        _svgImages[agentId]   = svg;
+
+        emit AgentRegistered(agentId, msg.sender, name_, "");
+        emit CreatorRoyaltySet(agentId, msg.sender, defaultSalesRoyaltyBps, defaultServiceRoyaltyBps);
+        emit SVGImageSet(agentId, bytes(svg).length);
         _callAfterMint(agentId, msg.sender, "");
     }
 
@@ -551,6 +613,9 @@ contract AgentCollectionImpl is
 
     function updateAgentURI(uint256 agentId, string calldata newURI) external {
         if (ownerOf(agentId) != msg.sender) revert NotOwner();
+        // Mode lock: only ExplicitURI tokens accept URI updates.
+        if (metadataMode[agentId] != MetadataMode.ExplicitURI) revert MetadataModeLocked();
+        if (bytes(newURI).length == 0) revert EmptyInput();
         _setTokenURI(agentId, newURI);
     }
 
@@ -633,6 +698,11 @@ contract AgentCollectionImpl is
 
     function setSVGImage(uint256 agentId, string calldata svg) external {
         if (ownerOf(agentId) != msg.sender) revert NotOwner();
+        // Mode is locked at mint. Only OnChainSVG-mode tokens can have
+        // their SVG bytes mutated; ExplicitURI / BaseURI tokens reject
+        // the call rather than silently storing dead bytes that would
+        // never be served by `tokenURI`.
+        if (metadataMode[agentId] != MetadataMode.OnChainSVG) revert MetadataModeLocked();
         if (bytes(svg).length == 0) revert EmptyInput();
         if (bytes(svg).length > MAX_SVG_SIZE) revert TooLarge();
 
@@ -813,8 +883,12 @@ contract AgentCollectionImpl is
     function tokenURI(uint256 tokenId) public view override(ERC721Upgradeable, ERC721URIStorageUpgradeable) returns (string memory) {
         if (_ownerOf(tokenId) == address(0)) revert NotExists();
 
-        // On-chain SVG path takes precedence — render the embedded data URI.
-        if (bytes(_svgImages[tokenId]).length > 0) {
+        // Strict switch on the per-token mode set at mint. No fallbacks.
+        // Each branch resolves the canonical metadata source for the
+        // mode the creator committed to when the token was minted.
+        MetadataMode mode = metadataMode[tokenId];
+
+        if (mode == MetadataMode.OnChainSVG) {
             AgentMetadata storage a = agents[tokenId];
             return AgentCollectionRenderer.buildTokenURI(AgentCollectionRenderer.TokenURIInput({
                 tokenId:               tokenId,
@@ -833,20 +907,12 @@ contract AgentCollectionImpl is
             }));
         }
 
-        // Per-token explicit URI (legacy / hybrid) — returned as-is.
-        string memory stored = super.tokenURI(tokenId);
-        if (bytes(stored).length > 0) {
-            return stored;
-        }
-
-        // Generative-drop fallback: composed from `collectionBaseURI`.
-        // Delegated to the renderer library so the impl bytecode stays
-        // under the EIP-170 ceiling.
-        if (bytes(collectionBaseURI).length > 0) {
+        if (mode == MetadataMode.BaseURI) {
             return AgentCollectionRenderer.buildSequentialURI(collectionBaseURI, tokenId);
         }
 
-        return "";
+        // ExplicitURI (default). Returns the per-token frozen URI string.
+        return super.tokenURI(tokenId);
     }
 
     // ============ ERC-2981 Royalty ============
