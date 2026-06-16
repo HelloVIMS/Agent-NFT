@@ -21,7 +21,7 @@
     "AgentRoyaltySplitterFactory":"0x785d63DE8d3EE714A5F550f1FcE2593154B98393"
   },
   "implementations": {
-    "AgentIdentityRegistry":  "0xF04A33b2f9dd5fE9B8248Af134fa502d468d8397",
+    "AgentIdentityRegistry":  "0xCBBa112c05A97E1880e21504984acf40351D94b3",
     "AgentReputationRegistry":"0x4198D94008A348261DcceCeeed6711B10eb60519",
     "AgentContextRegistry":   "0x5a31595F915dC8e2b67A1397BaDdA19D1d734ca3",
     "AgentMemory":            "0xEE3B214e08d54042Ae72991DF8D67D9Abb839F6A",
@@ -60,11 +60,12 @@
     "notes":                 "v0.9.1 testnet beacon-proxy factory + impl. Adds collectionBaseURI + setBaseURI(), so creators can pre-upload shuffled metadata to IPFS and `tokenURI(id)` resolves to `${baseURI}${id}.json` for any token minted via mintAgent('','') / mintAgentAllowlist('','',proof). Bytecode kept under EIP-170 by linking AgentCollectionRenderer, AgentCollectionEIP712 (with verifyCommit consolidating the keeper signature flow), and AgentCollectionPaymentLib (primary-mint payment split). createCollectionWithSplits() keeps msg.sender as collectionCreator (governance: hooks, mint config, allowlist, baseURI, lock) and wires the splitter as royaltyReceiver via setRoyaltyReceiverOnce."
   },
   "implementationHistory": {
-    "_note": "Pre-mainnet testnet iterations. The current canonical version is v0.9.1; earlier entries are kept for forensic continuity only.",
+    "_note": "Pre-mainnet testnet iterations. The current canonical version is v0.9.2; earlier entries are kept for forensic continuity only.",
     "AgentIdentityRegistry": [
       { "version": "v0.9.0-pre1", "address": "0xE55E549d0e4D7cF99f4EFc1a28Bb760997fC54cD", "deployedAt": "2026-04-29T17:00:00Z" },
       { "version": "v0.9.0",      "address": "0xf6658189B7e48945f3fE648eE41ac833E24A0d4c", "deployedAt": "2026-04-30T17:00:00Z", "notes": "Adds secondary-market royalty splitter (ERC-2981 vault)" },
-      { "version": "v0.9.1",      "address": "0xF04A33b2f9dd5fE9B8248Af134fa502d468d8397", "deployedAt": "2026-04-30T17:10:00Z", "notes": "Current canonical. Lowers MIN_CREATOR_ROYALTY_BPS from 100 to 0 (creators may opt out of royalties)." }
+      { "version": "v0.9.1",      "address": "0xF04A33b2f9dd5fE9B8248Af134fa502d468d8397", "deployedAt": "2026-04-30T17:10:00Z", "notes": "Lowers MIN_CREATOR_ROYALTY_BPS from 100 to 0 (creators may opt out of royalties)." },
+      { "version": "v0.9.2",      "address": "0xCBBa112c05A97E1880e21504984acf40351D94b3", "deployedAt": "2026-06-16T03:33:00Z", "notes": "Current canonical. Impl-only UUPS upgrade so registerAgent/mintWithFullStack record _agentCreator=msg.sender and _creatorRoyaltyBps at mint (prior live impl 0x6467a98c5ecfec830cef3e9e00474c49ff9336e7 left both unset). Verified on-chain: fresh mint returns creator=deployer, royalty=1000bps." }
     ]
   },
   "secondaryRoyalty": {
