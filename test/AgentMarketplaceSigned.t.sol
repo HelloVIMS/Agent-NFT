@@ -97,7 +97,8 @@ contract AgentMarketplaceSignedTest is Test {
             startTime:    0,
             endTime:      endTime,
             salt:         uint256(keccak256(abi.encode(block.number, "ask"))),
-            counter:      market.counters(seller)
+            counter:      market.counters(seller),
+            criteriaRoot: bytes32(0)
         });
     }
 
@@ -114,7 +115,8 @@ contract AgentMarketplaceSignedTest is Test {
             startTime:    0,
             endTime:      endTime,
             salt:         uint256(keccak256(abi.encode(block.number, "bid"))),
-            counter:      market.counters(bidder)
+            counter:      market.counters(bidder),
+            criteriaRoot: bytes32(0)
         });
     }
 
@@ -347,7 +349,8 @@ contract AgentMarketplaceSignedTest is Test {
             startTime:    0,
             endTime:      0,
             salt:         uint256(keccak256("1271-salt")),
-            counter:      market.counters(address(wallet))
+            counter:      market.counters(address(wallet)),
+            criteriaRoot: bytes32(0)
         });
         // Wallet's `signer` (the seller EOA) signs the order digest.
         bytes32 digest = market.hashOrder(o);

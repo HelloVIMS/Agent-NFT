@@ -10,6 +10,7 @@ export { default as AgentMemory_ABI } from './AgentMemory';
 export { default as AgentPaymentRouter_ABI } from './AgentPaymentRouter';
 export { default as AgentX402Receiver_ABI } from './AgentX402Receiver';
 export { default as AgentMarketplace_ABI } from './AgentMarketplace';
+export { default as AgentAuctionHouse_ABI } from './AgentAuctionHouse';
 export { default as AgentRoyaltyVault_ABI } from './AgentRoyaltyVault';
 export { default as AgentRoyaltySplitter_ABI } from './AgentRoyaltySplitter';
 export { default as AgentRoyaltySplitterFactory_ABI } from './AgentRoyaltySplitterFactory';

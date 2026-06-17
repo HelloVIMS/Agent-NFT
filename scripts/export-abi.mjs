@@ -50,6 +50,7 @@ const EXPORTS = [
   'AgentX402Receiver',
   // ── Marketplace ─────────────────────────────────────────────────────
   'AgentMarketplace',
+  'AgentAuctionHouse',
   // ── Royalty + vault ─────────────────────────────────────────────────
   'AgentRoyaltyVault',
   'AgentRoyaltySplitter',

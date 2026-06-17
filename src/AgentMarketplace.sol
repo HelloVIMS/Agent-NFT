@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -61,18 +62,19 @@ contract AgentMarketplace is
         OrderSide side;
         address   offerer;
         address   collection;
-        uint256   tokenId;
+        uint256   tokenId;        // ignored when criteriaRoot != 0
         address   paymentToken;  // address(0) == ETH (ASK only)
         uint256   price;
         uint64    startTime;
         uint64    endTime;       // 0 == no expiry
         uint256   salt;
         uint256   counter;
+        bytes32   criteriaRoot;  // 0 == concrete order; non-zero == Merkle root over allowed tokenIds
     }
 
     /// @dev keccak256 of the canonical Order EIP-712 type string.
     bytes32 public constant ORDER_TYPEHASH = keccak256(
-        "Order(uint8 side,address offerer,address collection,uint256 tokenId,address paymentToken,uint256 price,uint64 startTime,uint64 endTime,uint256 salt,uint256 counter)"
+        "Order(uint8 side,address offerer,address collection,uint256 tokenId,address paymentToken,uint256 price,uint64 startTime,uint64 endTime,uint256 salt,uint256 counter,bytes32 criteriaRoot)"
     );
 
     mapping(address => uint256) public counters;
@@ -453,6 +455,16 @@ contract AgentMarketplace is
     event OrderCancelled(bytes32 indexed orderHash, address indexed offerer);
     event CounterIncremented(address indexed offerer, uint256 newCounter);
 
+    /// @notice Emitted *before* `OrderFulfilled` on a criteria-fill so
+    ///         indexers can attribute the resolved tokenId back to the
+    ///         signed Merkle root (the standard OrderFulfilled event
+    ///         only carries the concrete tokenId).
+    event CriteriaOrderResolved(
+        bytes32 indexed orderHash,
+        bytes32 indexed criteriaRoot,
+        uint256 resolvedTokenId
+    );
+
     error InvalidSignature();
     error OrderInactive();
     error OrderConsumed();
@@ -460,6 +472,9 @@ contract AgentMarketplace is
     error WrongSide();
     error CallerNotOfferer();
     error BidPaymentMustBeERC20();
+    error NotCriteriaOrder();
+    error CriteriaOrderUseCriteriaFulfill();
+    error InvalidCriteriaProof();
 
     /// @notice EIP-712 hash of an order — what the wallet signs.
     function hashOrder(Order calldata o) public view returns (bytes32) {
@@ -534,6 +549,75 @@ contract AgentMarketplace is
     }
 
     function _fulfillOne(Order calldata o, bytes calldata sig, uint256 ethValue) internal {
+        // Concrete orders only — criteria orders go through fulfillCriteriaOrder.
+        if (o.criteriaRoot != bytes32(0)) revert CriteriaOrderUseCriteriaFulfill();
+        _fulfillCore(o, sig, ethValue, o.tokenId);
+    }
+
+    /// @notice Fulfill a criteria-bound signed order by supplying the
+    ///         concrete tokenId being traded and a Merkle proof against
+    ///         `o.criteriaRoot`. The criteria leaf is
+    ///         `keccak256(bytes.concat(keccak256(abi.encode(tokenId))))`
+    ///         (OpenZeppelin's standard double-hash convention).
+    ///
+    /// @dev    Use case: collection-wide bids ("I'll buy any tokenId
+    ///         in this whitelist for Y USDC"), seller-side bundle asks,
+    ///         trait-filtered bids. Concrete `tokenId` field is ignored
+    ///         when criteriaRoot != 0 so signers don't have to
+    ///         enumerate every token upfront.
+    function fulfillCriteriaOrder(
+        Order calldata o,
+        bytes calldata sig,
+        uint256 resolvedTokenId,
+        bytes32[] calldata proof
+    ) external payable nonReentrant {
+        if (o.criteriaRoot == bytes32(0)) revert NotCriteriaOrder();
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(resolvedTokenId))));
+        if (!MerkleProof.verify(proof, o.criteriaRoot, leaf)) revert InvalidCriteriaProof();
+        emit CriteriaOrderResolved(hashOrder(o), o.criteriaRoot, resolvedTokenId);
+        _fulfillCore(o, sig, msg.value, resolvedTokenId);
+    }
+
+    /// @notice Bulk criteria-fill — same semantics as fulfillOrders but
+    ///         each order gets a `(resolvedTokenId, proof)` pair.
+    function fulfillCriteriaOrders(
+        Order[]     calldata orders_,
+        bytes[]     calldata sigs,
+        uint256[]   calldata resolvedTokenIds,
+        bytes32[][] calldata proofs,
+        uint256[]   calldata ethPerOrder
+    ) external payable nonReentrant {
+        uint256 n = orders_.length;
+        require(
+            sigs.length == n &&
+            resolvedTokenIds.length == n &&
+            proofs.length == n &&
+            ethPerOrder.length == n,
+            "len"
+        );
+        uint256 sum;
+        for (uint256 i; i < n; ) { sum += ethPerOrder[i]; unchecked { ++i; } }
+        if (sum != msg.value) revert WrongPayment();
+        for (uint256 i; i < n; ) {
+            Order calldata o = orders_[i];
+            if (o.criteriaRoot == bytes32(0)) revert NotCriteriaOrder();
+            bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(resolvedTokenIds[i]))));
+            if (!MerkleProof.verify(proofs[i], o.criteriaRoot, leaf)) revert InvalidCriteriaProof();
+            emit CriteriaOrderResolved(hashOrder(o), o.criteriaRoot, resolvedTokenIds[i]);
+            _fulfillCore(o, sigs[i], ethPerOrder[i], resolvedTokenIds[i]);
+            unchecked { ++i; }
+        }
+    }
+
+    /// @dev Shared settlement core. `resolvedTokenId` is the concrete
+    ///      tokenId actually transferred — equal to `o.tokenId` for
+    ///      concrete orders, Merkle-proof-resolved for criteria orders.
+    function _fulfillCore(
+        Order calldata o,
+        bytes calldata sig,
+        uint256 ethValue,
+        uint256 resolvedTokenId
+    ) internal {
         // 1. Time window.
         if (o.startTime != 0 && block.timestamp < o.startTime) revert OrderInactive();
         if (o.endTime   != 0 && block.timestamp >= o.endTime)  revert Expired();
@@ -544,7 +628,7 @@ contract AgentMarketplace is
         // 3. Self-trade guard.
         if (o.offerer == msg.sender) revert NoSelfTrade();
 
-        // 4. Order status.
+        // 4. Order status (hashed over the signed Order, not the resolved id).
         bytes32 h = hashOrder(o);
         if (orderFilled[h] || orderCancelled[h]) revert OrderConsumed();
 
@@ -553,12 +637,16 @@ contract AgentMarketplace is
             revert InvalidSignature();
         }
 
-        // 6. Mark filled before any external call.
+        // 6. Mark filled before any external call. NB: for criteria
+        //    orders the order hash is consumed in full on first fill,
+        //    so each criteria order is single-use. A signer who wants
+        //    a fillable-N criteria order must sign N distinct salts.
         orderFilled[h] = true;
 
-        // 7. Settlement splits.
+        // 7. Settlement splits (computed on the *resolved* tokenId so
+        //    ERC-2981 royaltyInfo reflects the actual traded token).
         (uint256 royalty, uint256 fee, uint256 offererProceeds, address royaltyReceiver) =
-            _computeSplits(o.collection, o.tokenId, o.price);
+            _computeSplits(o.collection, resolvedTokenId, o.price);
 
         if (o.side == OrderSide.ASK) {
             // offerer is seller, msg.sender is buyer.
@@ -576,15 +664,15 @@ contract AgentMarketplace is
             }
             // Verify NFT ownership at fill time and pull from seller.
             IERC721 nft = IERC721(o.collection);
-            if (nft.ownerOf(o.tokenId) != o.offerer) revert NotOwner();
-            nft.safeTransferFrom(o.offerer, msg.sender, o.tokenId);
+            if (nft.ownerOf(resolvedTokenId) != o.offerer) revert NotOwner();
+            nft.safeTransferFrom(o.offerer, msg.sender, resolvedTokenId);
 
             // If a matching on-chain listing existed, mark it Cancelled
             // so the subgraph stays consistent.
-            uint256 lid = openListingOf[o.collection][o.tokenId];
+            uint256 lid = openListingOf[o.collection][resolvedTokenId];
             if (lid != 0 && listings[lid].status == ListingStatus.Open) {
                 listings[lid].status = ListingStatus.Cancelled;
-                openListingOf[o.collection][o.tokenId] = 0;
+                openListingOf[o.collection][resolvedTokenId] = 0;
                 emit ListingCancelled(lid);
             }
         } else {
@@ -592,19 +680,19 @@ contract AgentMarketplace is
             if (o.paymentToken == address(0)) revert BidPaymentMustBeERC20();
             if (ethValue != 0) revert WrongPayment();
             IERC721 nft = IERC721(o.collection);
-            if (nft.ownerOf(o.tokenId) != msg.sender) revert NotOwner();
+            if (nft.ownerOf(resolvedTokenId) != msg.sender) revert NotOwner();
 
             IERC20 t = IERC20(o.paymentToken);
             if (royalty > 0) t.safeTransferFrom(o.offerer, royaltyReceiver, royalty);
             if (fee > 0)     t.safeTransferFrom(o.offerer, feeRecipient,    fee);
             t.safeTransferFrom(o.offerer, msg.sender, offererProceeds);
 
-            nft.safeTransferFrom(msg.sender, o.offerer, o.tokenId);
+            nft.safeTransferFrom(msg.sender, o.offerer, resolvedTokenId);
         }
 
         emit OrderFulfilled(
             h, o.offerer, msg.sender, o.side,
-            o.collection, o.tokenId, o.paymentToken, o.price,
+            o.collection, resolvedTokenId, o.paymentToken, o.price,
             royalty, fee, offererProceeds
         );
     }
@@ -621,7 +709,8 @@ contract AgentMarketplace is
             o.startTime,
             o.endTime,
             o.salt,
-            o.counter
+            o.counter,
+            o.criteriaRoot
         ));
     }
 

@@ -139,6 +139,10 @@ const abi = [
           {
             "name": "counter",
             "type": "uint256"
+          },
+          {
+            "name": "criteriaRoot",
+            "type": "bytes32"
           }
         ]
       }
@@ -193,6 +197,10 @@ const abi = [
           {
             "name": "counter",
             "type": "uint256"
+          },
+          {
+            "name": "criteriaRoot",
+            "type": "bytes32"
           }
         ]
       }
@@ -312,6 +320,150 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "fulfillCriteriaOrder",
+    "inputs": [
+      {
+        "name": "o",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "side",
+            "type": "uint8"
+          },
+          {
+            "name": "offerer",
+            "type": "address"
+          },
+          {
+            "name": "collection",
+            "type": "address"
+          },
+          {
+            "name": "tokenId",
+            "type": "uint256"
+          },
+          {
+            "name": "paymentToken",
+            "type": "address"
+          },
+          {
+            "name": "price",
+            "type": "uint256"
+          },
+          {
+            "name": "startTime",
+            "type": "uint64"
+          },
+          {
+            "name": "endTime",
+            "type": "uint64"
+          },
+          {
+            "name": "salt",
+            "type": "uint256"
+          },
+          {
+            "name": "counter",
+            "type": "uint256"
+          },
+          {
+            "name": "criteriaRoot",
+            "type": "bytes32"
+          }
+        ]
+      },
+      {
+        "name": "sig",
+        "type": "bytes"
+      },
+      {
+        "name": "resolvedTokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "proof",
+        "type": "bytes32[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "fulfillCriteriaOrders",
+    "inputs": [
+      {
+        "name": "orders_",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "side",
+            "type": "uint8"
+          },
+          {
+            "name": "offerer",
+            "type": "address"
+          },
+          {
+            "name": "collection",
+            "type": "address"
+          },
+          {
+            "name": "tokenId",
+            "type": "uint256"
+          },
+          {
+            "name": "paymentToken",
+            "type": "address"
+          },
+          {
+            "name": "price",
+            "type": "uint256"
+          },
+          {
+            "name": "startTime",
+            "type": "uint64"
+          },
+          {
+            "name": "endTime",
+            "type": "uint64"
+          },
+          {
+            "name": "salt",
+            "type": "uint256"
+          },
+          {
+            "name": "counter",
+            "type": "uint256"
+          },
+          {
+            "name": "criteriaRoot",
+            "type": "bytes32"
+          }
+        ]
+      },
+      {
+        "name": "sigs",
+        "type": "bytes[]"
+      },
+      {
+        "name": "resolvedTokenIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "proofs",
+        "type": "bytes32[][]"
+      },
+      {
+        "name": "ethPerOrder",
+        "type": "uint256[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
     "name": "fulfillOrder",
     "inputs": [
       {
@@ -357,6 +509,10 @@ const abi = [
           {
             "name": "counter",
             "type": "uint256"
+          },
+          {
+            "name": "criteriaRoot",
+            "type": "bytes32"
           }
         ]
       },
@@ -415,6 +571,10 @@ const abi = [
           {
             "name": "counter",
             "type": "uint256"
+          },
+          {
+            "name": "criteriaRoot",
+            "type": "bytes32"
           }
         ]
       },
@@ -579,6 +739,10 @@ const abi = [
           {
             "name": "counter",
             "type": "uint256"
+          },
+          {
+            "name": "criteriaRoot",
+            "type": "bytes32"
           }
         ]
       }
@@ -935,6 +1099,28 @@ const abi = [
       },
       {
         "name": "newCounter",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "CriteriaOrderResolved",
+    "inputs": [
+      {
+        "name": "orderHash",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "criteriaRoot",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "resolvedTokenId",
         "type": "uint256",
         "indexed": false
       }
@@ -1303,6 +1489,11 @@ const abi = [
   },
   {
     "type": "error",
+    "name": "CriteriaOrderUseCriteriaFulfill",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "ERC1967InvalidImplementation",
     "inputs": [
       {
@@ -1333,6 +1524,11 @@ const abi = [
   },
   {
     "type": "error",
+    "name": "InvalidCriteriaProof",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidExpiry",
     "inputs": []
   },
@@ -1359,6 +1555,11 @@ const abi = [
   {
     "type": "error",
     "name": "NotApproved",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotCriteriaOrder",
     "inputs": []
   },
   {
