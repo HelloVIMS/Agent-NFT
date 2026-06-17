@@ -1,0 +1,303 @@
+{
+  "generatedAt": "2026-06-17T20:31:55.458Z",
+  "generator": "agent-nft/scripts/export-abi.mjs",
+  "contracts": [
+    {
+      "contract": "AgentIdentityRegistry",
+      "namespace": null,
+      "src": "src/AgentIdentityRegistry.sol",
+      "abi": "AgentIdentityRegistry.json",
+      "sha256": "0c391a3eb27f3abca5836cf79612e8c92691f3fdf4c247d51124fc197c5aaa65",
+      "bytes": 38377,
+      "entries": 152
+    },
+    {
+      "contract": "AgentTBARegistry",
+      "namespace": null,
+      "src": "src/AgentTBARegistry.sol",
+      "abi": "AgentTBARegistry.json",
+      "sha256": "16c3a25612982210bc3fed29a061919cee13a1f7d34f0c54b95d8605c9e85bca",
+      "bytes": 5212,
+      "entries": 20
+    },
+    {
+      "contract": "AgentLinkedAccountRegistry",
+      "namespace": null,
+      "src": "src/AgentLinkedAccountRegistry.sol",
+      "abi": "AgentLinkedAccountRegistry.json",
+      "sha256": "87dce10cfd29093593516c1679ba1b14aa5af267b6d91ecc1c77f8fe0bd5f78d",
+      "bytes": 20832,
+      "entries": 85
+    },
+    {
+      "contract": "AgentEncryptionRegistry",
+      "namespace": null,
+      "src": "src/AgentEncryptionRegistry.sol",
+      "abi": "AgentEncryptionRegistry.json",
+      "sha256": "acbd1dc8e7ffd25949ae161f3b6481ec18d09ba31aee024aaca7ce81b83a8ce5",
+      "bytes": 8209,
+      "entries": 39
+    },
+    {
+      "contract": "AgentReputationRegistry",
+      "namespace": null,
+      "src": "src/AgentReputationRegistry.sol",
+      "abi": "AgentReputationRegistry.json",
+      "sha256": "178ab8c72ad5e7f530cc6f7088d592c17261a0892b8e03c10ae191946bef9690",
+      "bytes": 12578,
+      "entries": 44
+    },
+    {
+      "contract": "AgentContextRegistry",
+      "namespace": null,
+      "src": "src/AgentContextRegistry.sol",
+      "abi": "AgentContextRegistry.json",
+      "sha256": "ca43d34528bdfe756a6e4626c9e8500bcc1424f4fd6021ad97d3ec9f090f94c3",
+      "bytes": 19674,
+      "entries": 78
+    },
+    {
+      "contract": "AgentMemory",
+      "namespace": null,
+      "src": "src/AgentMemory.sol",
+      "abi": "AgentMemory.json",
+      "sha256": "13f5c7d0cf9d8f006b81a0d4a2f539c87d7a1d50e5dd3554e95fadc74c5216f5",
+      "bytes": 22272,
+      "entries": 84
+    },
+    {
+      "contract": "AgentPaymentRouter",
+      "namespace": null,
+      "src": "src/AgentPaymentRouter.sol",
+      "abi": "AgentPaymentRouter.json",
+      "sha256": "f1d53bd9aa04d49a91af10293362ab94152969dc9fd63871bae88c38b7baae93",
+      "bytes": 21306,
+      "entries": 85
+    },
+    {
+      "contract": "AgentX402Receiver",
+      "namespace": null,
+      "src": "src/AgentX402Receiver.sol",
+      "abi": "AgentX402Receiver.json",
+      "sha256": "d0e322a2df4096b9660b47bf656d939d56576185a28ba093d0186bc6487696f6",
+      "bytes": 29147,
+      "entries": 102
+    },
+    {
+      "contract": "AgentMarketplace",
+      "namespace": null,
+      "src": "src/AgentMarketplace.sol",
+      "abi": "AgentMarketplace.json",
+      "sha256": "b89d07e9eb794ad02a47a5fea33228218a4f7848fcf733eb4a24127155875da9",
+      "bytes": 25956,
+      "entries": 85
+    },
+    {
+      "contract": "AgentRoyaltyVault",
+      "namespace": null,
+      "src": "src/AgentRoyaltyVault.sol",
+      "abi": "AgentRoyaltyVault.json",
+      "sha256": "95d4f30342c5d364072d9af3085e4f14c10e6edb7bf9b5be3c591fa4dab651d0",
+      "bytes": 4558,
+      "entries": 22
+    },
+    {
+      "contract": "AgentRoyaltySplitter",
+      "namespace": null,
+      "src": "src/AgentRoyaltySplitter.sol",
+      "abi": "AgentRoyaltySplitter.json",
+      "sha256": "d77e52e2b153cbbd2ce74ce99de43e5272e97f9afedd33589c45e423cc9ca240",
+      "bytes": 8270,
+      "entries": 43
+    },
+    {
+      "contract": "AgentRoyaltySplitterFactory",
+      "namespace": null,
+      "src": "src/AgentRoyaltySplitterFactory.sol",
+      "abi": "AgentRoyaltySplitterFactory.json",
+      "sha256": "35b4813c9a9de5742bd0a2d86badf05afb70b48d149067b2948aa3d6ea9ac86e",
+      "bytes": 3913,
+      "entries": 14
+    },
+    {
+      "contract": "AgentCollectionFactory",
+      "namespace": null,
+      "src": "src/AgentCollectionFactory.sol",
+      "abi": "AgentCollectionFactory.json",
+      "sha256": "1505d5fa145e4cbc78c340dffc5144ef8eb9c903ebc08a251fcc208d383554a9",
+      "bytes": 10948,
+      "entries": 36
+    },
+    {
+      "contract": "AgentCollectionImpl",
+      "namespace": null,
+      "src": "src/AgentCollectionImpl.sol",
+      "abi": "AgentCollectionImpl.json",
+      "sha256": "8bf1e1dd8729ca9595ea2a77c4a13ec482c97ed3a472e441a3d1f0123df47f6f",
+      "bytes": 50308,
+      "entries": 180
+    },
+    {
+      "contract": "AgentAccount",
+      "namespace": null,
+      "src": "src/AgentAccount.sol",
+      "abi": "AgentAccount.json",
+      "sha256": "381dca77cc2828e747ca7c8568d91a143c87c33ed59202abe93f5a0d92471d68",
+      "bytes": 14289,
+      "entries": 45
+    },
+    {
+      "contract": "VimsProvenance",
+      "namespace": null,
+      "src": "src/VimsProvenance.sol",
+      "abi": "VimsProvenance.json",
+      "sha256": "ca189ac64065ffb1bbadae7bd48c34c83ba22760d250117af8c0e0f4a050ef30",
+      "bytes": 1522,
+      "entries": 6
+    },
+    {
+      "contract": "AgentSkillsExtension",
+      "namespace": null,
+      "src": "src/AgentSkillsExtension.sol",
+      "abi": "AgentSkillsExtension.json",
+      "sha256": "2fbad0faebdff3e3501772448678ef2c57dbb29c825e04b09d228f50fbec7353",
+      "bytes": 9624,
+      "entries": 40
+    },
+    {
+      "contract": "AgentBridge",
+      "namespace": "hyperlane",
+      "src": "src/hyperlane/AgentBridge.sol",
+      "abi": "hyperlane/AgentBridge.json",
+      "sha256": "05783e5371aa0a8f0859153381e783baff0d48238560a45237ea8ba415f287eb",
+      "bytes": 15201,
+      "entries": 70
+    },
+    {
+      "contract": "IAgentEvolutionHook",
+      "namespace": "hooks",
+      "src": "src/hooks/IAgentEvolutionHook.sol",
+      "abi": "hooks/IAgentEvolutionHook.json",
+      "sha256": "80472d439ccebf607220bf456f0de73ba4ddac896aa96741db12766a0978a680",
+      "bytes": 2901,
+      "entries": 7
+    },
+    {
+      "contract": "AgentStatusHook",
+      "namespace": "hooks",
+      "src": "src/hooks/AgentStatusHook.sol",
+      "abi": "hooks/AgentStatusHook.json",
+      "sha256": "b26a2bab29ddff742c4984fd722f797d7093131b26ea37c00334cfbbb153aea8",
+      "bytes": 8304,
+      "entries": 29
+    },
+    {
+      "contract": "EvolutionStagesHook",
+      "namespace": "hooks",
+      "src": "src/hooks/EvolutionStagesHook.sol",
+      "abi": "hooks/EvolutionStagesHook.json",
+      "sha256": "47b46b04ead142f7e562f86958c1a1ff86a429fa83213eaa1c7fa3ce3fff25bd",
+      "bytes": 4844,
+      "entries": 17
+    },
+    {
+      "contract": "GenerationHook",
+      "namespace": "hooks",
+      "src": "src/hooks/GenerationHook.sol",
+      "abi": "hooks/GenerationHook.json",
+      "sha256": "af8beba10ce4b17c289a583f9d096df3ba43761a73470c99a3c17b3e1892ef3b",
+      "bytes": 5285,
+      "entries": 17
+    },
+    {
+      "contract": "HueRotateHook",
+      "namespace": "hooks",
+      "src": "src/hooks/HueRotateHook.sol",
+      "abi": "hooks/HueRotateHook.json",
+      "sha256": "834bfd07d7e4042c44b334bc0eb566eec143c4b91b68ebd5022152258dad4605",
+      "bytes": 5343,
+      "entries": 19
+    },
+    {
+      "contract": "OracleHook",
+      "namespace": "hooks",
+      "src": "src/hooks/OracleHook.sol",
+      "abi": "hooks/OracleHook.json",
+      "sha256": "dc0798a66c19aa77cad1dacf0a5f61fccb1b382573be1ff70f004f9936942a97",
+      "bytes": 5070,
+      "entries": 18
+    },
+    {
+      "contract": "ReputationLevelHook",
+      "namespace": "hooks",
+      "src": "src/hooks/ReputationLevelHook.sol",
+      "abi": "hooks/ReputationLevelHook.json",
+      "sha256": "72bb1999a975baada21671541b9c7872be3563c9fcc495e56122b5f46fd7cdda",
+      "bytes": 7288,
+      "entries": 25
+    },
+    {
+      "contract": "RevenueLevelHook",
+      "namespace": "hooks",
+      "src": "src/hooks/RevenueLevelHook.sol",
+      "abi": "hooks/RevenueLevelHook.json",
+      "sha256": "4d448f29d19acf7dc305461554bb1447ea8b30519188ab025a25efdbbea072fa",
+      "bytes": 5463,
+      "entries": 18
+    },
+    {
+      "contract": "SeasonalHook",
+      "namespace": "hooks",
+      "src": "src/hooks/SeasonalHook.sol",
+      "abi": "hooks/SeasonalHook.json",
+      "sha256": "35a8bc5d94a7707b2375e8fb1e015862452ec1a31c23162796475f26ddf7699c",
+      "bytes": 5517,
+      "entries": 17
+    },
+    {
+      "contract": "SoulboundHook",
+      "namespace": "hooks",
+      "src": "src/hooks/SoulboundHook.sol",
+      "abi": "hooks/SoulboundHook.json",
+      "sha256": "b191db8eef5f1ddc577c1c2a3cf9ec980de2d0f12fe2796a0b75cb5550ca1932",
+      "bytes": 5207,
+      "entries": 18
+    },
+    {
+      "contract": "TimeOfDayHook",
+      "namespace": "hooks",
+      "src": "src/hooks/TimeOfDayHook.sol",
+      "abi": "hooks/TimeOfDayHook.json",
+      "sha256": "b2fca09e8a44c7179b6f8068a74b1213181eb25b3387eddf59c6f23b3e1b1184",
+      "bytes": 3678,
+      "entries": 11
+    },
+    {
+      "contract": "TipJarHook",
+      "namespace": "hooks",
+      "src": "src/hooks/TipJarHook.sol",
+      "abi": "hooks/TipJarHook.json",
+      "sha256": "acee8e5aa7f6173c650d6662bd82639570bc9e4a5454a4072ba9e53e03badc02",
+      "bytes": 6932,
+      "entries": 26
+    },
+    {
+      "contract": "TransferRecolorHook",
+      "namespace": "hooks",
+      "src": "src/hooks/TransferRecolorHook.sol",
+      "abi": "hooks/TransferRecolorHook.json",
+      "sha256": "7313f3819b72d650f3bac8f106977784dfca365ac55c411609504fc80dc85c94",
+      "bytes": 4045,
+      "entries": 12
+    },
+    {
+      "contract": "VoteGatedHook",
+      "namespace": "hooks",
+      "src": "src/hooks/VoteGatedHook.sol",
+      "abi": "hooks/VoteGatedHook.json",
+      "sha256": "a674bce00004c999c0e38d11ac291c4bd56005f568808d8c01e39a919990d80a",
+      "bytes": 6569,
+      "entries": 25
+    }
+  ]
+}
