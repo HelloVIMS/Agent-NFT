@@ -82,17 +82,45 @@ contract AgentIdentityRegistryExtrasTest is Test {
     function test_agentCreator_returnsRegistrar() public {
         vm.prank(alice);
         uint256 agentId = registry.registerAgent("Solo", "ipfs://meta", 1500, address(0));
-        assertEq(registry.agentCreator(agentId), alice);
+        (address creator,) = registry.getCreatorRoyalty(agentId);
+        assertEq(creator, alice);
     }
 
-    function test_calculateRoyaltySplit_returnsBpsSplit() public {
+    function test_creatorRoyalty_bpsAccess() public {
         vm.prank(alice);
         uint256 agentId = registry.registerAgent("Royal", "ipfs://m", 1500, address(0)); // 15%
-        (uint256 creatorCut, uint256 ownerCut) = registry.calculateRoyaltySplit(agentId, 1 ether);
-        assertEq(creatorCut, 0.15 ether);
-        assertEq(ownerCut,   0.85 ether);
-        assertEq(creatorCut + ownerCut, 1 ether);
+        (address creator, uint256 bps) = registry.getCreatorRoyalty(agentId);
+        assertEq(creator, alice);
+        assertEq(bps, 1500);
+        // Off-chain split: 1 ether * 1500 / 10000 = 0.15 ether.
+        assertEq((1 ether * bps) / 10000, 0.15 ether);
     }
+
+    // ─── contractURI (OpenSea / Blur collection metadata) ────────────────
+
+    function test_contractURI_defaultsToEmpty() public view {
+        assertEq(registry.contractURI(), "");
+    }
+
+    function test_setContractURI_OwnerOnly() public {
+        // Non-owner reverts.
+        vm.prank(alice);
+        vm.expectRevert();
+        registry.setContractURI("ipfs://x");
+
+        // Owner succeeds. The test contract is the owner because it
+        // deployed the proxy and ran initialize() without prank.
+        registry.setContractURI("ipfs://collection-meta");
+        assertEq(registry.contractURI(), "ipfs://collection-meta");
+    }
+
+    function test_setContractURI_EmitsEvent() public {
+        vm.expectEmit(false, false, false, true, address(registry));
+        emit ContractURIUpdated("https://vims.com/agents/meta.json");
+        registry.setContractURI("https://vims.com/agents/meta.json");
+    }
+
+    event ContractURIUpdated(string uri);
 
     // ─── Collections: createCollection / mintToCollection / lock ──────────
 

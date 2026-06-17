@@ -410,8 +410,6 @@ contract ReputationAnchorTest is Test {
         uint256 a3 = identityRegistry.registerAgent("A3", "ipfs://a3", 0, creator);
         vm.stopPrank();
 
-        assertEq(identityRegistry.anchorAgentCount(creator), 3);
-
         uint256[] memory ids = identityRegistry.agentsByAnchor(creator);
         assertEq(ids.length, 3);
         assertEq(ids[0], anchoredAgentId);
@@ -419,11 +417,10 @@ contract ReputationAnchorTest is Test {
         assertEq(ids[2], a3);
 
         // Transferable agents do not populate the anchor index.
-        assertEq(identityRegistry.anchorAgentCount(address(0)), 0);
+        assertEq(identityRegistry.agentsByAnchor(address(0)).length, 0);
     }
 
     function test_AUDIT_AnchorReverseIndex_EmptyForUnusedAnchor() public view {
-        assertEq(identityRegistry.anchorAgentCount(address(0xCAFE)), 0);
         uint256[] memory ids = identityRegistry.agentsByAnchor(address(0xCAFE));
         assertEq(ids.length, 0);
     }

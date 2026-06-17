@@ -453,12 +453,6 @@ contract AgentIdentityRegistry is
         return _anchorAgents[anchor];
     }
 
-    /**
-     * @notice Count of agents sharing a given reputation anchor.
-     */
-    function anchorAgentCount(address anchor) external view returns (uint256) {
-        return _anchorAgents[anchor].length;
-    }
     
     /**
      * @notice Get total number of agents minted
@@ -484,30 +478,6 @@ contract AgentIdentityRegistry is
         return (_agentCreator[agentId], _creatorRoyaltyBps[agentId]);
     }
     
-    /**
-     * @notice Get just the soulbound creator address
-     * @param agentId The agent's token ID
-     * @return The original creator address (immutable)
-     */
-    function agentCreator(uint256 agentId) external view returns (address) {
-        return _agentCreator[agentId];
-    }
-    
-    /**
-     * @notice Calculate the creator's cut for a given payment amount
-     * @param agentId The agent's token ID
-     * @param amount The total payment amount
-     * @return creatorCut The amount that goes to the creator
-     * @return ownerCut The amount that goes to the current owner
-     */
-    function calculateRoyaltySplit(uint256 agentId, uint256 amount) external view returns (
-        uint256 creatorCut,
-        uint256 ownerCut
-    ) {
-        uint256 royaltyBps = _creatorRoyaltyBps[agentId];
-        creatorCut = (amount * royaltyBps) / 10000;
-        ownerCut = amount - creatorCut;
-    }
     
     /**
      * @notice Update the creator royalty percentage
@@ -554,13 +524,6 @@ contract AgentIdentityRegistry is
         return _svgImages[agentId];
     }
     
-    /**
-     * @notice Check if an agent has an on-chain SVG image
-     * @param agentId The agent's token ID
-     */
-    function hasSVGImage(uint256 agentId) external view returns (bool) {
-        return bytes(_svgImages[agentId]).length > 0;
-    }
     
     // ============ V6: On-chain Collections ============
     
@@ -1063,34 +1026,6 @@ contract AgentIdentityRegistry is
         );
     }
 
-    /**
-     * @notice Convenience wrapper around `mintToCollection` matching the SDK
-     *         signature `(collectionId, name, uri, royaltyBps)`. Reputation
-     *         anchor is fixed to address(0) (transferable). Body is inlined —
-     *         not a `this.mintToCollection(...)` external call — to preserve
-     *         `msg.sender` for the `registerAgent` ownership stamp.
-     */
-    function mintToCollectionWithRoyalty(
-        uint256 collectionId,
-        string calldata name,
-        string calldata agentURI,
-        uint256 royaltyBps
-    ) external returns (uint256 agentId) {
-        Collection storage col = collections[collectionId];
-        if (col.creator == address(0)) revert NotExists();
-        if (col.creator != msg.sender) revert NotCollectionCreator();
-        if (col.locked) revert CollectionLocked();
-        if (col.maxSupply > 0 && col.mintedCount >= col.maxSupply) revert CollectionFull();
-
-        agentId = registerAgent(name, agentURI, royaltyBps, address(0));
-
-        agentToCollection[agentId] = collectionId;
-        _collectionAgents[collectionId].push(agentId);
-        col.mintedCount++;
-
-        emit AgentAddedToCollection(agentId, collectionId);
-    }
-
     // ============ Full-stack mint storage (appended after audit) ============
 
     /// @notice Trusted ERC-6551 TBA registry used by `mintWithFullStack`.
@@ -1104,6 +1039,30 @@ contract AgentIdentityRegistry is
     /// @notice Emitted when the linked x402 receiver pointer changes.
     event LinkedX402ReceiverUpdated(address indexed oldReceiver, address indexed newReceiver);
 
+    // ============ Collection-level metadata (OpenSea / Blur) ============
+    //
+    // OpenSea / Blur fetch `contractURI()` for the registry's collection
+    // landing page (name, description, banner, fee_recipient). Storing
+    // the full URI lets reads be a single SLOAD; build the JSON
+    // off-chain (or via {AgentIdentityURILib.buildContractURIIdentity})
+    // and pin via {setContractURI}.
+
+    string private _contractURI;
+
+    event ContractURIUpdated(string uri);
+
+    /// @notice OpenSea / Blur compatible collection-level metadata URI.
+    function contractURI() external view returns (string memory) {
+        return _contractURI;
+    }
+
+    /// @notice Owner: set the collection-level metadata URI. Accepts
+    ///         `data:application/json;base64,…`, `ipfs://…`, `https://…`.
+    function setContractURI(string calldata uri) external onlyOwner {
+        _contractURI = uri;
+        emit ContractURIUpdated(uri);
+    }
+
     // ============ Storage Gap ============
     //
     // Reserved slots for future upgrades. Reduce this number by the number of
@@ -1112,6 +1071,10 @@ contract AgentIdentityRegistry is
     // is appended in a future inheritance change would shift slots and corrupt
     // state.
     // Shrunk from 50 → 48 when `trustedTBARegistry` + `linkedX402Receiver`
-    // were appended for the atomic full-stack mint path.
-    uint256[48] private __gap;
+    //   were appended for the atomic full-stack mint path.
+    // Shrunk from 48 → 47 when `_contractURI` was appended for OpenSea/Blur
+    //   collection-level metadata. Budget recovered by removing
+    //   redundant getters (`agentCreator`, `anchorAgentCount`,
+    //   `hasSVGImage`, `calculateRoyaltySplit`).
+    uint256[47] private __gap;
 }

@@ -307,7 +307,6 @@ contract AgentIdentityRegistryTest is Test {
 
         vm.prank(user1);
         registry.setSVGImage(agentId, string(svg));
-        assertTrue(registry.hasSVGImage(agentId));
         assertEq(bytes(registry.getSVGImage(agentId)).length, 49152);
     }
 
