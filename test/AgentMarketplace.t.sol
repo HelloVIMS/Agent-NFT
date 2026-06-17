@@ -292,4 +292,89 @@ contract AgentMarketplaceTest is Test {
         vm.expectRevert(AgentMarketplace.FeeTooHigh.selector);
         market.setProtocolFee(1001, feeRecv);
     }
+
+    // ─── purchaseMany (sweep) ────────────────────────────────────────
+
+    function test_PurchaseMany_SweepETH() public {
+        // Mint two more agents so the seller has a sweepable inventory.
+        vm.startPrank(seller);
+        uint256 a2 = identity.registerAgent("B", "ipfs://b", 500, address(0));
+        uint256 a3 = identity.registerAgent("C", "ipfs://c", 500, address(0));
+        identity.setApprovalForAll(address(market), true);
+
+        uint256 lid1 = market.createListing(address(identity), agentId, address(0), 1 ether, 0);
+        uint256 lid2 = market.createListing(address(identity), a2,      address(0), 2 ether, 0);
+        uint256 lid3 = market.createListing(address(identity), a3,      address(0), 3 ether, 0);
+        vm.stopPrank();
+
+        uint256[] memory ids = new uint256[](3);
+        ids[0] = lid1; ids[1] = lid2; ids[2] = lid3;
+
+        uint256 feeBefore = feeRecv.balance;
+        vm.deal(buyer, 10 ether);
+        vm.prank(buyer);
+        market.purchaseMany{value: 6 ether}(ids);
+
+        // All three NFTs transferred.
+        assertEq(identity.ownerOf(agentId), buyer);
+        assertEq(identity.ownerOf(a2),      buyer);
+        assertEq(identity.ownerOf(a3),      buyer);
+        // Total protocol fee = 2.5% of 6 ether = 0.15 ether.
+        assertEq(feeRecv.balance - feeBefore, 0.15 ether, "aggregate fee");
+        // All listings now Sold.
+        ( , , , , , , , AgentMarketplace.ListingStatus s1) = market.listings(lid1);
+        ( , , , , , , , AgentMarketplace.ListingStatus s2) = market.listings(lid2);
+        ( , , , , , , , AgentMarketplace.ListingStatus s3) = market.listings(lid3);
+        assertEq(uint8(s1), uint8(AgentMarketplace.ListingStatus.Sold));
+        assertEq(uint8(s2), uint8(AgentMarketplace.ListingStatus.Sold));
+        assertEq(uint8(s3), uint8(AgentMarketplace.ListingStatus.Sold));
+    }
+
+    function test_PurchaseMany_RefundsOverpayment() public {
+        vm.startPrank(seller);
+        identity.setApprovalForAll(address(market), true);
+        uint256 lid = market.createListing(address(identity), agentId, address(0), 1 ether, 0);
+        vm.stopPrank();
+
+        uint256[] memory ids = new uint256[](1);
+        ids[0] = lid;
+
+        vm.deal(buyer, 10 ether);
+        uint256 buyerBefore = buyer.balance;
+        vm.prank(buyer);
+        market.purchaseMany{value: 2 ether}(ids); // 1 ether overpaid
+        assertEq(buyerBefore - buyer.balance, 1 ether, "exact spend, overpayment refunded");
+    }
+
+    function test_PurchaseMany_RevertsOnInsufficientETH() public {
+        vm.startPrank(seller);
+        uint256 a2 = identity.registerAgent("B", "ipfs://b", 500, address(0));
+        identity.setApprovalForAll(address(market), true);
+        uint256 lid1 = market.createListing(address(identity), agentId, address(0), 1 ether, 0);
+        uint256 lid2 = market.createListing(address(identity), a2,      address(0), 2 ether, 0);
+        vm.stopPrank();
+
+        uint256[] memory ids = new uint256[](2);
+        ids[0] = lid1; ids[1] = lid2;
+
+        vm.deal(buyer, 10 ether);
+        vm.prank(buyer);
+        vm.expectRevert(AgentMarketplace.WrongPayment.selector);
+        market.purchaseMany{value: 1.5 ether}(ids); // need 3 ether
+    }
+
+    function test_PurchaseMany_RevertsOnClosedListing() public {
+        vm.startPrank(seller);
+        identity.setApprovalForAll(address(market), true);
+        uint256 lid = market.createListing(address(identity), agentId, address(0), 1 ether, 0);
+        market.cancelListing(lid);
+        vm.stopPrank();
+
+        uint256[] memory ids = new uint256[](1);
+        ids[0] = lid;
+        vm.deal(buyer, 10 ether);
+        vm.prank(buyer);
+        vm.expectRevert(AgentMarketplace.ListingNotOpen.selector);
+        market.purchaseMany{value: 1 ether}(ids);
+    }
 }

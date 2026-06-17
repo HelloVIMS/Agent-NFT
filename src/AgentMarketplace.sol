@@ -259,6 +259,57 @@ contract AgentMarketplace is
         emit ListingCancelled(listingId);
     }
 
+    /// @notice Bulk-fill multiple open listings in a single tx ("sweep").
+    /// @dev    For ETH listings, msg.value must equal the sum of prices
+    ///         (the UI computes this off-chain via getListing). For ERC-20
+    ///         listings, msg.value MUST be 0 and the buyer must have
+    ///         pre-approved the marketplace for the sum of prices across
+    ///         the payment-token set being swept.
+    ///
+    ///         Mixed payment tokens are allowed — the function dispatches
+    ///         per-listing. This lets the UI sweep a single click across
+    ///         (some ETH listings) + (some USDC listings) provided the
+    ///         buyer has approved each ERC-20 in advance.
+    function purchaseMany(uint256[] calldata listingIds) external payable nonReentrant {
+        uint256 ethConsumed = 0;
+        uint256 n = listingIds.length;
+        for (uint256 i; i < n; ) {
+            uint256 lid = listingIds[i];
+            Listing storage l = listings[lid];
+            if (l.status != ListingStatus.Open) revert ListingNotOpen();
+            if (l.expiresAt != 0 && l.expiresAt <= block.timestamp) revert Expired();
+            if (l.seller == msg.sender) revert NoSelfTrade();
+
+            l.status = ListingStatus.Sold;
+            if (openListingOf[l.collection][l.tokenId] == lid) {
+                openListingOf[l.collection][l.tokenId] = 0;
+            }
+
+            (uint256 royalty, uint256 fee, uint256 sellerCut, address royaltyReceiver) =
+                _computeSplits(l.collection, l.tokenId, l.price);
+
+            if (l.paymentToken == address(0)) {
+                ethConsumed += l.price;
+                if (ethConsumed > msg.value) revert WrongPayment();
+                _payETH(royaltyReceiver, royalty);
+                _payETH(feeRecipient, fee);
+                _payETH(l.seller, sellerCut);
+            } else {
+                IERC20 t = IERC20(l.paymentToken);
+                if (royalty > 0) t.safeTransferFrom(msg.sender, royaltyReceiver, royalty);
+                if (fee > 0)     t.safeTransferFrom(msg.sender, feeRecipient,    fee);
+                t.safeTransferFrom(msg.sender, l.seller, sellerCut);
+            }
+
+            IERC721(l.collection).safeTransferFrom(l.seller, msg.sender, l.tokenId);
+            emit ListingFilled(lid, msg.sender, royalty, fee, sellerCut);
+            unchecked { ++i; }
+        }
+        // ETH refund for unused balance (e.g. mixed-token sweep where the
+        // ERC-20 listings consume no ETH).
+        if (msg.value > ethConsumed) _payETH(msg.sender, msg.value - ethConsumed);
+    }
+
     function purchase(uint256 listingId) external payable nonReentrant {
         Listing storage l = listings[listingId];
         if (l.status != ListingStatus.Open) revert ListingNotOpen();

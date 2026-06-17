@@ -1039,6 +1039,18 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "purchaseMany",
+    "inputs": [
+      {
+        "name": "listingIds",
+        "type": "uint256[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
     "name": "renounceOwnership",
     "inputs": [],
     "outputs": [],
