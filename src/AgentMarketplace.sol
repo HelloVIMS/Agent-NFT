@@ -5,7 +5,9 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
+import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -32,9 +34,50 @@ contract AgentMarketplace is
     Initializable,
     OwnableUpgradeable,
     UUPSUpgradeable,
-    ReentrancyGuardUpgradeable
+    ReentrancyGuardUpgradeable,
+    EIP712Upgradeable
 {
     using SafeERC20 for IERC20;
+
+    // ─── EIP-712 signed orders ───────────────────────────────────────
+    //
+    // Seaport-style off-chain orderbook: sellers sign listings (ASK)
+    // and bidders sign collection bids (BID) without paying gas. Fills
+    // verify the EIP-712 signature, royalty & fee splits run identical
+    // to the on-chain `purchase` / `acceptOffer` paths.
+    //
+    // Smart-contract wallets (Safe, Argent, AA) are supported via
+    // ERC-1271 through `SignatureChecker.isValidSignatureNow`.
+    //
+    // Bulk-cancel: incrementing `counters[offerer]` invalidates every
+    // signature whose `counter` field doesn't match.
+    //
+    // Per-order cancel: `cancelOrder(o)` flips `orderCancelled[hash]`.
+    // Filled orders flip `orderFilled[hash]`; both block re-fills.
+
+    enum OrderSide { ASK, BID }
+
+    struct Order {
+        OrderSide side;
+        address   offerer;
+        address   collection;
+        uint256   tokenId;
+        address   paymentToken;  // address(0) == ETH (ASK only)
+        uint256   price;
+        uint64    startTime;
+        uint64    endTime;       // 0 == no expiry
+        uint256   salt;
+        uint256   counter;
+    }
+
+    /// @dev keccak256 of the canonical Order EIP-712 type string.
+    bytes32 public constant ORDER_TYPEHASH = keccak256(
+        "Order(uint8 side,address offerer,address collection,uint256 tokenId,address paymentToken,uint256 price,uint64 startTime,uint64 endTime,uint256 salt,uint256 counter)"
+    );
+
+    mapping(address => uint256) public counters;
+    mapping(bytes32 => bool)    public orderFilled;
+    mapping(bytes32 => bool)    public orderCancelled;
 
     // ─── Storage ─────────────────────────────────────────────────────
 
@@ -147,6 +190,7 @@ contract AgentMarketplace is
         __Ownable_init(admin);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __EIP712_init("AgentMarketplace", "1");
         feeRecipient = feeRecipient_;
         protocolFeeBps = protocolFeeBps_;
         emit ProtocolFeeUpdated(0, protocolFeeBps_, feeRecipient_);
@@ -391,6 +435,201 @@ contract AgentMarketplace is
         return offers[offerId];
     }
 
+    // ─── Signed orders (EIP-712 + EIP-1271) ──────────────────────────
+
+    event OrderFulfilled(
+        bytes32 indexed orderHash,
+        address indexed offerer,
+        address indexed taker,
+        OrderSide side,
+        address collection,
+        uint256 tokenId,
+        address paymentToken,
+        uint256 price,
+        uint256 royaltyPaid,
+        uint256 protocolFeePaid,
+        uint256 offererProceeds
+    );
+    event OrderCancelled(bytes32 indexed orderHash, address indexed offerer);
+    event CounterIncremented(address indexed offerer, uint256 newCounter);
+
+    error InvalidSignature();
+    error OrderInactive();
+    error OrderConsumed();
+    error WrongCounter();
+    error WrongSide();
+    error CallerNotOfferer();
+    error BidPaymentMustBeERC20();
+
+    /// @notice EIP-712 hash of an order — what the wallet signs.
+    function hashOrder(Order calldata o) public view returns (bytes32) {
+        return _hashTypedDataV4(_structHash(o));
+    }
+
+    /// @notice Increments the caller's counter, invalidating every
+    ///         off-chain signature whose `counter` field doesn't match
+    ///         the new value. Use as a global "cancel all my orders".
+    function incrementCounter() external returns (uint256 newCounter) {
+        unchecked { newCounter = ++counters[msg.sender]; }
+        emit CounterIncremented(msg.sender, newCounter);
+    }
+
+    /// @notice Per-order cancel by the offerer. Cheap (single SSTORE).
+    function cancelOrder(Order calldata o) external {
+        if (o.offerer != msg.sender) revert CallerNotOfferer();
+        bytes32 h = hashOrder(o);
+        if (orderFilled[h] || orderCancelled[h]) revert OrderConsumed();
+        orderCancelled[h] = true;
+        emit OrderCancelled(h, msg.sender);
+    }
+
+    /// @notice Bulk per-order cancel.
+    function cancelOrders(Order[] calldata os) external {
+        uint256 n = os.length;
+        for (uint256 i; i < n; ) {
+            Order calldata o = os[i];
+            if (o.offerer != msg.sender) revert CallerNotOfferer();
+            bytes32 h = hashOrder(o);
+            if (!orderFilled[h] && !orderCancelled[h]) {
+                orderCancelled[h] = true;
+                emit OrderCancelled(h, msg.sender);
+            }
+            unchecked { ++i; }
+        }
+    }
+
+    /// @notice Fulfill a single signed order.
+    /// @dev    For ASK: msg.sender is the buyer; sends ETH/ERC-20.
+    ///         For BID: msg.sender is the seller (NFT owner); pulls
+    ///         ERC-20 from offerer (must have approved this contract).
+    function fulfillOrder(Order calldata o, bytes calldata sig)
+        external
+        payable
+        nonReentrant
+    {
+        _fulfillOne(o, sig, msg.value);
+    }
+
+    /// @notice Bulk-fill multiple orders in a single tx (sweep).
+    /// @dev    Pass an array of msg.value-equivalents per order via the
+    ///         `ethPerOrder` argument; sum must equal msg.value. ERC-20
+    ///         orders carry 0. Failures revert the entire batch.
+    function fulfillOrders(
+        Order[] calldata orders_,
+        bytes[]  calldata sigs,
+        uint256[] calldata ethPerOrder
+    ) external payable nonReentrant {
+        uint256 n = orders_.length;
+        require(sigs.length == n && ethPerOrder.length == n, "len");
+        uint256 sum;
+        for (uint256 i; i < n; ) {
+            sum += ethPerOrder[i];
+            unchecked { ++i; }
+        }
+        if (sum != msg.value) revert WrongPayment();
+        for (uint256 i; i < n; ) {
+            _fulfillOne(orders_[i], sigs[i], ethPerOrder[i]);
+            unchecked { ++i; }
+        }
+    }
+
+    function _fulfillOne(Order calldata o, bytes calldata sig, uint256 ethValue) internal {
+        // 1. Time window.
+        if (o.startTime != 0 && block.timestamp < o.startTime) revert OrderInactive();
+        if (o.endTime   != 0 && block.timestamp >= o.endTime)  revert Expired();
+
+        // 2. Counter freshness.
+        if (o.counter != counters[o.offerer]) revert WrongCounter();
+
+        // 3. Self-trade guard.
+        if (o.offerer == msg.sender) revert NoSelfTrade();
+
+        // 4. Order status.
+        bytes32 h = hashOrder(o);
+        if (orderFilled[h] || orderCancelled[h]) revert OrderConsumed();
+
+        // 5. Signature (ECDSA or ERC-1271).
+        if (!SignatureChecker.isValidSignatureNow(o.offerer, h, sig)) {
+            revert InvalidSignature();
+        }
+
+        // 6. Mark filled before any external call.
+        orderFilled[h] = true;
+
+        // 7. Settlement splits.
+        (uint256 royalty, uint256 fee, uint256 offererProceeds, address royaltyReceiver) =
+            _computeSplits(o.collection, o.tokenId, o.price);
+
+        if (o.side == OrderSide.ASK) {
+            // offerer is seller, msg.sender is buyer.
+            if (o.paymentToken == address(0)) {
+                if (ethValue != o.price) revert WrongPayment();
+                _payETH(royaltyReceiver, royalty);
+                _payETH(feeRecipient,    fee);
+                _payETH(o.offerer,       offererProceeds);
+            } else {
+                if (ethValue != 0) revert WrongPayment();
+                IERC20 t = IERC20(o.paymentToken);
+                if (royalty > 0) t.safeTransferFrom(msg.sender, royaltyReceiver, royalty);
+                if (fee > 0)     t.safeTransferFrom(msg.sender, feeRecipient,    fee);
+                t.safeTransferFrom(msg.sender, o.offerer, offererProceeds);
+            }
+            // Verify NFT ownership at fill time and pull from seller.
+            IERC721 nft = IERC721(o.collection);
+            if (nft.ownerOf(o.tokenId) != o.offerer) revert NotOwner();
+            nft.safeTransferFrom(o.offerer, msg.sender, o.tokenId);
+
+            // If a matching on-chain listing existed, mark it Cancelled
+            // so the subgraph stays consistent.
+            uint256 lid = openListingOf[o.collection][o.tokenId];
+            if (lid != 0 && listings[lid].status == ListingStatus.Open) {
+                listings[lid].status = ListingStatus.Cancelled;
+                openListingOf[o.collection][o.tokenId] = 0;
+                emit ListingCancelled(lid);
+            }
+        } else {
+            // BID: offerer is buyer, msg.sender is seller.
+            if (o.paymentToken == address(0)) revert BidPaymentMustBeERC20();
+            if (ethValue != 0) revert WrongPayment();
+            IERC721 nft = IERC721(o.collection);
+            if (nft.ownerOf(o.tokenId) != msg.sender) revert NotOwner();
+
+            IERC20 t = IERC20(o.paymentToken);
+            if (royalty > 0) t.safeTransferFrom(o.offerer, royaltyReceiver, royalty);
+            if (fee > 0)     t.safeTransferFrom(o.offerer, feeRecipient,    fee);
+            t.safeTransferFrom(o.offerer, msg.sender, offererProceeds);
+
+            nft.safeTransferFrom(msg.sender, o.offerer, o.tokenId);
+        }
+
+        emit OrderFulfilled(
+            h, o.offerer, msg.sender, o.side,
+            o.collection, o.tokenId, o.paymentToken, o.price,
+            royalty, fee, offererProceeds
+        );
+    }
+
+    function _structHash(Order calldata o) internal pure returns (bytes32) {
+        return keccak256(abi.encode(
+            ORDER_TYPEHASH,
+            uint8(o.side),
+            o.offerer,
+            o.collection,
+            o.tokenId,
+            o.paymentToken,
+            o.price,
+            o.startTime,
+            o.endTime,
+            o.salt,
+            o.counter
+        ));
+    }
+
+    /// @notice EIP-712 domain separator for off-chain signers.
+    function domainSeparator() external view returns (bytes32) {
+        return _domainSeparatorV4();
+    }
+
     /// @notice Storage gap for future upgrades.
-    uint256[44] private __gap;
+    uint256[40] private __gap;
 }

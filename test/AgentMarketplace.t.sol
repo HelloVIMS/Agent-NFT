@@ -73,10 +73,10 @@ contract AgentMarketplaceTest is Test {
         vm.prank(buyer);
         market.purchase{value: 1 ether}(lid);
 
-        // 10% creator royalty + 0.5% system = 10.5% to vault, 2.5% protocol fee, 87% to seller.
-        assertEq(vault.balance,                  0.105 ether, "vault");
+        // 10% creator royalty + 1% system = 11% to vault, 2.5% protocol fee, 86.5% to seller.
+        assertEq(vault.balance,                  0.11 ether,  "vault");
         assertEq(feeRecv.balance - feeRecvBefore, 0.025 ether, "feeRecv");
-        assertEq(seller.balance - sellerBefore,   0.87 ether,  "seller");
+        assertEq(seller.balance - sellerBefore,   0.865 ether, "seller");
         assertEq(identity.ownerOf(agentId),       buyer,        "transferred");
 
         AgentMarketplace.Listing memory l = market.getListing(lid);
@@ -97,9 +97,9 @@ contract AgentMarketplaceTest is Test {
         market.purchase(lid);
 
         address vault = identity.royaltyVaultAddress(agentId);
-        assertEq(usdc.balanceOf(vault),    10_500_000, "vault");
+        assertEq(usdc.balanceOf(vault),    11_000_000, "vault");
         assertEq(usdc.balanceOf(feeRecv),   2_500_000, "feeRecv");
-        assertEq(usdc.balanceOf(seller),   87_000_000, "seller");
+        assertEq(usdc.balanceOf(seller),   86_500_000, "seller");
         assertEq(identity.ownerOf(agentId), buyer);
     }
 
@@ -191,9 +191,9 @@ contract AgentMarketplaceTest is Test {
         vm.stopPrank();
 
         address vault = identity.royaltyVaultAddress(agentId);
-        assertEq(vault.balance,                  0.105 ether);
+        assertEq(vault.balance,                  0.11 ether);
         assertEq(feeRecv.balance,                0.025 ether);
-        assertEq(seller.balance - sellerBefore,  0.87 ether);
+        assertEq(seller.balance - sellerBefore,  0.865 ether);
         assertEq(identity.ownerOf(agentId),      bidder);
         assertEq(address(market).balance,        0, "escrow released");
     }
@@ -213,9 +213,9 @@ contract AgentMarketplaceTest is Test {
         vm.stopPrank();
 
         address vault = identity.royaltyVaultAddress(agentId);
-        assertEq(usdc.balanceOf(vault),    10_500_000);
+        assertEq(usdc.balanceOf(vault),    11_000_000);
         assertEq(usdc.balanceOf(feeRecv),   2_500_000);
-        assertEq(usdc.balanceOf(seller),   87_000_000);
+        assertEq(usdc.balanceOf(seller),   86_500_000);
         assertEq(identity.ownerOf(agentId), bidder);
         assertEq(usdc.balanceOf(address(market)), 0);
     }

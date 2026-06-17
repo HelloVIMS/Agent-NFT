@@ -87,7 +87,7 @@ contract DeployAgentScript is Script {
             address(x402Impl),
             abi.encodeCall(
                 AgentX402Receiver.initialize,
-                (address(identityRegistry), TREASURY, 50) // 0.5% system fee
+                (address(identityRegistry), TREASURY, 100) // 1% system fee
             )
         );
         AgentX402Receiver x402Receiver = AgentX402Receiver(address(x402Proxy));

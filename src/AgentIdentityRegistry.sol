@@ -128,9 +128,9 @@ contract AgentIdentityRegistry is
     // captures economics on secondary NFT sales. royaltyInfo() returns the
     // per-agent vault address; the vault (lazily deployed via CREATE2) splits
     // incoming ETH/ERC20 between creator and treasury at release time.
-    uint256 public secondarySystemFeeBps;                        // current bps (default 50 = 0.5%)
+    uint256 public secondarySystemFeeBps;                        // current bps (default 100 = 1%)
     address public secondaryTreasury;                            // VIMS treasury for secondary royalties
-    uint256 public constant DEFAULT_SECONDARY_SYSTEM_FEE_BPS = 50;   // 0.5%
+    uint256 public constant DEFAULT_SECONDARY_SYSTEM_FEE_BPS = 100;  // 1%
     uint256 public constant MAX_SECONDARY_SYSTEM_FEE_BPS     = 500;  // 5% cap
 
     // ============ Storage: 1:Many Subaccounts ============

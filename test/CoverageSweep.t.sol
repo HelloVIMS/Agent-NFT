@@ -221,7 +221,7 @@ contract CoverageSweepTest is Test {
     // ─── AgentRoyaltyVault.pendingSplit math ─────────────────────────────
 
     function test_royaltyVault_pendingSplit_zeroWhenNoBps() public {
-        // Default secondarySystemFeeBps is 50; zero it out explicitly.
+        // Default secondarySystemFeeBps is 100; zero it out explicitly.
         identityRegistry.setSecondarySystemFeeBps(0);
         vm.prank(alice);
         uint256 agentId = identityRegistry.registerAgent("V0", "ipfs://m", 0, address(0));
