@@ -90,10 +90,13 @@ contract AgentSubaccountWiringTest is Test {
         identity.registerSubaccount(clientAgentId, clientSubacct, bytes32(0), permRep);
 
         // Subaccount writes feedback. Canonical client should be clientEoa.
+        // targetAgentId is transferable (no anchor) so the v2 OWNER
+        // branch fires and dedup is recorded in clientHasFeedbackForAgent.
+        bytes32 subj = reputation.reputationSubjectOf(targetAgentId);
         vm.prank(clientSubacct);
         reputation.giveFeedback(targetAgentId, 88, 0, "quality", "", "ipfs://r1");
-        assertTrue(reputation.clientHasFeedback(reputation.reputationSubjectOf(targetAgentId), clientEoa));
-        assertFalse(reputation.clientHasFeedback(reputation.reputationSubjectOf(targetAgentId), clientSubacct));
+        assertTrue(reputation.clientHasFeedback(subj, targetAgentId, clientEoa));
+        assertFalse(reputation.clientHasFeedback(subj, targetAgentId, clientSubacct));
 
         // A second subaccount also bound with PERM_REPUTATION must NOT be
         // able to bypass dedup — same canonical client.
@@ -109,7 +112,7 @@ contract AgentSubaccountWiringTest is Test {
         // client (clientEoa) was who recorded the feedback.
         vm.prank(clientSubacct);
         reputation.revokeFeedback(targetAgentId);
-        assertFalse(reputation.clientHasFeedback(reputation.reputationSubjectOf(targetAgentId), clientEoa));
+        assertFalse(reputation.clientHasFeedback(subj, targetAgentId, clientEoa));
     }
 
     function test_Reputation_PrimaryTBA_AlsoCanonicalises() public {
@@ -118,7 +121,8 @@ contract AgentSubaccountWiringTest is Test {
 
         vm.prank(clientPrimaryTba);
         reputation.giveFeedback(targetAgentId, 70, 0, "quality", "", "ipfs://r3");
-        assertTrue(reputation.clientHasFeedback(reputation.reputationSubjectOf(targetAgentId), clientEoa));
+        bytes32 subj = reputation.reputationSubjectOf(targetAgentId);
+        assertTrue(reputation.clientHasFeedback(subj, targetAgentId, clientEoa));
     }
 
     function test_Reputation_CannotReviewOwnAgent_ViaSubaccount() public {

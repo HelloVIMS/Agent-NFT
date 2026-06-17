@@ -32,25 +32,43 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
         bool revoked;
     }
     
-    // SECURITY: Subject keys are domain-separated bytes32 derived from
-    // keccak256("AGENT", agentId) for transferable agents, or
-    // keccak256("ANCHOR", anchorAddress) for anchored agents. This prevents
-    // an attacker from minting an anchor address whose uint160 representation
-    // collides with an existing agentId, which would otherwise merge two
-    // independent reputation pools.
+    // Subject keys are domain-separated bytes32 derived from one of two
+    // namespaces:
+    //
+    //   ANCHOR(anchorAddress)         — opt-in shared collection-level
+    //                                   pool (set at mint via
+    //                                   AgentIdentityRegistry.reputationAnchor).
+    //
+    //   OWNER(currentOwnerAddress)    — default. Reputation is SOULBOUND
+    //                                   to the wallet that owns the NFT
+    //                                   at the moment each attestation
+    //                                   is made. Transferring the NFT
+    //                                   does NOT carry attestations over.
+    //
+    // Domain separation prevents owner/anchor namespace collisions.
 
     // subject => feedbacks
     mapping(bytes32 => Feedback[]) public feedbacks;
 
-    // subject => client => hasFeedback (prevent spam)
-    mapping(bytes32 => mapping(address => bool)) public clientHasFeedback;
+    // Dedup: one feedback per (subject, agentId, client). Keyed by
+    // agentId on top of subject because the OWNER subject collapses
+    // across every agent the wallet operates — without the agentId
+    // axis, Bob could review Alice's agent #1 and then be locked out
+    // of reviewing Alice's agent #2.
+    mapping(bytes32 => mapping(uint256 => mapping(address => bool))) public clientHasFeedback;
 
     // subject => tag => average score
     mapping(bytes32 => mapping(string => int256)) public tagScores;
     mapping(bytes32 => mapping(string => uint256)) public tagCounts;
 
-    bytes32 private constant _SUBJECT_AGENT  = keccak256("AGENT");
     bytes32 private constant _SUBJECT_ANCHOR = keccak256("ANCHOR");
+    bytes32 private constant _SUBJECT_OWNER  = keccak256("OWNER");
+
+    // Per-attestation snapshot of the agentId the review was given
+    // against. Lets the marketplace render "reviews this wallet earned
+    // while holding agent #N" without scanning every feedback.
+    // subject => feedback array index => agentId at attestation time
+    mapping(bytes32 => mapping(uint256 => uint256)) public feedbackAgentId;
 
     event FeedbackGiven(
         uint256 indexed agentId,
@@ -90,18 +108,25 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
      * @param feedbackURI IPFS URI with detailed feedback
      */
     /**
-     * @dev Resolve the reputation subject key for an agentId.
-     *      Returns a domain-separated bytes32:
-     *        - keccak256("ANCHOR", anchor)  if reputationAnchor is non-zero
-     *        - keccak256("AGENT",  agentId) otherwise (transferable, follows NFT)
-     *      Domain separation prevents agentId/anchor namespace collisions.
+     * @dev Resolve the reputation subject key for an agentId AT THE
+     *      MOMENT OF THIS CALL.
+     *
+     *      ANCHOR(anchor)              — opt-in shared collection pool.
+     *      OWNER(ownerOf(agentId))     — soulbound default. Every
+     *                                    attestation made while Alice
+     *                                    owns agent #N lands in Alice's
+     *                                    bucket; on transfer to Bob,
+     *                                    ownerOf flips and Alice's
+     *                                    bucket is frozen — the buyer
+     *                                    cannot inherit (or shake off)
+     *                                    the seller's track record.
      */
     function _reputationSubject(uint256 agentId) internal view returns (bytes32 subject) {
         address anchor = identityRegistry.reputationAnchorOf(agentId);
         if (anchor != address(0)) {
             return keccak256(abi.encode(_SUBJECT_ANCHOR, anchor));
         }
-        return keccak256(abi.encode(_SUBJECT_AGENT, agentId));
+        return keccak256(abi.encode(_SUBJECT_OWNER, identityRegistry.ownerOf(agentId)));
     }
 
     /**
@@ -141,11 +166,15 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
         require(identityRegistry.ownerOf(agentId) != client, "Cannot review own agent");
         if (isBound) require(callerAgentId != agentId, "Cannot review own agent");
 
-        // Prevent duplicate feedback (can revoke and re-submit). Dedup is
-        // keyed on the canonical client to defeat subaccount spam.
+        // Prevent duplicate feedback (can revoke and re-submit). Dedup
+        // is keyed on (subject, agentId, canonical client) to defeat
+        // subaccount spam while still allowing one review per agent
+        // even when the subject collapses across many agents (OWNER
+        // and ANCHOR branches both do that).
         bytes32 subject = _reputationSubject(agentId);
-        require(!clientHasFeedback[subject][client], "Already gave feedback");
+        require(!clientHasFeedback[subject][agentId][client], "Already gave feedback");
 
+        uint256 feedbackIndex = feedbacks[subject].length;
         feedbacks[subject].push(Feedback({
             client: client,
             value: value,
@@ -156,8 +185,12 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
             timestamp: block.timestamp,
             revoked: false
         }));
-        
-        clientHasFeedback[subject][client] = true;
+        // Snapshot the agentId so the marketplace can filter this
+        // wallet's reputation down to "reviews earned while holding
+        // agent #N".
+        feedbackAgentId[subject][feedbackIndex] = agentId;
+
+        clientHasFeedback[subject][agentId][client] = true;
 
         // Update tag scores
         if (bytes(tag1).length > 0) {
@@ -181,32 +214,33 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
         // a feedback that the canonical client recorded.
         (address client,, ) = _canonicalClient(msg.sender);
         bytes32 subject = _reputationSubject(agentId);
-        require(clientHasFeedback[subject][client], "No feedback to revoke");
+        require(clientHasFeedback[subject][agentId][client], "No feedback to revoke");
 
         Feedback[] storage agentFeedbacks = feedbacks[subject];
-        
         for (uint256 i = 0; i < agentFeedbacks.length; i++) {
-            if (agentFeedbacks[i].client == client && !agentFeedbacks[i].revoked) {
-                Feedback storage fb = agentFeedbacks[i];
-                fb.revoked = true;
-                
-                // Update tag scores
-                if (bytes(fb.tag1).length > 0) {
-                    tagScores[subject][fb.tag1] -= int256(fb.value);
-                    tagCounts[subject][fb.tag1]--;
-                }
-                if (bytes(fb.tag2).length > 0) {
-                    tagScores[subject][fb.tag2] -= int256(fb.value);
-                    tagCounts[subject][fb.tag2]--;
-                }
+            if (agentFeedbacks[i].client != client) continue;
+            if (agentFeedbacks[i].revoked) continue;
+            // Subject can hold multiple unrevoked feedbacks from the
+            // same client (one per agentId on the OWNER branch).
+            // Find the one tagged with this agentId.
+            if (feedbackAgentId[subject][i] != agentId) continue;
 
-                clientHasFeedback[subject][client] = false;
-                
-                emit FeedbackRevoked(agentId, client, subject, i);
-                return;
+            Feedback storage fb = agentFeedbacks[i];
+            fb.revoked = true;
+
+            if (bytes(fb.tag1).length > 0) {
+                tagScores[subject][fb.tag1] -= int256(fb.value);
+                tagCounts[subject][fb.tag1]--;
             }
+            if (bytes(fb.tag2).length > 0) {
+                tagScores[subject][fb.tag2] -= int256(fb.value);
+                tagCounts[subject][fb.tag2]--;
+            }
+
+            clientHasFeedback[subject][agentId][client] = false;
+            emit FeedbackRevoked(agentId, client, subject, i);
+            return;
         }
-        
         revert("Feedback not found");
     }
     
@@ -224,25 +258,29 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
     ) {
         bytes32 subject = _reputationSubject(agentId);
         Feedback[] storage agentFeedbacks = feedbacks[subject];
-        
+
         if (agentFeedbacks.length == 0) {
             return (0, 0, 0);
         }
-        
+
+        // The subject holds every review the current owner (or anchor)
+        // has received across every agent they operate. Filter to
+        // attestations explicitly tagged against THIS agentId so the
+        // public summary reflects this agent's track record, not the
+        // owner's wallet-wide rollup.
         int256 sum = 0;
         uint256 count = 0;
         uint256 lastTime = 0;
-        
         for (uint256 i = 0; i < agentFeedbacks.length; i++) {
-            if (!agentFeedbacks[i].revoked) {
-                sum += int256(agentFeedbacks[i].value);
-                count++;
-                if (agentFeedbacks[i].timestamp > lastTime) {
-                    lastTime = agentFeedbacks[i].timestamp;
-                }
+            if (agentFeedbacks[i].revoked) continue;
+            if (feedbackAgentId[subject][i] != agentId) continue;
+            sum += int256(agentFeedbacks[i].value);
+            count++;
+            if (agentFeedbacks[i].timestamp > lastTime) {
+                lastTime = agentFeedbacks[i].timestamp;
             }
         }
-        
+
         return (
             count,
             count > 0 ? sum / int256(count) : int256(0),
@@ -348,4 +386,47 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
     function reputationSubjectOf(uint256 agentId) external view returns (bytes32) {
         return _reputationSubject(agentId);
     }
+
+    /**
+     * @notice Reputation summary scoped to a specific (wallet, agent)
+     *         tenure. Walks the wallet's full feedback list and counts
+     *         only entries whose `feedbackAgentId` snapshot matches
+     *         `agentId`. This is the marketplace "track record while
+     *         this wallet held this agent" view that lets a buyer see
+     *         how the seller performed BEFORE the sale, without
+     *         conflating it with the seller's reviews from other
+     *         agents they've operated.
+     *
+     * @dev    O(n) over the wallet's feedback list. Off-chain indexers
+     *         can replicate this cheaply via the FeedbackGiven event
+     *         stream — emit-time `agentId` is in the indexed topic.
+     */
+    function getReputationByOwnerAgent(
+        address owner,
+        uint256 agentId
+    ) external view returns (
+        uint256 totalFeedbacks,
+        int256 averageScore,
+        uint256 lastFeedbackTime
+    ) {
+        bytes32 subject = keccak256(abi.encode(_SUBJECT_OWNER, owner));
+        Feedback[] storage list = feedbacks[subject];
+        int256 sum = 0;
+        uint256 count = 0;
+        uint256 lastTime = 0;
+        uint256 len = list.length;
+        for (uint256 i = 0; i < len; i++) {
+            if (list[i].revoked) continue;
+            if (feedbackAgentId[subject][i] != agentId) continue;
+            sum += int256(list[i].value);
+            count++;
+            if (list[i].timestamp > lastTime) lastTime = list[i].timestamp;
+        }
+        return (
+            count,
+            count > 0 ? sum / int256(count) : int256(0),
+            lastTime
+        );
+    }
+
 }

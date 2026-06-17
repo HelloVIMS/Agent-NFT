@@ -114,46 +114,73 @@ contract ReputationAnchorTest is Test {
         identityRegistry.reputationAnchorOf(999);
     }
 
-    // ============ Transferable Reputation Tests ============
+    // ============ Soulbound (default, non-anchored) Reputation Tests ============
+    //
+    // Reviews on a transferable agent NFT bind to the wallet that owns
+    // it AT THE MOMENT OF ATTESTATION. Transferring the NFT does NOT
+    // carry reviews to the new owner — the new owner starts with a
+    // clean record, and the previous owner's track record stays
+    // queryable as a per-tenure record. This pins the v2 semantic that
+    // replaced the pre-v2 "reputation follows agentId" behaviour.
 
-    function test_TransferableReputation_FollowsAgentId() public {
-        // Client gives feedback to transferable agent
+    function test_SoulboundReputation_DoesNotTransferWithNFT() public {
+        // Creator earns feedback while owning the agent.
         vm.prank(client1);
         reputationRegistry.giveFeedback(transferableAgentId, 80, 0, "quality", "", "");
 
-        (uint256 count1, int256 avg1,) = reputationRegistry.getReputationSummary(transferableAgentId);
+        (uint256 count1, int256 avg1,) =
+            reputationRegistry.getReputationSummary(transferableAgentId);
         assertEq(count1, 1);
         assertEq(avg1, 80);
 
-        // Creator sells the NFT to buyer
+        // Creator sells the NFT to buyer.
         vm.prank(creator);
         identityRegistry.transferFrom(creator, buyer, transferableAgentId);
 
-        // New owner inherits the reputation
-        (uint256 count2, int256 avg2,) = reputationRegistry.getReputationSummary(transferableAgentId);
-        assertEq(count2, 1);
-        assertEq(avg2, 80);
+        // Buyer does NOT inherit the reputation — the public summary
+        // for this agent now reflects buyer's (empty) tenure.
+        (uint256 count2, int256 avg2,) =
+            reputationRegistry.getReputationSummary(transferableAgentId);
+        assertEq(count2, 0, "buyer must not inherit reviews");
+        assertEq(avg2, 0);
+
+        // Creator's tenure track record is preserved and queryable.
+        (uint256 creatorCount, int256 creatorAvg,) =
+            reputationRegistry.getReputationByOwnerAgent(creator, transferableAgentId);
+        assertEq(creatorCount, 1, "previous owner's tenure persists");
+        assertEq(creatorAvg, 80);
     }
 
-    function test_TransferableReputation_BuyerCanContinue() public {
+    function test_SoulboundReputation_BuyerEarnsFreshTrackRecord() public {
+        // Creator earns a review.
         vm.prank(client1);
         reputationRegistry.giveFeedback(transferableAgentId, 80, 0, "quality", "", "");
 
-        // Transfer to buyer
+        // Transfer to buyer.
         vm.prank(creator);
         identityRegistry.transferFrom(creator, buyer, transferableAgentId);
 
-        // Buyer still receives the reputation on queries
-        (uint256 count,,) = reputationRegistry.getReputationSummary(transferableAgentId);
-        assertEq(count, 1);
+        // Public summary on the same NFT is now empty (buyer's tenure).
+        (uint256 count,,) =
+            reputationRegistry.getReputationSummary(transferableAgentId);
+        assertEq(count, 0);
 
-        // New client can still review the agent (feedback keyed to agentId)
+        // A fresh client reviews buyer's tenure.
         vm.prank(client2);
         reputationRegistry.giveFeedback(transferableAgentId, 90, 0, "quality", "", "");
 
-        (uint256 countAfter, int256 avgAfter,) = reputationRegistry.getReputationSummary(transferableAgentId);
-        assertEq(countAfter, 2);
-        assertEq(avgAfter, 85); // (80 + 90) / 2
+        // Buyer's tenure summary reflects ONLY their own record (not
+        // 85 = (80+90)/2 — the creator's 80 is soulbound to creator).
+        (uint256 countAfter, int256 avgAfter,) =
+            reputationRegistry.getReputationSummary(transferableAgentId);
+        assertEq(countAfter, 1);
+        assertEq(avgAfter, 90);
+
+        // Creator's tenure remains intact.
+        (uint256 creatorCount, int256 creatorAvg,) =
+            reputationRegistry.getReputationByOwnerAgent(creator, transferableAgentId);
+        assertEq(creatorCount, 1);
+        assertEq(creatorAvg, 80);
     }
 
     // ============ Anchored Reputation Tests ============
@@ -216,16 +243,18 @@ contract ReputationAnchorTest is Test {
         vm.prank(client2);
         reputationRegistry.giveFeedback(agent2Id, 50, 0, "quality", "", "");
 
-        // Both agents share the SAME reputation subject (creator's anchor)
-        // So querying either agentId returns the combined reputation
+        // Both agents share the same anchor BUCKET, but each public
+        // summary is filtered to that agentId's attestations only —
+        // anchor sharing decides which bucket reviews drop into, not
+        // whether reviews of unrelated agents bleed across the public
+        // per-agent card. The combined view is read explicitly via
+        // getReputationByOwnerAgent(anchor, agentId) when needed.
         (uint256 count1, int256 avg1,) = reputationRegistry.getReputationSummary(anchoredAgentId);
         (uint256 count2, int256 avg2,) = reputationRegistry.getReputationSummary(agent2Id);
-
-        // Both point to the same anchor, so both show 2 reviews avg 75
-        assertEq(count1, 2);
-        assertEq(count2, 2);
-        assertEq(avg1, 75); // (100 + 50) / 2
-        assertEq(avg2, 75);
+        assertEq(count1, 1);
+        assertEq(avg1, 100);
+        assertEq(count2, 1);
+        assertEq(avg2, 50);
     }
 
     // ============ Tag Scores ============
@@ -339,18 +368,26 @@ contract ReputationAnchorTest is Test {
     }
 
     /**
-     * @dev MEDIUM-4 sanity: subject is exposed via reputationSubjectOf and is
-     *      domain-separated for both anchor and agentId paths.
+     * @dev MEDIUM-4 sanity (v2): subject is exposed via
+     *      reputationSubjectOf and is domain-separated. After the
+     *      soulbound upgrade the transferable branch resolves to
+     *      keccak256("OWNER", currentOwner) instead of the legacy
+     *      keccak256("AGENT", agentId) — pinning that derivation here
+     *      so a future change can't silently break domain separation
+     *      and merge the OWNER and ANCHOR pools.
      */
     function test_AUDIT_ReputationSubjectIsDomainSeparated() public view {
         bytes32 anchored = reputationRegistry.reputationSubjectOf(anchoredAgentId);
         bytes32 transferable = reputationRegistry.reputationSubjectOf(transferableAgentId);
 
         bytes32 expectedAnchor = keccak256(abi.encode(keccak256("ANCHOR"), creator));
-        bytes32 expectedAgent  = keccak256(abi.encode(keccak256("AGENT"),  transferableAgentId));
+        bytes32 expectedOwner  = keccak256(abi.encode(
+            keccak256("OWNER"),
+            identityRegistry.ownerOf(transferableAgentId)
+        ));
 
         assertEq(anchored, expectedAnchor);
-        assertEq(transferable, expectedAgent);
+        assertEq(transferable, expectedOwner);
         assertTrue(anchored != transferable);
     }
 
