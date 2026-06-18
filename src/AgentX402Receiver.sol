@@ -86,7 +86,7 @@ contract AgentX402Receiver is
 
     // ============ Constants ============
     uint256 public constant BPS_DENOM          = 10_000;
-    uint256 public constant MAX_SYSTEM_FEE_BPS = 500; // 5%
+    uint256 public constant MAX_SYSTEM_FEE_BPS = 250; // 2.5%
 
     /// @notice EIP-712 typehash for the off-chain payment commitment.
     /// @dev    keccak256("PaymentCommitment(uint256 agentId,bytes32 serviceId,address token,uint256 amount,bytes32 nonce,uint256 validBefore)")

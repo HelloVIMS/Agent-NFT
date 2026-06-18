@@ -14,14 +14,14 @@ import "./interfaces/IAgentIdentityRegistry.sol";
  * 
  * Features:
  * - Automatic creator royalty split on all service payments (dynamic 1-50%)
- * - System royalty (0.5%) for AEyeOS treasury
+ * - System royalty (1%) for VIMS treasury
  * - Hardcoded infrastructure exemptions (Uniswap, Chainlink, etc.)
  * - Creator-controlled whitelist for custom operational addresses
  * - Buyers can check whitelist before purchasing an agent
  * 
  * Payment Flow:
  * 1. User pays via payAgent(agentId) or payAgentUSDC(agentId, amount)
- * 2. Contract deducts system royalty (0.5%) for AEyeOS
+ * 2. Contract deducts system royalty (1%) for VIMS
  * 3. Contract queries creator royalty from IdentityRegistry
  * 4. Creator receives their % of remainder
  * 5. Rest goes to agent's TBA (or owner if no TBA)
@@ -45,12 +45,15 @@ contract AgentPaymentRouter is ReentrancyGuard, Ownable, VimsProvenance {
     // Common payment tokens
     address public immutable USDC;
     
-    // ============ SYSTEM ROYALTY (AEyeOS) ============
+    // ============ SYSTEM ROYALTY (VIMS) ============
     
-    // System royalty for AEyeOS platform sustainability
-    uint256 public constant SYSTEM_ROYALTY_BPS = 50;  // 0.5%
+    // System royalty for VIMS platform sustainability. Set at 1% — the
+    // hard cap (`AgentX402Receiver.MAX_SYSTEM_FEE_BPS` and the identity
+    // registry's secondary-sales fee cap) is 2.5%; this constant stays
+    // well under it so future bumps remain governance-bounded.
+    uint256 public constant SYSTEM_ROYALTY_BPS = 100;  // 1%
     address public aeyeosTreasury;
-    uint256 public totalSystemRoyalties;  // Total collected for AEyeOS
+    uint256 public totalSystemRoyalties;  // Total collected for VIMS
     mapping(address => uint256) public pendingSystemRoyalties;  // token => pending amount
     
     // ============ WHITELIST SYSTEM ============
@@ -587,7 +590,7 @@ contract AgentPaymentRouter is ReentrancyGuard, Ownable, VimsProvenance {
      * @notice Preview the payment split for an agent (includes system royalty)
      * @param agentId The Agent agent token ID
      * @param amount The payment amount
-     * @return systemCut Amount going to AEyeOS treasury (0.5%)
+     * @return systemCut Amount going to VIMS treasury (1%)
      * @return creator The creator address
      * @return creatorCut Amount going to creator
      * @return recipient The TBA or owner address
@@ -600,7 +603,7 @@ contract AgentPaymentRouter is ReentrancyGuard, Ownable, VimsProvenance {
         address recipient,
         uint256 recipientCut
     ) {
-        // System royalty first (0.5% of gross)
+        // System royalty first (1% of gross)
         systemCut = (amount * SYSTEM_ROYALTY_BPS) / 10000;
         uint256 afterSystem = amount - systemCut;
         
@@ -708,7 +711,7 @@ contract AgentPaymentRouter is ReentrancyGuard, Ownable, VimsProvenance {
     }
     
     /**
-     * @notice Update the AEyeOS treasury address
+     * @notice Update the VIMS treasury address
      * @dev Only owner can update
      * @param newTreasury The new treasury address
      */

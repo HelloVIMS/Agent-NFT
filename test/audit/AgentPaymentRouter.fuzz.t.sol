@@ -17,7 +17,7 @@ contract MockUSDC6 is ERC20 {
 ///   * Conservation across all paid rails (ETH + USDC):
 ///       payment == systemCut + creatorCut + recipientCut
 ///       and the router holds zero net balance after the call.
-///   * System-fee invariant: cut == floor(amount * 50 / 10_000).
+///   * System-fee invariant: cut == floor(amount * 100 / 10_000).
 ///   * Creator-royalty invariant:
 ///       creatorCut == floor((amount - systemCut) * royaltyBps / 10_000)
 ///   * Cross-rail parity: ETH and USDC of the same nominal amount split
@@ -35,7 +35,7 @@ contract AgentPaymentRouterFuzz is Test {
 
     uint256 internal agentId;
 
-    uint256 internal constant SYSTEM_BPS = 50; // 0.5%
+    uint256 internal constant SYSTEM_BPS = 100; // 1%
 
     function setUp() public {
         AgentIdentityRegistry impl = new AgentIdentityRegistry();
@@ -157,11 +157,11 @@ contract AgentPaymentRouterFuzz is Test {
 
     // ─────────────────────────────────────────────────────────────────────
     // Royalty-bound invariant: creator cut never exceeds royaltyBps share
-    // of the after-system remainder, regardless of bps in [0..5000].
+    // of the after-system remainder, regardless of bps in [0..8000].
     // ─────────────────────────────────────────────────────────────────────
     function testFuzz_CreatorRoyaltyBounded(uint16 royaltyBps, uint96 amount) public {
-        // 0% to 50% is the legal range of registerAgent.
-        royaltyBps = uint16(bound(royaltyBps, 0, 5_000));
+        // 0% to 80% is the legal range of registerAgent.
+        royaltyBps = uint16(bound(royaltyBps, 0, 8_000));
         amount     = uint96(bound(uint256(amount), 1e6, 100 ether));
 
         // Register a fresh agent at the chosen bps.
@@ -208,7 +208,7 @@ contract AgentPaymentRouterFuzz is Test {
     // Differential: paying via the exempt rail vs the standard rail must
     // ALWAYS leave the recipient with strictly more (or equal in the
     // royaltyBps=0 + system=0 corner case, which can't happen here since
-    // SYSTEM_BPS is hard-coded at 50).
+    // SYSTEM_BPS is hard-coded at 100).
     // ─────────────────────────────────────────────────────────────────────
     function testFuzz_ExemptStrictlyBetterForRecipient(uint96 amount) public {
         amount = uint96(bound(uint256(amount), 1e6, 100 ether));

@@ -141,7 +141,7 @@ contract AgentSubaccountWiringTest is Test {
 
         vm.deal(payer, 10 ether);
         uint256 amount = 1 ether;
-        uint256 systemCut = (amount * 50) / 10000;
+        uint256 systemCut = (amount * 100) / 10000;
         uint256 afterSystem = amount - systemCut;
         uint256 creatorCut = (afterSystem * 1000) / 10000;
         uint256 recipientCut = afterSystem - creatorCut;
@@ -198,7 +198,7 @@ contract AgentSubaccountWiringTest is Test {
         usdc.approve(address(router), type(uint256).max);
 
         uint256 amount = 100 * 10**6;
-        uint256 systemCut = (amount * 50) / 10000;
+        uint256 systemCut = (amount * 100) / 10000;
         uint256 afterSystem = amount - systemCut;
         uint256 creatorCut = (afterSystem * 1000) / 10000;
         uint256 recipientCut = afterSystem - creatorCut;

@@ -327,12 +327,12 @@ contract AgentX402ReceiverTest is Test {
 
     function test_SetSystemFeeBps_Capped() public {
         vm.prank(owner);
-        x402.setSystemFeeBps(500);
-        assertEq(x402.systemFeeBps(), 500);
+        x402.setSystemFeeBps(250);
+        assertEq(x402.systemFeeBps(), 250);
 
         vm.prank(owner);
         vm.expectRevert(AgentX402Receiver.InvalidFee.selector);
-        x402.setSystemFeeBps(501);
+        x402.setSystemFeeBps(251);
     }
 
     function test_SetIdentityRegistry_OwnerOnly() public {
@@ -408,7 +408,7 @@ contract AgentX402ReceiverTest is Test {
 
     function testFuzz_Splits_SumToGross(uint256 price, uint256 feeBps) public {
         price  = bound(price,  1, 1_000_000e6);
-        feeBps = bound(feeBps, 0, 500);
+        feeBps = bound(feeBps, 0, 250);
         vm.prank(owner);
         x402.setSystemFeeBps(feeBps);
 

@@ -617,17 +617,16 @@ contract AgentCollectionFactoryTest is Test {
         address originalCreator = collection.agentCreator(agentId);
         assertEq(originalCreator, minter);
         
-        // Only original creator can update royalty
-        vm.prank(creator2);
-        vm.expectRevert(AgentCollectionImpl.NotCreator.selector);
-        collection.updateSalesRoyalty(agentId, 2000);
-        
-        // Original creator can update
+        // Royalties are committed at mint and immutable thereafter — the
+        // legacy `updateSalesRoyalty` selector is gone, so neither the
+        // original creator nor a transferee can mutate the bps.
+        bytes memory call = abi.encodeWithSignature("updateSalesRoyalty(uint256,uint256)", agentId, 2000);
         vm.prank(minter);
-        collection.updateSalesRoyalty(agentId, 2000);
-        
+        (bool ok,) = address(collection).call(call);
+        assertFalse(ok, "updateSalesRoyalty should be removed");
+
         uint256 salesBps = collection.getSalesRoyalty(agentId);
-        assertEq(salesBps, 2000);
+        assertEq(salesBps, 1000); // pinned at the collection's default
     }
     
     function test_RoyaltySplitCalculation() public {
@@ -827,20 +826,34 @@ contract AgentCollectionFactoryTest is Test {
         collection.getLatestPixe(999);
     }
     
-    // ============ Edge Case: Royalty Unchanged ============
-    
-    function test_RevertOnUnchangedRoyalty() public {
+    // ============ Royalties are immutable post-mint ============
+
+    function test_RoyaltiesAreImmutablePostMint() public {
         vm.prank(creator1);
         (, address collectionAddr) = factory.createCollection("Unchanged", "UCH", 100, 1500, 750, "");
-        
+
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
-        
+
         vm.prank(minter);
         uint256 agentId = collection.registerAgent("Agent1", "uri1");
-        
+
+        // The old `updateSalesRoyalty` / `updateServiceRoyalty` selectors
+        // are gone — calls fall through to the empty fallback path and
+        // return `false` from the low-level call.
+        bytes memory salesCall   = abi.encodeWithSignature("updateSalesRoyalty(uint256,uint256)",   agentId, 2000);
+        bytes memory serviceCall = abi.encodeWithSignature("updateServiceRoyalty(uint256,uint256)", agentId, 2000);
+
         vm.prank(minter);
-        vm.expectRevert(AgentCollectionImpl.Unchanged.selector);
-        collection.updateSalesRoyalty(agentId, 1500); // Same as default
+        (bool okSales,)   = address(collection).call(salesCall);
+        vm.prank(minter);
+        (bool okService,) = address(collection).call(serviceCall);
+
+        assertFalse(okSales,   "updateSalesRoyalty should be removed");
+        assertFalse(okService, "updateServiceRoyalty should be removed");
+
+        // Stored values still match what was committed at mint.
+        assertEq(collection.getSalesRoyalty(agentId),   1500);
+        assertEq(collection.getServiceRoyalty(agentId),  750);
     }
     
     // ============ Fuzz Tests ============

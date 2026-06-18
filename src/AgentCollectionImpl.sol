@@ -674,25 +674,13 @@ contract AgentCollectionImpl is
         ownerCut = amount - creatorCut;
     }
 
-    function updateSalesRoyalty(uint256 agentId, uint256 newBps) external {
-        if (_agentCreator[agentId] != msg.sender) revert NotCreator();
-        if (newBps > MAX_ROYALTY_BPS) revert InvalidValue();
-        if (newBps == _salesRoyaltyBps[agentId]) revert Unchanged();
-
-        uint256 oldBps = _salesRoyaltyBps[agentId];
-        _salesRoyaltyBps[agentId] = newBps;
-        emit SalesRoyaltyUpdated(agentId, oldBps, newBps);
-    }
-
-    function updateServiceRoyalty(uint256 agentId, uint256 newBps) external {
-        if (_agentCreator[agentId] != msg.sender) revert NotCreator();
-        if (newBps > MAX_ROYALTY_BPS) revert InvalidValue();
-        if (newBps == _serviceRoyaltyBps[agentId]) revert Unchanged();
-
-        uint256 oldBps = _serviceRoyaltyBps[agentId];
-        _serviceRoyaltyBps[agentId] = newBps;
-        emit ServiceRoyaltyUpdated(agentId, oldBps, newBps);
-    }
+    // Sales / service royalties are COMMITTED AT MINT (via
+    // `registerAgentWithRoyalty`) and immutable thereafter. The legacy
+    // `updateSalesRoyalty` / `updateServiceRoyalty` selectors were removed
+    // in 2026-06-18 to enforce determinism. Calling them now reverts with
+    // the standard "function selector not found" fallback. The stored
+    // mappings and `getSalesRoyalty` / `getServiceRoyalty` views are
+    // unchanged.
 
     // ============ On-chain SVG Storage ============
 

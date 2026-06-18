@@ -37,7 +37,7 @@ contract MockUSDC is ERC20 {
 ///   - Mint agent NFT → register service → pay for service → verify splits.
 ///   - Invariant: sysCut + creatorCut + agentCut == gross for EVERY payment.
 ///   - Invariant: totalSupply only increments on mint; deactivation does not burn.
-///   - Fuzz: random price (1..1M USDC), random fee bps (0..500), random royalty (0..5000).
+///   - Fuzz: random price (1..1M USDC), random fee bps (0..250), random royalty (0..8000).
 contract AgentEconomyLifecycle is Test {
     AgentIdentityRegistry public registry;
     AgentX402Receiver     public x402;
@@ -68,7 +68,7 @@ contract AgentEconomyLifecycle is Test {
         AgentX402Receiver x402Impl = new AgentX402Receiver();
         x402 = AgentX402Receiver(address(new ERC1967Proxy(
             address(x402Impl),
-            abi.encodeCall(AgentX402Receiver.initialize, (address(registry), treasury, 50))
+            abi.encodeCall(AgentX402Receiver.initialize, (address(registry), treasury, 100))
         )));
         vm.stopPrank();
 
@@ -145,10 +145,10 @@ contract AgentEconomyLifecycle is Test {
         _pay(agentId, sid, bytes32(uint256(1)));
 
         (uint256 gross,,,) = x402.quoteSplit(agentId, sid);
-        // Treasury gets 50 bps = 0.5%
-        assertEq(usdc.balanceOf(treasury) - preTreasury, gross * 50 / 10_000, "treasury cut");
+        // Treasury gets 100 bps = 1%
+        assertEq(usdc.balanceOf(treasury) - preTreasury, gross * 100 / 10_000, "treasury cut");
         // Creator gets royalty (1000 bps = 10%) + agent cut (89.5%) since no TBA
-        assertEq(usdc.balanceOf(creator) - preCreator, gross * 9950 / 10_000, "creator+agent cut");
+        assertEq(usdc.balanceOf(creator) - preCreator, gross * 9900 / 10_000, "creator+agent cut");
     }
 
     function test_Lifecycle_DeactivateDoesNotBurn() public {
@@ -193,8 +193,8 @@ contract AgentEconomyLifecycle is Test {
 
     function testFuzz_FullLifecycle(uint256 price, uint256 feeBps, uint256 royaltyBps) public {
         price      = bound(price,      1,      1_000_000e6);
-        feeBps     = bound(feeBps,     0,      500);
-        royaltyBps = bound(royaltyBps, 0,      5000);
+        feeBps     = bound(feeBps,     0,      250);
+        royaltyBps = bound(royaltyBps, 0,      8000);
 
         vm.prank(owner);
         x402.setSystemFeeBps(feeBps);
@@ -242,7 +242,8 @@ contract AgentEconomyLifecycle is Test {
         _register(agentId, sid, 50e6);
 
         vm.expectEmit(true, true, true, true, address(x402));
-        emit ServicePaid(agentId, sid, payer, address(usdc), 50e6, 250_000, 5_000_000, 44_750_000, creator);
+        // gross 50e6, system 1% = 500_000, creator 10% off gross = 5_000_000, agent = 44_500_000
+        emit ServicePaid(agentId, sid, payer, address(usdc), 50e6, 500_000, 5_000_000, 44_500_000, creator);
 
         bytes32 commitDigest = x402.hashPaymentCommitment(
             agentId, sid, address(usdc), 50e6, bytes32(uint256(99)), DEADLINE

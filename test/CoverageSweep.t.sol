@@ -221,7 +221,7 @@ contract CoverageSweepTest is Test {
     // ─── AgentRoyaltyVault.pendingSplit math ─────────────────────────────
 
     function test_royaltyVault_pendingSplit_zeroWhenNoBps() public {
-        // Default secondarySystemFeeBps is 50; zero it out explicitly.
+        // Default secondarySystemFeeBps is 100; zero it out explicitly.
         identityRegistry.setSecondarySystemFeeBps(0);
         vm.prank(alice);
         uint256 agentId = identityRegistry.registerAgent("V0", "ipfs://m", 0, address(0));
@@ -232,20 +232,20 @@ contract CoverageSweepTest is Test {
     }
 
     function test_royaltyVault_pendingSplit_splitsByBps() public {
-        // creator royalty is capped at 5000 (50%), secondary system fee at 500 (5%).
-        identityRegistry.setSecondarySystemFeeBps(500); // 5%
+        // creator royalty is capped at 8000 (80%), secondary system fee at 250 (2.5%).
+        identityRegistry.setSecondarySystemFeeBps(250); // 2.5%
         identityRegistry.setSecondaryTreasury(address(0xfee));
 
         vm.prank(alice);
-        uint256 agentId = identityRegistry.registerAgent("V1", "ipfs://m", 4500, address(0)); // 45%
+        uint256 agentId = identityRegistry.registerAgent("V1", "ipfs://m", 4750, address(0)); // 47.5%
         AgentRoyaltyVault vault = new AgentRoyaltyVault(address(identityRegistry), agentId);
 
         (uint256 cr, uint256 tr) = vault.pendingSplit(1 ether);
-        // total = 4500 + 500 = 5000.
-        // treasury = 1e18 * 500 / 5000 = 0.1 ether.
-        // creator  = 1 ether - 0.1 ether = 0.9 ether.
-        assertEq(tr, 0.1 ether);
-        assertEq(cr, 0.9 ether);
+        // total = 4750 + 250 = 5000.
+        // treasury = 1e18 * 250 / 5000 = 0.05 ether.
+        // creator  = 1 ether - 0.05 ether = 0.95 ether.
+        assertEq(tr, 0.05 ether);
+        assertEq(cr, 0.95 ether);
         assertEq(cr + tr, 1 ether);
     }
 }

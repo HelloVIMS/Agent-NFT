@@ -79,53 +79,27 @@ contract AgentCollectionImplExtrasTest is Test {
         assertEq(ownerCut,   0.95 ether);
     }
 
-    function test_updateServiceRoyalty_byCreator() public {
+    // Sales / service royalties are committed at mint and immutable
+    // thereafter — the legacy `updateSalesRoyalty` / `updateServiceRoyalty`
+    // selectors no longer exist. These tests replace the prior CRUD-style
+    // suite with a single immutability assertion.
+    function test_royalties_areImmutablePostMint() public {
         uint256 id = _mint(minter);
+
+        bytes memory salesCall   = abi.encodeWithSignature("updateSalesRoyalty(uint256,uint256)",   id, 800);
+        bytes memory serviceCall = abi.encodeWithSignature("updateServiceRoyalty(uint256,uint256)", id, 1500);
+
         vm.prank(minter);
-        collection.updateServiceRoyalty(id, 1500);
-        assertEq(collection.getServiceRoyalty(id), 1500);
-    }
-
-    function test_updateServiceRoyalty_revertsForNonCreator() public {
-        uint256 id = _mint(minter);
-        vm.prank(stranger);
-        vm.expectRevert(AgentCollectionImpl.NotCreator.selector);
-        collection.updateServiceRoyalty(id, 500);
-    }
-
-    function test_updateServiceRoyalty_revertsForUnchanged() public {
-        uint256 id = _mint(minter);
+        (bool okSales,)   = address(collection).call(salesCall);
         vm.prank(minter);
-        vm.expectRevert(AgentCollectionImpl.Unchanged.selector);
-        collection.updateServiceRoyalty(id, 1000);
-    }
+        (bool okService,) = address(collection).call(serviceCall);
 
-    function test_updateServiceRoyalty_revertsForOverMax() public {
-        uint256 id = _mint(minter);
-        vm.prank(minter);
-        vm.expectRevert(AgentCollectionImpl.InvalidValue.selector);
-        collection.updateServiceRoyalty(id, 100_000); // > MAX_ROYALTY_BPS
-    }
+        assertFalse(okSales,   "updateSalesRoyalty selector should be removed");
+        assertFalse(okService, "updateServiceRoyalty selector should be removed");
 
-    function test_updateSalesRoyalty_byCreator() public {
-        uint256 id = _mint(minter);
-        vm.prank(minter);
-        collection.updateSalesRoyalty(id, 800);
-        assertEq(collection.getSalesRoyalty(id), 800);
-    }
-
-    function test_updateSalesRoyalty_revertsForNonCreator() public {
-        uint256 id = _mint(minter);
-        vm.prank(stranger);
-        vm.expectRevert(AgentCollectionImpl.NotCreator.selector);
-        collection.updateSalesRoyalty(id, 200);
-    }
-
-    function test_updateSalesRoyalty_revertsForUnchanged() public {
-        uint256 id = _mint(minter);
-        vm.prank(minter);
-        vm.expectRevert(AgentCollectionImpl.Unchanged.selector);
-        collection.updateSalesRoyalty(id, 500);
+        // Stored bps unchanged from the mint values.
+        assertEq(collection.getSalesRoyalty(id),   500);
+        assertEq(collection.getServiceRoyalty(id), 1000);
     }
 
     // ─── setBaseURI ──────────────────────────────────────────────────────

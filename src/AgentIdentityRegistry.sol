@@ -116,8 +116,12 @@ contract AgentIdentityRegistry is
     mapping(uint256 => address) private _agentCreator;
     mapping(uint256 => uint256) private _creatorRoyaltyBps;  // basis points (100 = 1%)
     
-    uint256 public constant DEFAULT_CREATOR_ROYALTY_BPS = 1000;  // 10%
-    uint256 public constant MAX_CREATOR_ROYALTY_BPS = 5000;      // 50% cap
+    // Creator royalty is COMMITTED AT MINT and immutable thereafter. The
+    // bps value is supplied by the minter (UI defaults to 0); the registry
+    // only enforces the upper bound and the deterministic-at-mint property
+    // by exposing no setter post-mint.
+    uint256 public constant DEFAULT_CREATOR_ROYALTY_BPS = 0;     // 0% by default
+    uint256 public constant MAX_CREATOR_ROYALTY_BPS = 8000;      // 80% cap
     uint256 public constant MIN_CREATOR_ROYALTY_BPS = 0;         // 0% allowed (creator can opt out)
     
     // On-chain SVG storage limit.
@@ -128,10 +132,10 @@ contract AgentIdentityRegistry is
     // captures economics on secondary NFT sales. royaltyInfo() returns the
     // per-agent vault address; the vault (lazily deployed via CREATE2) splits
     // incoming ETH/ERC20 between creator and treasury at release time.
-    uint256 public secondarySystemFeeBps;                        // current bps (default 50 = 0.5%)
+    uint256 public secondarySystemFeeBps;                        // current bps (default 100 = 1%)
     address public secondaryTreasury;                            // VIMS treasury for secondary royalties
-    uint256 public constant DEFAULT_SECONDARY_SYSTEM_FEE_BPS = 50;   // 0.5%
-    uint256 public constant MAX_SECONDARY_SYSTEM_FEE_BPS     = 500;  // 5% cap
+    uint256 public constant DEFAULT_SECONDARY_SYSTEM_FEE_BPS = 100;  // 1%
+    uint256 public constant MAX_SECONDARY_SYSTEM_FEE_BPS     = 250;  // 2.5% cap
 
     // ============ Storage: 1:Many Subaccounts ============
     //
@@ -510,22 +514,17 @@ contract AgentIdentityRegistry is
     }
     
     /**
-     * @notice Update the creator royalty percentage
-     * @dev Creator can adjust royalty within MIN/MAX bounds (1%-50%)
-     * @param agentId The agent's token ID
-     * @param newRoyaltyBps The new royalty in basis points
+     * @notice Creator royalty is COMMITTED AT MINT and immutable thereafter.
+     *         There is no setter — the bps value supplied to
+     *         `registerAgent` (or via the collection mint paths) is
+     *         deterministic for the lifetime of the agent.
+     *
+     * @dev    The legacy `updateCreatorRoyalty(uint256,uint256)` selector
+     *         was removed in 2026-06-18 to enforce the determinism
+     *         requirement. Calling it now reverts with the standard
+     *         "function selector not found" fallback. The stored mapping
+     *         and `getCreatorRoyalty` view are unchanged.
      */
-    function updateCreatorRoyalty(uint256 agentId, uint256 newRoyaltyBps) external {
-        if (_agentCreator[agentId] != msg.sender) revert NotCreator();
-        // 0 bps is allowed; only the upper bound is enforced.
-        if (newRoyaltyBps > MAX_CREATOR_ROYALTY_BPS) revert InvalidValue();
-        if (newRoyaltyBps == _creatorRoyaltyBps[agentId]) revert Unchanged();
-        
-        uint256 oldRoyalty = _creatorRoyaltyBps[agentId];
-        _creatorRoyaltyBps[agentId] = newRoyaltyBps;
-        
-        emit CreatorRoyaltyUpdated(agentId, oldRoyalty, newRoyaltyBps);
-    }
     
     // ============ On-chain SVG Storage ============
     
