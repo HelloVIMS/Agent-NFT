@@ -1,7 +1,7 @@
 # Chain 138 Atomic x402 Example
 
-This note shows how the Agent NFT model can fit a Chain 138-origin x402 flow
-without changing the core identity design in this repository.
+This note shows one way the Agent NFT model can fit a Chain 138-origin x402
+flow without changing the core identity design in this repository.
 
 ## Why this fits
 
@@ -12,7 +12,7 @@ This repository already combines:
 - ERC-1271 signature verification,
 - and x402-aware service payments.
 
-That makes it a natural place to document a buyer flow where the **agent
+That makes it a reasonable place to document a buyer flow where the **agent
 identity** and the **payment-origin wallet** do not need to be the same
 runtime actor.
 
@@ -45,7 +45,7 @@ That means:
 - the TBA or linked account can be the payer,
 - and the actual settlement corridor can remain external.
 
-In practice this is a good fit for agent commerce systems where:
+In practice this can be a good fit for agent commerce systems where:
 
 - the agent needs a durable identity,
 - the payment authorization needs to be machine-readable,
