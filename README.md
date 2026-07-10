@@ -78,6 +78,19 @@ const x402     = new ethers.Contract(addrs.proxies.AgentX402Receiver,     AgentX
 
 ---
 
+## Chain 138 Atomic x402 example
+
+This repository's identity model also maps cleanly to a Chain 138-origin
+x402 flow where:
+
+- the agent identity stays on the NFT / TBA side,
+- the buyer signs an ERC-3009 authorization on `eip155:138`,
+- and a separate filler or executor completes downstream settlement.
+
+See [`docs/CHAIN138_ATOMIC_X402_EXAMPLE.md`](./docs/CHAIN138_ATOMIC_X402_EXAMPLE.md).
+
+---
+
 ## Economics & royalties
 
 Three independent surfaces — different fees on each, all enforced on-chain.
