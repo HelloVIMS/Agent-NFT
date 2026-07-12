@@ -1254,6 +1254,23 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "metadataMode",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "mintAgent",
     "inputs": [
       {
@@ -1338,6 +1355,27 @@ const abi = [
       }
     ],
     "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "mintAgentWithSVG",
+    "inputs": [
+      {
+        "name": "name_",
+        "type": "string"
+      },
+      {
+        "name": "svg",
+        "type": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "agentId",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1979,38 +2017,6 @@ const abi = [
       {
         "name": "newURI",
         "type": "string"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "updateSalesRoyalty",
-    "inputs": [
-      {
-        "name": "agentId",
-        "type": "uint256"
-      },
-      {
-        "name": "newBps",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "updateServiceRoyalty",
-    "inputs": [
-      {
-        "name": "agentId",
-        "type": "uint256"
-      },
-      {
-        "name": "newBps",
-        "type": "uint256"
       }
     ],
     "outputs": [],
@@ -2721,6 +2727,11 @@ const abi = [
   },
   {
     "type": "error",
+    "name": "CollectionBaseURINotSet",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "CollectionLocked",
     "inputs": []
   },
@@ -2899,6 +2910,11 @@ const abi = [
   {
     "type": "error",
     "name": "MaxSupplyReached",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MetadataModeLocked",
     "inputs": []
   },
   {

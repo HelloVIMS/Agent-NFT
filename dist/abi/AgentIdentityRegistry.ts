@@ -1460,22 +1460,6 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "updateCreatorRoyalty",
-    "inputs": [
-      {
-        "name": "agentId",
-        "type": "uint256"
-      },
-      {
-        "name": "newRoyaltyBps",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "updateSubaccountPermissions",
     "inputs": [
       {
