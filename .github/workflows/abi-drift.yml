@@ -1,0 +1,41 @@
+name: abi-drift
+# Verifies that the committed dist/abi/ matches what `forge build` would produce
+# right now. Consumer repos (vimsbot-sdk, vimsbot-marketplace) cross-check this
+# bundle's checksums, so this gate is the upstream half of the drift fence.
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'foundry.toml'
+      - 'remappings.txt'
+      - 'scripts/export-abi.mjs'
+      - 'scripts/check-abi.mjs'
+      - 'dist/abi/**'
+      - '.github/workflows/abi-drift.yml'
+  push:
+    branches: [main, 'audit-fixes-**']
+
+jobs:
+  abi-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: forge build
+        run: forge build --sizes
+
+      - name: ABI drift check
+        run: node scripts/check-abi.mjs

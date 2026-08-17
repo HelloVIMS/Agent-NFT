@@ -18,46 +18,56 @@
     "AgentMemory":           "0x2eEc7cB85a127D2f2B49EE1957d87797C961a2D1",
     "AgentX402Receiver":     "0xd180DC89270Df505F5d4B7B36e83318f330014A7",
     "AgentCollectionFactory":"0x6B182188269208533Ed95B7C2b83240f21fA7f12",
-    "AgentRoyaltySplitterFactory":"0x785d63DE8d3EE714A5F550f1FcE2593154B98393"
+    "AgentRoyaltySplitterFactory":"0x785d63DE8d3EE714A5F550f1FcE2593154B98393",
+    "AgentAvatarExtension":  "0x132A0d33aC8040A81E5a3A865Ca2D5238D2Bdbc1"
   },
   "implementations": {
-    "AgentIdentityRegistry":  "0xf04A33b2f9DD5fE9B8248Af134fa502D468D8397",
+    "AgentIdentityRegistry":  "0xCBBa112c05A97E1880e21504984acf40351D94b3",
     "AgentReputationRegistry":"0x4198D94008A348261DcceCeeed6711B10eb60519",
     "AgentContextRegistry":   "0x5a31595F915dC8e2b67A1397BaDdA19D1d734ca3",
     "AgentMemory":            "0xEE3B214e08d54042Ae72991DF8D67D9Abb839F6A",
     "AgentX402Receiver":      "0xE1322cD39fB7A35e44fE34D05a3d383413EB005e",
-    "AgentCollectionImpl":    "0x9A0E93F14385e94F50284Ab4D973fbCBa3746f9d"
+    "AgentCollectionImpl":    "0x9A0E93F14385e94F50284Ab4D973fbCBa3746f9d",
+    "AgentAvatarExtension":   "0x789b381Cd2ED136EC8DDeB1552a5Fd9CFd61371a"
   },
   "agentCollectionLibraries": {
-    "AgentCollectionRenderer":   "0x167655252e710533083c12e0EA48c10d1f92F2fa",
-    "AgentCollectionEIP712":     "0xc8C233ceA8D2D6edCcE00bF6744e4aA8d4F5B8C7",
-    "AgentCollectionPaymentLib": "0x14C2B4259155cA4179a547064D977C8CA42BefBE",
+    "AgentCollectionRenderer":   "0x167655252e710533083C12e0Ea48c10d1F92f2FA",
+    "AgentCollectionEIP712":     "0xc8c233Cea8d2d6EDCce00Bf6744e4aA8d4F5b8C7",
+    "AgentCollectionPaymentLib": "0x14c2b4259155CA4179A547064d977c8CA42BeFBe",
     "deployedAt":                "2026-05-10T05:15:00Z",
-    "notes":                     "Linked external libraries for AgentCollectionImpl. PaymentLib added to keep impl bytecode under EIP-170 once collectionBaseURI / Pattern B was added; EIP712 grew a verifyCommit() entry that consolidates the keeper signature verification block."
+    "notes":                     "Linked external libraries for AgentCollectionImpl. PaymentLib keeps impl bytecode under EIP-170 once collectionBaseURI was added; EIP712 carries a verifyCommit() entry that consolidates the keeper signature verification block."
   },
   "agentCollectionFactory": {
     "factory":               "0x6B182188269208533Ed95B7C2b83240f21fA7f12",
-    "factoryV2Legacy":       "0x8dd6F96997b9b52d32c1216222817420ec7b79BD",
-    "factoryV1Legacy":       "0x45F4F9082a6232111F5a9daFe89d23B5bbc3399A",
+    "factoryLegacy": [
+      { "address": "0x45F4F9082a6232111F5a9daFe89d23B5bbc3399A", "replacedAt": "2026-05-08T19:35:00Z", "notes": "first testnet deploy" },
+      { "address": "0x8dd6F96997b9b52d32c1216222817420ec7b79BD", "replacedAt": "2026-05-08T19:35:00Z", "notes": "second testnet deploy" }
+    ],
     "implementation":        "0x9A0E93F14385e94F50284Ab4D973fbCBa3746f9d",
-    "implementationV1":      "0xE5a34709CCb56acA387A43afb8D008aEA4bBba86",
-    "implementationV2":      "0x6aE96a8A2584BD7dA2672157521698493fc271f8",
+    "implementationLegacy": [
+      { "address": "0xE5a34709CCb56acA387A43afb8D008aEA4bBba86", "replacedAt": "2026-05-08T19:35:00Z" },
+      { "address": "0x6aE96a8A2584BD7dA2672157521698493fc271f8", "replacedAt": "2026-05-10T05:15:00Z" }
+    ],
     "beacon":                "0xA28E020f8E6258B890e78630C0A5034642f97f2C",
     "splitterFactory":       "0x785d63DE8d3EE714A5F550f1FcE2593154B98393",
-    "splitterFactoryV1Legacy":"0xB0194Ca0EB5799293121Be50a0D6e71e717595DF",
+    "splitterFactoryLegacy": [
+      { "address": "0xB0194Ca0EB5799293121Be50a0D6e71e717595DF", "replacedAt": "2026-05-08T19:35:00Z" }
+    ],
     "protocolFeeRecipient":  "0xE48840eD6678218Bd21dF2671b98bCF23de661b9",
     "protocolPrimaryFeeBps": 200,
     "protocolSecondaryFeeBps":50,
     "deployedAt":            "2026-05-08T03:30:00Z",
     "redeployedAt":          "2026-05-08T19:35:00Z",
     "patternBUpgradedAt":    "2026-05-10T05:15:00Z",
-    "notes":                 "Beacon-proxy factory v3. Impl v3 (Pattern B): adds collectionBaseURI + setBaseURI(), so creators can pre-upload shuffled metadata to IPFS and `tokenURI(id)` resolves to `${baseURI}${id}.json` for any token minted via mintAgent('','') / mintAgentAllowlist('','',proof). Bytecode kept under EIP-170 by linking AgentCollectionRenderer, AgentCollectionEIP712 (with verifyCommit consolidating the keeper signature flow), and the new AgentCollectionPaymentLib (primary-mint payment split). createCollectionWithSplits() keeps msg.sender as collectionCreator (governance: hooks, mint config, allowlist, baseURI, lock) and wires the splitter as royaltyReceiver via setRoyaltyReceiverOnce."
+    "notes":                 "v0.9.1 testnet beacon-proxy factory + impl. Adds collectionBaseURI + setBaseURI(), so creators can pre-upload shuffled metadata to IPFS and `tokenURI(id)` resolves to `${baseURI}${id}.json` for any token minted via mintAgent('','') / mintAgentAllowlist('','',proof). Bytecode kept under EIP-170 by linking AgentCollectionRenderer, AgentCollectionEIP712 (with verifyCommit consolidating the keeper signature flow), and AgentCollectionPaymentLib (primary-mint payment split). createCollectionWithSplits() keeps msg.sender as collectionCreator (governance: hooks, mint config, allowlist, baseURI, lock) and wires the splitter as royaltyReceiver via setRoyaltyReceiverOnce."
   },
   "implementationHistory": {
+    "_note": "Pre-mainnet testnet iterations. The current canonical version is v0.9.2; earlier entries are kept for forensic continuity only.",
     "AgentIdentityRegistry": [
-      { "version": "v1", "address": "0xE55E549d0e4D7cF99f4EFc1a28Bb760997fC54cD", "deployedAt": "2026-04-29T17:00:00Z" },
-      { "version": "v7",   "address": "0xf6658189b7e48945f3fE648EE41ac833e24A0D4c", "deployedAt": "2026-04-30T17:00:00Z", "notes": "Adds secondary-market royalty splitter (ERC-2981 vault)" },
-      { "version": "v7.1", "address": "0xf04A33b2f9DD5fE9B8248Af134fa502D468D8397", "deployedAt": "2026-04-30T17:10:00Z", "notes": "Lowers MIN_CREATOR_ROYALTY_BPS from 100 to 0 (creators may opt out of royalties)" }
+      { "version": "v0.9.0-pre1", "address": "0xE55E549d0e4D7cF99f4EFc1a28Bb760997fC54cD", "deployedAt": "2026-04-29T17:00:00Z" },
+      { "version": "v0.9.0",      "address": "0xf6658189B7e48945f3fE648eE41ac833E24A0d4c", "deployedAt": "2026-04-30T17:00:00Z", "notes": "Adds secondary-market royalty splitter (ERC-2981 vault)" },
+      { "version": "v0.9.1",      "address": "0xF04A33b2f9dd5fE9B8248Af134fa502d468d8397", "deployedAt": "2026-04-30T17:10:00Z", "notes": "Lowers MIN_CREATOR_ROYALTY_BPS from 100 to 0 (creators may opt out of royalties)." },
+      { "version": "v0.9.2",      "address": "0xCBBa112c05A97E1880e21504984acf40351D94b3", "deployedAt": "2026-06-16T03:33:00Z", "notes": "Current canonical. Impl-only UUPS upgrade so registerAgent/mintWithFullStack record _agentCreator=msg.sender and _creatorRoyaltyBps at mint (prior live impl 0x6467a98c5ecfec830cef3e9e00474c49ff9336e7 left both unset). Verified on-chain: fresh mint returns creator=deployer, royalty=1000bps." }
     ]
   },
   "secondaryRoyalty": {

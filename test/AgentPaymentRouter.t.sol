@@ -66,8 +66,8 @@ contract AgentPaymentRouterTest is Test {
     
     function test_PayAgentETH() public {
         uint256 paymentAmount = 1 ether;
-        // System takes 0.5% first, then creator takes 10% of remainder
-        uint256 expectedSystemCut = paymentAmount * 50 / 10000; // 0.5%
+        // System takes 1% first, then creator takes 10% of remainder
+        uint256 expectedSystemCut = paymentAmount * 100 / 10000; // 1%
         uint256 afterSystem = paymentAmount - expectedSystemCut;
         uint256 expectedCreatorCut = afterSystem * 1000 / 10000; // 10% of remainder
         uint256 expectedOwnerCut = afterSystem - expectedCreatorCut;
@@ -92,8 +92,8 @@ contract AgentPaymentRouterTest is Test {
     
     function test_PayAgentUSDC() public {
         uint256 paymentAmount = 100 * 10**6; // 100 USDC
-        // System takes 0.5% first, then creator takes 10% of remainder
-        uint256 expectedSystemCut = paymentAmount * 50 / 10000; // 0.5%
+        // System takes 1% first, then creator takes 10% of remainder
+        uint256 expectedSystemCut = paymentAmount * 100 / 10000; // 1%
         uint256 afterSystem = paymentAmount - expectedSystemCut;
         uint256 expectedCreatorCut = afterSystem * 1000 / 10000; // 10% of remainder
         uint256 expectedOwnerCut = afterSystem - expectedCreatorCut;
@@ -116,15 +116,15 @@ contract AgentPaymentRouterTest is Test {
     function test_PreviewSplit() public {
         uint256 amount = 10000;  // Use 10000 for easier math
         
-        // System takes 0.5% first = 50, then creator takes 10% of 9950 = 995
+        // System takes 1% first = 50, then creator takes 10% of 9950 = 995
         (uint256 systemCut, address creatorAddr, uint256 creatorCut, address recipient, uint256 recipientCut) = 
             paymentRouter.previewSplit(agentId, amount);
         
-        assertEq(systemCut, 50);  // 0.5% of 10000
+        assertEq(systemCut, 100);  // 1% of 10000
         assertEq(creatorAddr, creator);
-        assertEq(creatorCut, 995); // 10% of 9950
+        assertEq(creatorCut, 990); // 10% of 9900
         assertEq(recipient, creator); // No TBA set, so owner (who is creator)
-        assertEq(recipientCut, 8955); // 9950 - 995
+        assertEq(recipientCut, 8910); // 9900 - 990
     }
     
     // ============ CREATOR WHITELIST TESTS ============
@@ -296,12 +296,12 @@ contract AgentPaymentRouterTest is Test {
         vm.prank(payer);
         paymentRouter.payAgent{value: 1 ether}(agentId);
         
-        // System takes 0.5% first = 0.005 ETH, then creator takes 10% of 0.995 ETH = 0.0995 ETH
+        // System takes 1% first = 0.005 ETH, then creator takes 10% of 0.995 ETH = 0.0995 ETH
         (uint256 totalReceived, uint256 creatorEarnings, address creatorAddr, uint256 royaltyBps) = 
             paymentRouter.getAgentStats(agentId);
         
         assertEq(totalReceived, 1 ether);
-        assertEq(creatorEarnings, 0.0995 ether); // 10% of (1 - 0.5%)
+        assertEq(creatorEarnings, 0.099 ether); // 10% of (1 - 1%)
         assertEq(creatorAddr, creator);
         assertEq(royaltyBps, 1000);
     }
@@ -318,7 +318,7 @@ contract AgentPaymentRouterTest is Test {
         
         // Pay agent - system takes 0.5% first, then creator takes 10% of remainder
         uint256 paymentAmount = 1 ether;
-        uint256 systemCut = paymentAmount * 50 / 10000; // 0.5%
+        uint256 systemCut = paymentAmount * 100 / 10000; // 1%
         uint256 afterSystem = paymentAmount - systemCut;
         uint256 expectedCreatorCut = afterSystem * 1000 / 10000; // 10% of remainder
         uint256 expectedOwnerCut = afterSystem - expectedCreatorCut;
@@ -356,9 +356,9 @@ contract AgentPaymentRouterTest is Test {
     
     function test_SmallPaymentAccumulates() public {
         // Payment below threshold should accumulate
-        // System takes 0.5% first, then creator takes 10% of remainder
+        // System takes 1% first, then creator takes 10% of remainder
         uint256 smallPayment = 0.0005 ether;
-        uint256 systemCut = smallPayment * 50 / 10000; // 0.5%
+        uint256 systemCut = smallPayment * 100 / 10000; // 0.5%
         uint256 afterSystem = smallPayment - systemCut;
         uint256 expectedCreatorCut = afterSystem * 1000 / 10000; // 10% of remainder
         
@@ -382,11 +382,11 @@ contract AgentPaymentRouterTest is Test {
         identityRegistry.transferFrom(creator, owner, agentId);
         
         // Make multiple small payments until threshold is met
-        // System takes 0.5% first, then creator takes 10% of remainder
-        // Use 0.0006 ETH so royalty = 0.0006 * 0.995 * 0.1 = 0.0000597 ETH per payment
-        // Two payments = 0.0001194 ETH > 0.0001 ETH threshold
+        // System takes 1% first, then creator takes 10% of remainder
+        // Use 0.0006 ETH so royalty = 0.0006 * 0.99 * 0.1 = 0.0000594 ETH per payment
+        // Two payments = 0.0001188 ETH > 0.0001 ETH threshold
         uint256 smallPayment = 0.0006 ether;
-        uint256 systemCut = smallPayment * 50 / 10000;
+        uint256 systemCut = smallPayment * 100 / 10000;
         uint256 afterSystem = smallPayment - systemCut;
         uint256 royaltyPerPayment = afterSystem * 1000 / 10000;
         
@@ -412,9 +412,9 @@ contract AgentPaymentRouterTest is Test {
     
     function test_WithdrawRoyalties() public {
         // Make small payment that accumulates (below 0.0001 ETH threshold)
-        // System takes 0.5% first, then creator takes 10% of remainder
+        // System takes 1% first, then creator takes 10% of remainder
         uint256 smallPayment = 0.0005 ether;
-        uint256 systemCut = smallPayment * 50 / 10000;
+        uint256 systemCut = smallPayment * 100 / 10000;
         uint256 afterSystem = smallPayment - systemCut;
         uint256 expectedCreatorCut = afterSystem * 1000 / 10000;
         
@@ -480,9 +480,9 @@ contract AgentPaymentRouterTest is Test {
     
     function test_LargePaymentTransfersImmediately() public {
         // Payment above threshold should transfer immediately
-        // System takes 0.5% first, then creator takes 10% of remainder
+        // System takes 1% first, then creator takes 10% of remainder
         uint256 largePayment = 1 ether;
-        uint256 systemCut = largePayment * 50 / 10000;
+        uint256 systemCut = largePayment * 100 / 10000;
         uint256 afterSystem = largePayment - systemCut;
         uint256 expectedCreatorCut = afterSystem * 1000 / 10000;
         uint256 recipientCut = afterSystem - expectedCreatorCut;
@@ -504,9 +504,9 @@ contract AgentPaymentRouterTest is Test {
         // Set a high USDC threshold so payments accumulate
         paymentRouter.setMinAutoTransferUSDC(1000 * 10**6); // $1000
         
-        // System takes 0.5% first, then creator takes 10% of remainder
+        // System takes 1% first, then creator takes 10% of remainder
         uint256 usdcPayment = 100 * 10**6; // $100
-        uint256 systemCut = usdcPayment * 50 / 10000;
+        uint256 systemCut = usdcPayment * 100 / 10000;
         uint256 afterSystem = usdcPayment - systemCut;
         uint256 expectedCreatorCut = afterSystem * 1000 / 10000;
         
@@ -530,7 +530,7 @@ contract AgentPaymentRouterTest is Test {
     
     function test_SystemRoyaltyAccumulates() public {
         uint256 paymentAmount = 1 ether;
-        uint256 expectedSystemCut = paymentAmount * 50 / 10000; // 0.5%
+        uint256 expectedSystemCut = paymentAmount * 100 / 10000; // 1%
         
         vm.prank(payer);
         paymentRouter.payAgent{value: paymentAmount}(agentId);
@@ -541,7 +541,7 @@ contract AgentPaymentRouterTest is Test {
     
     function test_WithdrawSystemRoyalties() public {
         uint256 paymentAmount = 1 ether;
-        uint256 expectedSystemCut = paymentAmount * 50 / 10000; // 0.5%
+        uint256 expectedSystemCut = paymentAmount * 100 / 10000; // 1%
         
         vm.prank(payer);
         paymentRouter.payAgent{value: paymentAmount}(agentId);
@@ -582,53 +582,25 @@ contract AgentPaymentRouterTest is Test {
     
     // ============ DYNAMIC ROYALTY TESTS ============
     
-    function test_UpdateCreatorRoyalty() public {
-        // Get initial royalty
-        (, uint256 initialRoyalty) = identityRegistry.getCreatorRoyalty(agentId);
-        assertEq(initialRoyalty, 1000); // 10%
-        
-        // Creator can increase royalty up to max (50%)
-        vm.prank(creator);
-        identityRegistry.updateCreatorRoyalty(agentId, 2000); // 20%
-        
-        (, uint256 newRoyalty) = identityRegistry.getCreatorRoyalty(agentId);
-        assertEq(newRoyalty, 2000);
-        
-        // Creator can decrease royalty
-        vm.prank(creator);
-        identityRegistry.updateCreatorRoyalty(agentId, 500); // 5%
-        
-        (, uint256 decreasedRoyalty) = identityRegistry.getCreatorRoyalty(agentId);
-        assertEq(decreasedRoyalty, 500);
-    }
-    
-    function test_UpdateCreatorRoyalty_AllowsZero() public {
-        // V7: 0 bps is now allowed (creator can opt out of royalties).
-        vm.prank(creator);
-        identityRegistry.updateCreatorRoyalty(agentId, 0);
+    // Creator royalty is committed at mint and immutable thereafter. The
+    // legacy `updateCreatorRoyalty(uint256,uint256)` selector was removed
+    // — every call (creator or not) falls through to the empty fallback
+    // and returns false from the low-level call.
+    function test_CreatorRoyalty_isImmutablePostMint() public {
+        (, uint256 initial) = identityRegistry.getCreatorRoyalty(agentId);
+        assertEq(initial, 1000); // committed at mint
 
-        (, uint256 bps) = identityRegistry.getCreatorRoyalty(agentId);
-        assertEq(bps, 0);
-    }
+        bytes memory call = abi.encodeWithSignature("updateCreatorRoyalty(uint256,uint256)", agentId, 2000);
 
-    function test_UpdateCreatorRoyalty_AllowsSubOnePercent() public {
-        // V7: sub-1% bps (e.g. 50 = 0.5%) is now allowed.
         vm.prank(creator);
-        identityRegistry.updateCreatorRoyalty(agentId, 50);
-
-        (, uint256 bps) = identityRegistry.getCreatorRoyalty(agentId);
-        assertEq(bps, 50);
-    }
-    
-    function test_UpdateCreatorRoyalty_RevertAboveMax() public {
-        vm.prank(creator);
-        vm.expectRevert(abi.encodeWithSelector(AgentIdentityRegistry.InvalidValue.selector));
-        identityRegistry.updateCreatorRoyalty(agentId, 6000); // 60% - above maximum
-    }
-    
-    function test_UpdateCreatorRoyalty_RevertNotCreator() public {
+        (bool okCreator,) = address(identityRegistry).call(call);
         vm.prank(payer);
-        vm.expectRevert(abi.encodeWithSelector(AgentIdentityRegistry.NotCreator.selector));
-        identityRegistry.updateCreatorRoyalty(agentId, 2000);
+        (bool okStranger,) = address(identityRegistry).call(call);
+
+        assertFalse(okCreator,  "selector should be removed for creator too");
+        assertFalse(okStranger, "selector should be removed for non-creator");
+
+        (, uint256 after_) = identityRegistry.getCreatorRoyalty(agentId);
+        assertEq(after_, 1000);
     }
 }

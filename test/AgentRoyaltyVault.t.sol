@@ -62,14 +62,15 @@ contract AgentRoyaltyVaultTest is Test {
         assertEq(registry.secondaryTreasury(), newT);
     }
 
-    function test_SetSecondarySystemFeeBpsCappedAt500() public {
+    function test_SetSecondarySystemFeeBpsCappedAt250() public {
+        // Hard cap is now 2.5% (250 bps).
         vm.prank(owner);
         vm.expectRevert(AgentIdentityRegistry.InvalidValue.selector);
-        registry.setSecondarySystemFeeBps(501);
+        registry.setSecondarySystemFeeBps(251);
 
         vm.prank(owner);
-        registry.setSecondarySystemFeeBps(500);
-        assertEq(registry.secondarySystemFeeBps(), 500);
+        registry.setSecondarySystemFeeBps(250);
+        assertEq(registry.secondarySystemFeeBps(), 250);
     }
 
     function test_SetSecondaryTreasuryRejectsZero() public {
@@ -88,7 +89,7 @@ contract AgentRoyaltyVaultTest is Test {
         // Vault is the receiver (deterministic, even before deployment).
         assertEq(receiver, registry.royaltyVaultAddress(agentId));
 
-        // (1000 + 100) / 10000 * 10000 ether = 1100 ether
+        // (1000 + 100) / 10000 * 10000 ether = 1_100 ether
         assertEq(amount, 1_100 ether);
     }
 
@@ -122,7 +123,7 @@ contract AgentRoyaltyVaultTest is Test {
         uint256 agentId = _mint(creator, DEFAULT_CREATOR_BPS);
         AgentRoyaltyVault vault = AgentRoyaltyVault(payable(registry.deployRoyaltyVault(agentId)));
 
-        // Buyer pays the *combined* royalty amount (1100 of every 10000 sale).
+        // Buyer pays the *combined* royalty amount (1_100 of every 10_000 sale).
         uint256 totalRoyalty = 1_100 ether;
         vm.deal(buyer, totalRoyalty);
         vm.prank(buyer);
@@ -148,27 +149,31 @@ contract AgentRoyaltyVaultTest is Test {
         vault.release();
     }
 
-    function test_ReleaseUsesLiveBpsAfterCreatorUpdate() public {
-        uint256 agentId = _mint(creator, DEFAULT_CREATOR_BPS);
+    function test_ReleaseUsesMintTimeBps() public {
+        // Creator royalty is committed at mint (immutable post-mint), but
+        // the secondary system fee is governance-mutable. This test pokes
+        // the live system-fee path: after the owner raises the system fee
+        // from 100 (1%) to 250 (2.5% — the cap), `royaltyInfo` and the
+        // vault split must reflect the new split deterministically.
+        uint256 agentId = _mint(creator, 2500); // creator bps locked at mint
         AgentRoyaltyVault vault = AgentRoyaltyVault(payable(registry.deployRoyaltyVault(agentId)));
 
-        // Creator bumps their bps from 10% -> 25% post-deploy.
-        vm.prank(creator);
-        registry.updateCreatorRoyalty(agentId, 2500);
+        vm.prank(owner);
+        registry.setSecondarySystemFeeBps(250);
 
-        // Now royaltyInfo: 2500 + 100 = 2600 bps.
+        // royaltyInfo: 2500 + 250 = 2750 bps of 10_000 ether = 2_750 ether.
         (, uint256 amount) = registry.royaltyInfo(agentId, 10_000 ether);
-        assertEq(amount, 2_600 ether);
+        assertEq(amount, 2_750 ether);
 
-        vm.deal(buyer, 2_600 ether);
+        vm.deal(buyer, 2_750 ether);
         vm.prank(buyer);
-        (bool ok,) = address(vault).call{value: 2_600 ether}("");
+        (bool ok,) = address(vault).call{value: 2_750 ether}("");
         assertTrue(ok);
 
         vault.release();
 
-        // treasury: 100/2600 of 2600 = 100 ether. creator: rest.
-        assertEq(treasury.balance, 100 ether);
+        // treasury: 250/2750 of 2750 = 250 ether. creator: rest.
+        assertEq(treasury.balance, 250 ether);
         assertEq(creator.balance,  2_500 ether);
     }
 
@@ -241,14 +246,18 @@ contract AgentRoyaltyVaultTest is Test {
         assertEq(creator.balance,  0);
     }
 
-    function test_UpdateCreatorRoyaltyToZero() public {
+    function test_CreatorRoyaltyIsImmutablePostMint() public {
         uint256 agentId = _mint(creator, 1000);
 
+        // The legacy `updateCreatorRoyalty(uint256,uint256)` selector is
+        // gone — even the creator can't mutate the bps post-mint.
+        bytes memory call = abi.encodeWithSignature("updateCreatorRoyalty(uint256,uint256)", agentId, 0);
         vm.prank(creator);
-        registry.updateCreatorRoyalty(agentId, 0);
+        (bool ok,) = address(registry).call(call);
+        assertFalse(ok, "updateCreatorRoyalty should be removed");
 
         (, uint256 bps) = registry.getCreatorRoyalty(agentId);
-        assertEq(bps, 0);
+        assertEq(bps, 1000); // pinned to mint-time value
     }
 
     function test_ReleaseRevertsWhenBothBpsAreZero() public {

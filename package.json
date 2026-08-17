@@ -1,0 +1,29 @@
+{
+  "name": "@hellovims/contracts",
+  "version": "0.5.0",
+  "private": true,
+  "description": "VIMS / Agent-NFT — Solidity contracts and exported ABI bundle.",
+  "license": "AGPL-3.0-or-later",
+  "files": [
+    "dist/abi",
+    "deployments",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    "./abi/*": "./dist/abi/*.json",
+    "./deployments/*": "./deployments/*.json",
+    "./manifest": "./dist/abi/manifest.json"
+  },
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test",
+    "abi:export": "node scripts/export-abi.mjs",
+    "abi:check": "node scripts/check-abi.mjs",
+    "release": "pnpm build && pnpm abi:export && pnpm abi:check"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

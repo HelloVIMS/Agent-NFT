@@ -303,21 +303,32 @@ contract AgentCollectionFactoryTest is Test {
     // ============ SVG Storage Tests ============
     
     function test_SetSVGImage() public {
+        // OnChainSVG mode is locked at mint via `mintAgentWithSVG`.
+        // `setSVGImage` is a mutator on already-OnChainSVG tokens — it
+        // can no longer convert an ExplicitURI token into an SVG token.
         vm.prank(creator1);
         (, address collectionAddr) = factory.createCollection("SVG", "SVG", 100, 1000, 500, "");
-        
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
-        
+
+        string memory svg1 = "<svg><circle cx='50' cy='50' r='40'/></svg>";
         vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
-        
-        string memory svg = "<svg><circle cx='50' cy='50' r='40'/></svg>";
-        
-        vm.prank(minter);
-        collection.setSVGImage(agentId, svg);
-        
+        uint256 agentId = collection.mintAgentWithSVG("Agent1", svg1);
         assertTrue(collection.hasSVGImage(agentId));
-        assertEq(collection.getSVGImage(agentId), svg);
+        assertEq(collection.getSVGImage(agentId), svg1);
+        assertEq(uint8(collection.metadataMode(agentId)), uint8(AgentCollectionImpl.MetadataMode.OnChainSVG));
+
+        // Owner can update the SVG payload of an already-OnChainSVG token.
+        string memory svg2 = "<svg><rect width='10' height='10'/></svg>";
+        vm.prank(minter);
+        collection.setSVGImage(agentId, svg2);
+        assertEq(collection.getSVGImage(agentId), svg2);
+
+        // ExplicitURI tokens MUST reject setSVGImage — no silent mode flip.
+        vm.prank(minter);
+        uint256 uriId = collection.registerAgent("Agent2", "ipfs://uri");
+        vm.prank(minter);
+        vm.expectRevert(AgentCollectionImpl.MetadataModeLocked.selector);
+        collection.setSVGImage(uriId, svg1);
     }
     
     function test_OnlyOwnerCanSetSVG() public {
@@ -335,20 +346,23 @@ contract AgentCollectionFactoryTest is Test {
     }
     
     function test_SVGSizeLimit() public {
+        // The size check now lives in `mintAgentWithSVG` (atomic mint+SVG)
+        // and on `setSVGImage` for OnChainSVG-mode updates. Cover both.
         vm.prank(creator1);
         (, address collectionAddr) = factory.createCollection("SVG", "SVG", 100, 1000, 500, "");
-        
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
-        
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
-        
-        // Create SVG larger than 48KB
+
         bytes memory largeSvg = new bytes(50000);
-        for (uint256 i = 0; i < 50000; i++) {
-            largeSvg[i] = "x";
-        }
-        
+        for (uint256 i = 0; i < 50000; i++) largeSvg[i] = "x";
+
+        // Mint path rejects oversize SVG.
+        vm.prank(minter);
+        vm.expectRevert(AgentCollectionImpl.TooLarge.selector);
+        collection.mintAgentWithSVG("Agent1", string(largeSvg));
+
+        // Update path on a valid OnChainSVG token also rejects oversize.
+        vm.prank(minter);
+        uint256 agentId = collection.mintAgentWithSVG("Agent1", "<svg/>");
         vm.prank(minter);
         vm.expectRevert(AgentCollectionImpl.TooLarge.selector);
         collection.setSVGImage(agentId, string(largeSvg));
@@ -506,27 +520,27 @@ contract AgentCollectionFactoryTest is Test {
     // ============ Token URI with SVG Tests ============
     
     function test_TokenURIWithSVG() public {
+        // Modes are independent and locked at mint. ExplicitURI tokens
+        // resolve to the stored URI; OnChainSVG tokens resolve to the
+        // rendered data URI. There is no longer a precedence chain.
         vm.prank(creator1);
         (, address collectionAddr) = factory.createCollection("URI", "URI", 100, 1000, 500, "");
-        
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
-        
+
+        // ExplicitURI mode — the URI is the canonical answer; never an SVG.
         vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "ipfs://fallback");
-        
-        // Without SVG - should return fallback
-        string memory uri1 = collection.tokenURI(agentId);
-        assertEq(uri1, "ipfs://fallback");
-        
-        // Set SVG
+        uint256 uriId = collection.registerAgent("Agent1", "ipfs://fallback");
+        assertEq(collection.tokenURI(uriId), "ipfs://fallback");
+        assertEq(uint8(collection.metadataMode(uriId)), uint8(AgentCollectionImpl.MetadataMode.ExplicitURI));
+
+        // OnChainSVG mode — rendered as data:application/json;base64,...
         vm.prank(minter);
-        collection.setSVGImage(agentId, "<svg><rect/></svg>");
-        
-        // With SVG - should return base64 encoded on-chain metadata
-        string memory uri2 = collection.tokenURI(agentId);
-        assertTrue(bytes(uri2).length > bytes(uri1).length);
-        // Should start with data:application/json;base64,
+        uint256 svgId = collection.mintAgentWithSVG("Agent2", "<svg><rect/></svg>");
+        assertEq(uint8(collection.metadataMode(svgId)), uint8(AgentCollectionImpl.MetadataMode.OnChainSVG));
+
+        string memory uri2 = collection.tokenURI(svgId);
         bytes memory prefix = bytes("data:application/json;base64,");
+        assertGt(bytes(uri2).length, prefix.length);
         for (uint256 i = 0; i < prefix.length; i++) {
             assertEq(bytes(uri2)[i], prefix[i]);
         }
@@ -603,17 +617,16 @@ contract AgentCollectionFactoryTest is Test {
         address originalCreator = collection.agentCreator(agentId);
         assertEq(originalCreator, minter);
         
-        // Only original creator can update royalty
-        vm.prank(creator2);
-        vm.expectRevert(AgentCollectionImpl.NotCreator.selector);
-        collection.updateSalesRoyalty(agentId, 2000);
-        
-        // Original creator can update
+        // Royalties are committed at mint and immutable thereafter — the
+        // legacy `updateSalesRoyalty` selector is gone, so neither the
+        // original creator nor a transferee can mutate the bps.
+        bytes memory call = abi.encodeWithSignature("updateSalesRoyalty(uint256,uint256)", agentId, 2000);
         vm.prank(minter);
-        collection.updateSalesRoyalty(agentId, 2000);
-        
+        (bool ok,) = address(collection).call(call);
+        assertFalse(ok, "updateSalesRoyalty should be removed");
+
         uint256 salesBps = collection.getSalesRoyalty(agentId);
-        assertEq(salesBps, 2000);
+        assertEq(salesBps, 1000); // pinned at the collection's default
     }
     
     function test_RoyaltySplitCalculation() public {
@@ -634,14 +647,17 @@ contract AgentCollectionFactoryTest is Test {
     // ============ Empty Input Validation Tests ============
     
     function test_RevertOnEmptySVG() public {
+        // Empty SVG is rejected on both mint and update paths.
         vm.prank(creator1);
         (, address collectionAddr) = factory.createCollection("Empty", "EMP", 100, 1000, 500, "");
-        
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
-        
+
         vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
-        
+        vm.expectRevert(AgentCollectionImpl.EmptyInput.selector);
+        collection.mintAgentWithSVG("Agent1", "");
+
+        vm.prank(minter);
+        uint256 agentId = collection.mintAgentWithSVG("Agent2", "<svg/>");
         vm.prank(minter);
         vm.expectRevert(AgentCollectionImpl.EmptyInput.selector);
         collection.setSVGImage(agentId, "");
@@ -810,20 +826,34 @@ contract AgentCollectionFactoryTest is Test {
         collection.getLatestPixe(999);
     }
     
-    // ============ Edge Case: Royalty Unchanged ============
-    
-    function test_RevertOnUnchangedRoyalty() public {
+    // ============ Royalties are immutable post-mint ============
+
+    function test_RoyaltiesAreImmutablePostMint() public {
         vm.prank(creator1);
         (, address collectionAddr) = factory.createCollection("Unchanged", "UCH", 100, 1500, 750, "");
-        
+
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
-        
+
         vm.prank(minter);
         uint256 agentId = collection.registerAgent("Agent1", "uri1");
-        
+
+        // The old `updateSalesRoyalty` / `updateServiceRoyalty` selectors
+        // are gone — calls fall through to the empty fallback path and
+        // return `false` from the low-level call.
+        bytes memory salesCall   = abi.encodeWithSignature("updateSalesRoyalty(uint256,uint256)",   agentId, 2000);
+        bytes memory serviceCall = abi.encodeWithSignature("updateServiceRoyalty(uint256,uint256)", agentId, 2000);
+
         vm.prank(minter);
-        vm.expectRevert(AgentCollectionImpl.Unchanged.selector);
-        collection.updateSalesRoyalty(agentId, 1500); // Same as default
+        (bool okSales,)   = address(collection).call(salesCall);
+        vm.prank(minter);
+        (bool okService,) = address(collection).call(serviceCall);
+
+        assertFalse(okSales,   "updateSalesRoyalty should be removed");
+        assertFalse(okService, "updateServiceRoyalty should be removed");
+
+        // Stored values still match what was committed at mint.
+        assertEq(collection.getSalesRoyalty(agentId),   1500);
+        assertEq(collection.getServiceRoyalty(agentId),  750);
     }
     
     // ============ Fuzz Tests ============

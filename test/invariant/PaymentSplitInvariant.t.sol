@@ -46,8 +46,8 @@ contract PaymentSplitInvariantTest is Test {
     address public treasury = makeAddr("treasury");
 
     uint256 public constant BPS_DENOM             = 10_000;
-    uint256 public constant MAX_SYSTEM_FEE_BPS    = 500;   // mirrors AgentX402Receiver
-    uint256 public constant MAX_CREATOR_BPS       = 5_000; // mirrors AgentIdentityRegistry
+    uint256 public constant MAX_SYSTEM_FEE_BPS    = 250;   // mirrors AgentX402Receiver (2.5%)
+    uint256 public constant MAX_CREATOR_BPS       = 8_000; // mirrors AgentIdentityRegistry (80%)
 
     function setUp() public {
         AgentIdentityRegistry impl = new AgentIdentityRegistry();
