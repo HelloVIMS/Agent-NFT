@@ -255,4 +255,161 @@ contract AgentAvatarExtensionTest is Test {
         vm.prank(admin);
         ext.upgradeToAndCall(address(impl2), "");
     }
+
+    /// An upgrade that loses the manifests is worse than no upgrade: the
+    /// tokens keep pointing at avatars the contract can no longer name,
+    /// and nothing reverts to say so. Upgrading and asserting the call
+    /// succeeded — which is all the test above did — cannot see that.
+    /// This writes state, upgrades, and reads it back through the proxy.
+    function test_upgrade_preservesManifestsAndVersions() public {
+        vm.prank(agentEoa);
+        ext.setAvatarManifest(TOKEN_A, URI_A, HASH_A, 3);
+        vm.prank(agentEoa);
+        ext.setAvatarManifest(TOKEN_A, URI_B, HASH_B, 4);
+        vm.prank(buyer);
+        ext.setAvatarManifest(TOKEN_B, URI_A, HASH_A, 1);
+
+        uint16 versionBefore = ext.latestVersion(TOKEN_A);
+        assertEq(versionBefore, 2, "two sets should be version 2");
+
+        AgentAvatarExtension impl2 = new AgentAvatarExtension();
+        vm.prank(admin);
+        ext.upgradeToAndCall(address(impl2), "");
+
+        AgentAvatarExtension.AvatarManifest memory m = ext.getAvatarManifest(TOKEN_A);
+        assertEq(m.manifestURI, URI_B, "manifest URI lost across upgrade");
+        assertEq(m.contentHash, HASH_B, "content hash lost across upgrade");
+        assertEq(m.fileCount, 4, "file count lost across upgrade");
+        assertEq(m.version, versionBefore, "version lost across upgrade");
+        assertEq(ext.latestVersion(TOKEN_A), versionBefore, "latestVersion lost across upgrade");
+
+        // The neighbouring token must survive too: a storage-layout
+        // change is as likely to shift a mapping as to clear one slot.
+        assertEq(ext.getAvatarManifest(TOKEN_B).manifestURI, URI_A, "second token lost across upgrade");
+        assertEq(ext.owner(), admin, "ownership lost across upgrade");
+        assertEq(address(ext.identityRegistry()), address(idReg), "registry lost across upgrade");
+
+        // And the contract stays writable, with versions continuing from
+        // where they were rather than restarting.
+        vm.prank(agentEoa);
+        ext.setAvatarManifest(TOKEN_A, URI_A, HASH_A, 1);
+        assertEq(ext.latestVersion(TOKEN_A), versionBefore + 1, "version did not continue after upgrade");
+    }
+
+    /// An unowned token must be writable by nobody — including address(0).
+    ///
+    /// This caught a real hole. The guard was `ownerOf(tokenId) !=
+    /// msg.sender`, and for an unminted token both sides are zero, so a
+    /// call from address(0) satisfied it and wrote a manifest to a token
+    /// that does not exist. The canonical registry reverts on an unminted
+    /// id, which hid it — but authorisation here must not rest on what a
+    /// collaborator happens to do, and the contract already declared
+    /// NotExists for precisely this case without ever raising it.
+    function test_setAvatarManifest_unmintedTokenIsWritableByNobody() public {
+        uint256 unminted = 999;
+        assertEq(idReg.ownerOf(unminted), address(0), "fixture expects an unowned token");
+
+        vm.prank(agentEoa);
+        vm.expectRevert(AgentAvatarExtension.NotExists.selector);
+        ext.setAvatarManifest(unminted, URI_A, HASH_A, 1);
+
+        vm.prank(address(0));
+        vm.expectRevert(AgentAvatarExtension.NotExists.selector);
+        ext.setAvatarManifest(unminted, URI_A, HASH_A, 1);
+
+        vm.prank(address(0));
+        vm.expectRevert(AgentAvatarExtension.NotExists.selector);
+        ext.clearAvatarManifest(unminted);
+
+        assertFalse(ext.hasAvatarManifest(unminted), "an unminted token must hold no manifest");
+    }
+
+    /// Burning is the same shape as never minting: once ownerOf goes back
+    /// to zero the manifest must stop being writable, rather than becoming
+    /// writable by address(0).
+    function test_setAvatarManifest_burnedTokenIsWritableByNobody() public {
+        vm.prank(agentEoa);
+        ext.setAvatarManifest(TOKEN_A, URI_A, HASH_A, 1);
+
+        idReg.setOwner(TOKEN_A, address(0));
+
+        vm.prank(agentEoa);
+        vm.expectRevert(AgentAvatarExtension.NotExists.selector);
+        ext.setAvatarManifest(TOKEN_A, URI_B, HASH_B, 1);
+
+        vm.prank(address(0));
+        vm.expectRevert(AgentAvatarExtension.NotExists.selector);
+        ext.setAvatarManifest(TOKEN_A, URI_B, HASH_B, 1);
+
+        // The record itself survives, so an indexer can still resolve what
+        // the token pointed at before it was burned.
+        assertEq(ext.getAvatarManifest(TOKEN_A).manifestURI, URI_A);
+    }
+
+    /// The existing suite only tests the far side of MAX_URI_LENGTH. A
+    /// bound is where off-by-ones live, so pin both sides of it: 512
+    /// accepted, 513 rejected.
+    function test_setAvatarManifest_uriAtExactlyMaxLengthIsAccepted() public {
+        uint256 max = ext.MAX_URI_LENGTH();
+        string memory atLimit = _repeat("a", max);
+        assertEq(bytes(atLimit).length, max, "fixture must sit exactly on the bound");
+
+        vm.prank(agentEoa);
+        ext.setAvatarManifest(TOKEN_A, atLimit, HASH_A, 1);
+        assertEq(ext.getAvatarManifest(TOKEN_A).manifestURI, atLimit);
+
+        string memory overLimit = _repeat("a", max + 1);
+        vm.prank(agentEoa);
+        vm.expectRevert(AgentAvatarExtension.URITooLong.selector);
+        ext.setAvatarManifest(TOKEN_A, overLimit, HASH_A, 1);
+    }
+
+    /// hasAvatarManifest is what clients branch on to decide between the
+    /// 3D avatar and the fallback SVG, so it has to track set and clear.
+    function test_hasAvatarManifest_tracksSetAndClear() public {
+        assertFalse(ext.hasAvatarManifest(TOKEN_A), "unset token must report no manifest");
+
+        vm.prank(agentEoa);
+        ext.setAvatarManifest(TOKEN_A, URI_A, HASH_A, 2);
+        assertTrue(ext.hasAvatarManifest(TOKEN_A), "set token must report a manifest");
+        assertFalse(ext.hasAvatarManifest(TOKEN_B), "manifest must not leak across tokens");
+
+        vm.prank(agentEoa);
+        ext.clearAvatarManifest(TOKEN_A);
+        assertFalse(ext.hasAvatarManifest(TOKEN_A), "cleared token must report no manifest");
+    }
+
+    /// The contract's stated reason for these events is that an indexer
+    /// can rebuild "current avatar for token N" from logs alone. That
+    /// only holds if every field it needs is in the log, so assert the
+    /// full payload rather than just that something was emitted.
+    function test_events_carryEverythingAnIndexerNeeds() public {
+        vm.expectEmit(true, true, false, true, address(ext));
+        emit AvatarManifestUpdated(TOKEN_A, agentEoa, URI_A, HASH_A, 1, 7);
+        vm.prank(agentEoa);
+        ext.setAvatarManifest(TOKEN_A, URI_A, HASH_A, 7);
+
+        // Replacement must report the bumped version, or an indexer
+        // cannot order two updates mined in the same block.
+        vm.expectEmit(true, true, false, true, address(ext));
+        emit AvatarManifestUpdated(TOKEN_A, agentEoa, URI_B, HASH_B, 2, 9);
+        vm.prank(agentEoa);
+        ext.setAvatarManifest(TOKEN_A, URI_B, HASH_B, 9);
+
+        vm.expectEmit(true, true, false, true, address(ext));
+        emit AvatarManifestCleared(TOKEN_A, agentEoa);
+        vm.prank(agentEoa);
+        ext.clearAvatarManifest(TOKEN_A);
+    }
+
+    function _repeat(string memory unit, uint256 times) internal pure returns (string memory out) {
+        bytes memory u = bytes(unit);
+        bytes memory buf = new bytes(u.length * times);
+        for (uint256 i; i < times; ++i) {
+            for (uint256 j; j < u.length; ++j) {
+                buf[i * u.length + j] = u[j];
+            }
+        }
+        return string(buf);
+    }
 }

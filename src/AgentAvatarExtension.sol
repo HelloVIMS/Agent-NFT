@@ -140,7 +140,16 @@ contract AgentAvatarExtension is Initializable, OwnableUpgradeable, UUPSUpgradea
     // ── Modifiers ─────────────────────────────────────────────────
 
     modifier onlyAgentOwner(uint256 tokenId) {
-        if (identityRegistry.ownerOf(tokenId) != msg.sender) revert NotOwner();
+        address tokenOwner = identityRegistry.ownerOf(tokenId);
+        // A token that does not exist has no owner to compare against.
+        // Checking only `!= msg.sender` made an unowned token writable by
+        // address(0), because both sides were zero and the guard passed.
+        // Unreachable through the canonical registry, which reverts on an
+        // unminted id — but this contract's authorisation must not depend
+        // on a collaborator's revert, and NotExists was declared for this
+        // case and never raised.
+        if (tokenOwner == address(0)) revert NotExists();
+        if (tokenOwner != msg.sender) revert NotOwner();
         _;
     }
 

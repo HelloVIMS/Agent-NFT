@@ -28,7 +28,7 @@
     "AgentMemory":            "0xEE3B214e08d54042Ae72991DF8D67D9Abb839F6A",
     "AgentX402Receiver":      "0xE1322cD39fB7A35e44fE34D05a3d383413EB005e",
     "AgentCollectionImpl":    "0x9A0E93F14385e94F50284Ab4D973fbCBa3746f9d",
-    "AgentAvatarExtension":   "0x789b381Cd2ED136EC8DDeB1552a5Fd9CFd61371a"
+    "AgentAvatarExtension":   "0x5b20645870604D9CbB153dE9eb6012Ae42Dfea5b"
   },
   "agentCollectionLibraries": {
     "AgentCollectionRenderer":   "0x167655252e710533083C12e0Ea48c10d1F92f2FA",
