@@ -19,7 +19,8 @@
     "AgentX402Receiver":     "0xd180DC89270Df505F5d4B7B36e83318f330014A7",
     "AgentCollectionFactory":"0x6B182188269208533Ed95B7C2b83240f21fA7f12",
     "AgentRoyaltySplitterFactory":"0x785d63DE8d3EE714A5F550f1FcE2593154B98393",
-    "AgentAvatarExtension":  "0x132A0d33aC8040A81E5a3A865Ca2D5238D2Bdbc1"
+    "AgentAvatarExtension":  "0x132A0d33aC8040A81E5a3A865Ca2D5238D2Bdbc1",
+    "AgentIdentityKeyExtension": "0xC6d25a28430eFfD9953250f5BDAC5Ab26228E974"
   },
   "implementations": {
     "AgentIdentityRegistry":  "0xCBBa112c05A97E1880e21504984acf40351D94b3",
@@ -28,7 +29,8 @@
     "AgentMemory":            "0xEE3B214e08d54042Ae72991DF8D67D9Abb839F6A",
     "AgentX402Receiver":      "0xE1322cD39fB7A35e44fE34D05a3d383413EB005e",
     "AgentCollectionImpl":    "0x9A0E93F14385e94F50284Ab4D973fbCBa3746f9d",
-    "AgentAvatarExtension":   "0x5b20645870604D9CbB153dE9eb6012Ae42Dfea5b"
+    "AgentAvatarExtension":   "0x5b20645870604D9CbB153dE9eb6012Ae42Dfea5b",
+    "AgentIdentityKeyExtension": "0x06216a771Fe62A0043E173d185A6744b1C498348"
   },
   "agentCollectionLibraries": {
     "AgentCollectionRenderer":   "0x167655252e710533083C12e0Ea48c10d1F92f2FA",

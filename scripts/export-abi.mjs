@@ -64,6 +64,7 @@ const EXPORTS = [
   // ── Token extensions ────────────────────────────────────────────────
   'AgentSkillsExtension',
   'AgentAvatarExtension',
+  'AgentIdentityKeyExtension',
   // ── Hyperlane bridge ────────────────────────────────────────────────
   { contract: 'AgentBridge', namespace: 'hyperlane' },
   // ── Evolution hooks (interface + impls) ─────────────────────────────

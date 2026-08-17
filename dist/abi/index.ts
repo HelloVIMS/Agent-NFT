@@ -20,6 +20,7 @@ export { default as AgentAccount_ABI } from './AgentAccount';
 export { default as VimsProvenance_ABI } from './VimsProvenance';
 export { default as AgentSkillsExtension_ABI } from './AgentSkillsExtension';
 export { default as AgentAvatarExtension_ABI } from './AgentAvatarExtension';
+export { default as AgentIdentityKeyExtension_ABI } from './AgentIdentityKeyExtension';
 export { default as AgentBridge_ABI } from './hyperlane/AgentBridge';
 export { default as IAgentEvolutionHook_ABI } from './hooks/IAgentEvolutionHook';
 export { default as AgentStatusHook_ABI } from './hooks/AgentStatusHook';
