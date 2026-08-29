@@ -59,6 +59,54 @@ contract AgentMarketplaceTest is Test {
 
     // ─── Listings ────────────────────────────────────────────────────
 
+    function test_InitializeWithFeesLocksCanonicalEconomics() public {
+        AgentMarketplace implementation = new AgentMarketplace();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(implementation),
+            abi.encodeCall(AgentMarketplace.initializeWithFees, (admin, feeRecv, 50, 0))
+        );
+        AgentMarketplace lockedMarket = AgentMarketplace(address(proxy));
+        assertEq(lockedMarket.buyerFeeBps(), 50);
+        assertEq(lockedMarket.protocolFeeBps(), 0);
+        assertTrue(lockedMarket.feesLocked());
+        vm.prank(admin);
+        vm.expectRevert(AgentMarketplace.FeesLocked.selector);
+        lockedMarket.setProtocolFees(100, 100, feeRecv);
+    }
+
+    function test_TwoSidedFees_ChargeBuyerAndSeller() public {
+        vm.prank(admin);
+        market.setProtocolFees(50, 0, feeRecv);
+        vm.prank(seller);
+        identity.setApprovalForAll(address(market), true);
+        vm.prank(seller);
+        uint256 lid = market.createListing(address(identity), agentId, address(0), 1 ether, 0);
+
+        uint256 buyerBefore = buyer.balance;
+        uint256 sellerBefore = seller.balance;
+        uint256 feeBefore = feeRecv.balance;
+        address vault = identity.royaltyVaultAddress(agentId);
+        vm.prank(buyer);
+        market.purchase{value: 1.005 ether}(lid);
+
+        assertEq(buyerBefore - buyer.balance, 1.005 ether, "buyer pays price + 0.5%");
+        assertEq(feeRecv.balance - feeBefore, 0.005 ether, "marketplace collects buyer 0.5%");
+        assertEq(seller.balance - sellerBefore, 0.895 ether, "ERC-2981 carries seller royalty");
+        assertEq(vault.balance, 0.105 ether, "creator royalty plus VIMS seller 0.5%");
+    }
+
+    function test_TwoSidedOfferFeeIsFullyRefundableBeforeAcceptance() public {
+        vm.prank(admin);
+        market.setProtocolFees(50, 0, feeRecv);
+        uint256 before = bidder.balance;
+        vm.prank(bidder);
+        uint256 offerId = market.makeOffer{value: 1.005 ether}(address(identity), agentId, address(0), 1 ether, 0);
+        assertEq(before - bidder.balance, 1.005 ether, "full buyer total escrowed");
+        vm.prank(bidder);
+        market.cancelOffer(offerId);
+        assertEq(bidder.balance, before, "full escrow refunded");
+    }
+
     function test_CreateListing_AndPurchase_ETH() public {
         vm.prank(seller);
         identity.setApprovalForAll(address(market), true);
@@ -73,10 +121,10 @@ contract AgentMarketplaceTest is Test {
         vm.prank(buyer);
         market.purchase{value: 1 ether}(lid);
 
-        // 10% creator royalty + 1% system = 11% to vault, 2.5% protocol fee, 86.5% to seller.
-        assertEq(vault.balance,                  0.11 ether,  "vault");
+        // 10% creator royalty + 0.5% system = 10.5% to vault, 2.5% protocol fee, 87% to seller.
+        assertEq(vault.balance,                  0.105 ether,  "vault");
         assertEq(feeRecv.balance - feeRecvBefore, 0.025 ether, "feeRecv");
-        assertEq(seller.balance - sellerBefore,   0.865 ether, "seller");
+        assertEq(seller.balance - sellerBefore,   0.87 ether, "seller");
         assertEq(identity.ownerOf(agentId),       buyer,        "transferred");
 
         AgentMarketplace.Listing memory l = market.getListing(lid);
@@ -97,9 +145,9 @@ contract AgentMarketplaceTest is Test {
         market.purchase(lid);
 
         address vault = identity.royaltyVaultAddress(agentId);
-        assertEq(usdc.balanceOf(vault),    11_000_000, "vault");
+        assertEq(usdc.balanceOf(vault),    10_500_000, "vault");
         assertEq(usdc.balanceOf(feeRecv),   2_500_000, "feeRecv");
-        assertEq(usdc.balanceOf(seller),   86_500_000, "seller");
+        assertEq(usdc.balanceOf(seller),   87_000_000, "seller");
         assertEq(identity.ownerOf(agentId), buyer);
     }
 
@@ -191,9 +239,9 @@ contract AgentMarketplaceTest is Test {
         vm.stopPrank();
 
         address vault = identity.royaltyVaultAddress(agentId);
-        assertEq(vault.balance,                  0.11 ether);
+        assertEq(vault.balance,                  0.105 ether);
         assertEq(feeRecv.balance,                0.025 ether);
-        assertEq(seller.balance - sellerBefore,  0.865 ether);
+        assertEq(seller.balance - sellerBefore,  0.87 ether);
         assertEq(identity.ownerOf(agentId),      bidder);
         assertEq(address(market).balance,        0, "escrow released");
     }
@@ -213,9 +261,9 @@ contract AgentMarketplaceTest is Test {
         vm.stopPrank();
 
         address vault = identity.royaltyVaultAddress(agentId);
-        assertEq(usdc.balanceOf(vault),    11_000_000);
+        assertEq(usdc.balanceOf(vault),    10_500_000);
         assertEq(usdc.balanceOf(feeRecv),   2_500_000);
-        assertEq(usdc.balanceOf(seller),   86_500_000);
+        assertEq(usdc.balanceOf(seller),   87_000_000);
         assertEq(identity.ownerOf(agentId), bidder);
         assertEq(usdc.balanceOf(address(market)), 0);
     }

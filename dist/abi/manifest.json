@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-17T14:36:24.061Z",
+  "generatedAt": "2026-08-29T13:35:12.401Z",
   "generator": "agent-nft/scripts/export-abi.mjs",
   "contracts": [
     {
@@ -88,9 +88,9 @@
       "namespace": null,
       "src": "src/AgentMarketplace.sol",
       "abi": "AgentMarketplace.json",
-      "sha256": "b6a730289d035ebb4d69dcb58ea84ba568acde714333c0dbc6769ea5abd6fa4e",
-      "bytes": 30184,
-      "entries": 92
+      "sha256": "881cac2e52117c852083ce1ce6c0f381a2a2a8085170b64466f615b29c60c2ac",
+      "bytes": 32065,
+      "entries": 100
     },
     {
       "contract": "AgentAuctionHouse",

@@ -8,14 +8,16 @@ import "../src/AgentMarketplace.sol";
 /// @notice Deploys AgentMarketplace.sol behind a UUPS proxy.
 ///         env: DEPLOYER_PRIVATE_KEY (required)
 ///              MARKETPLACE_ADMIN     (required) — proxy admin / fee setter
-///              MARKETPLACE_FEE_RECIPIENT (required) — receives protocolFee
-///              MARKETPLACE_FEE_BPS (default 250 = 2.5%)
+///              MARKETPLACE_FEE_RECIPIENT (required) — receives both fee legs
+///              MARKETPLACE_BUYER_FEE_BPS  (default 50 = 0.5%)
+///              MARKETPLACE_SELLER_FEE_BPS (default 0; ERC-2981 carries the 0.5% seller leg)
 contract DeployMarketplace is Script {
     function run() public {
         uint256 pk     = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address admin  = vm.envAddress("MARKETPLACE_ADMIN");
         address feeRcv = vm.envAddress("MARKETPLACE_FEE_RECIPIENT");
-        uint256 feeBps = vm.envOr("MARKETPLACE_FEE_BPS", uint256(250));
+        uint256 buyerFeeBps = vm.envOr("MARKETPLACE_BUYER_FEE_BPS", uint256(50));
+        uint256 sellerFeeBps = vm.envOr("MARKETPLACE_SELLER_FEE_BPS", uint256(0));
 
         vm.startBroadcast(pk);
 
@@ -24,12 +26,13 @@ contract DeployMarketplace is Script {
 
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(impl),
-            abi.encodeCall(AgentMarketplace.initialize, (admin, feeRcv, feeBps))
+            abi.encodeCall(AgentMarketplace.initializeWithFees, (admin, feeRcv, buyerFeeBps, sellerFeeBps))
         );
         console.log("AgentMarketplace proxy:", address(proxy));
         console.log("  admin:        ", admin);
         console.log("  feeRecipient: ", feeRcv);
-        console.log("  protocolFeeBps:", feeBps);
+        console.log("  buyerFeeBps:  ", buyerFeeBps);
+        console.log("  sellerFeeBps: ", sellerFeeBps);
 
         vm.stopBroadcast();
     }

@@ -108,7 +108,8 @@ contract AgentMarketplace is
         OfferStatus status;
     }
 
-    /// Marketplace protocol fee in bps (100 = 1%, max 1000 = 10%).
+    /// Additional seller fee in bps. Canonical VIMS collections keep this at
+    /// zero because their ERC-2981 royalty already includes the 0.5% seller leg.
     uint256 public protocolFeeBps;
     address public feeRecipient;
     uint256 public constant MAX_PROTOCOL_FEE_BPS = 1000;
@@ -122,6 +123,10 @@ contract AgentMarketplace is
 
     /// Reverse index: collection => tokenId => most recent open listing id (0 == none).
     mapping(address => mapping(uint256 => uint256)) public openListingOf;
+
+    /// Buyer-side fee in bps, charged above the listed price.
+    uint256 public buyerFeeBps;
+    bool public feesLocked;
 
     // ─── Events ──────────────────────────────────────────────────────
 
@@ -162,6 +167,7 @@ contract AgentMarketplace is
     );
 
     event ProtocolFeeUpdated(uint256 oldBps, uint256 newBps, address recipient);
+    event ProtocolFeesUpdated(uint256 buyerBps, uint256 sellerBps, address recipient);
 
     // ─── Errors ──────────────────────────────────────────────────────
 
@@ -178,6 +184,8 @@ contract AgentMarketplace is
     error CallerNotBidder();
     error NoSelfTrade();
     error FeeTooHigh();
+    error FeesLocked();
+    error InvalidFeeRecipient();
 
     // ─── Init ────────────────────────────────────────────────────────
 
@@ -188,22 +196,53 @@ contract AgentMarketplace is
         external
         initializer
     {
-        if (protocolFeeBps_ > MAX_PROTOCOL_FEE_BPS) revert FeeTooHigh();
+        _initialize(admin, feeRecipient_, 0, protocolFeeBps_);
+    }
+
+    function initializeWithFees(address admin, address feeRecipient_, uint256 buyerFeeBps_, uint256 sellerFeeBps_)
+        external
+        initializer
+    {
+        _initialize(admin, feeRecipient_, buyerFeeBps_, sellerFeeBps_);
+        feesLocked = true;
+    }
+
+    function _initialize(address admin, address feeRecipient_, uint256 buyerFeeBps_, uint256 sellerFeeBps_) internal {
+        if (buyerFeeBps_ > MAX_PROTOCOL_FEE_BPS || sellerFeeBps_ > MAX_PROTOCOL_FEE_BPS) revert FeeTooHigh();
+        if (admin == address(0) || feeRecipient_ == address(0)) revert InvalidFeeRecipient();
         __Ownable_init(admin);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __EIP712_init("AgentMarketplace", "1");
         feeRecipient = feeRecipient_;
-        protocolFeeBps = protocolFeeBps_;
-        emit ProtocolFeeUpdated(0, protocolFeeBps_, feeRecipient_);
+        buyerFeeBps = buyerFeeBps_;
+        protocolFeeBps = sellerFeeBps_;
+        emit ProtocolFeeUpdated(0, sellerFeeBps_, feeRecipient_);
+        emit ProtocolFeesUpdated(buyerFeeBps_, sellerFeeBps_, feeRecipient_);
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
     function setProtocolFee(uint256 newBps, address recipient) external onlyOwner {
-        if (newBps > MAX_PROTOCOL_FEE_BPS) revert FeeTooHigh();
-        emit ProtocolFeeUpdated(protocolFeeBps, newBps, recipient);
-        protocolFeeBps = newBps;
+        _setProtocolFees(newBps, newBps, recipient);
+    }
+
+    function setProtocolFees(uint256 newBuyerBps, uint256 newSellerBps, address recipient) external onlyOwner {
+        _setProtocolFees(newBuyerBps, newSellerBps, recipient);
+    }
+
+    function lockProtocolFees() external onlyOwner {
+        feesLocked = true;
+    }
+
+    function _setProtocolFees(uint256 newBuyerBps, uint256 newSellerBps, address recipient) internal {
+        if (feesLocked) revert FeesLocked();
+        if (newBuyerBps > MAX_PROTOCOL_FEE_BPS || newSellerBps > MAX_PROTOCOL_FEE_BPS) revert FeeTooHigh();
+        if (recipient == address(0)) revert InvalidFeeRecipient();
+        emit ProtocolFeeUpdated(protocolFeeBps, newSellerBps, recipient);
+        emit ProtocolFeesUpdated(newBuyerBps, newSellerBps, recipient);
+        buyerFeeBps = newBuyerBps;
+        protocolFeeBps = newSellerBps;
         feeRecipient = recipient;
     }
 
@@ -285,24 +324,25 @@ contract AgentMarketplace is
                 openListingOf[l.collection][l.tokenId] = 0;
             }
 
-            (uint256 royalty, uint256 fee, uint256 sellerCut, address royaltyReceiver) =
+            (uint256 royalty, uint256 sellerFee, uint256 sellerCut, address royaltyReceiver) =
                 _computeSplits(l.collection, l.tokenId, l.price);
+            uint256 protocolFee = sellerFee + _buyerFee(l.price);
 
             if (l.paymentToken == address(0)) {
-                ethConsumed += l.price;
+                ethConsumed += l.price + _buyerFee(l.price);
                 if (ethConsumed > msg.value) revert WrongPayment();
                 _payETH(royaltyReceiver, royalty);
-                _payETH(feeRecipient, fee);
+                _payETH(feeRecipient, protocolFee);
                 _payETH(l.seller, sellerCut);
             } else {
                 IERC20 t = IERC20(l.paymentToken);
-                if (royalty > 0) t.safeTransferFrom(msg.sender, royaltyReceiver, royalty);
-                if (fee > 0)     t.safeTransferFrom(msg.sender, feeRecipient,    fee);
+                if (royalty > 0)    t.safeTransferFrom(msg.sender, royaltyReceiver, royalty);
+                if (protocolFee > 0) t.safeTransferFrom(msg.sender, feeRecipient, protocolFee);
                 t.safeTransferFrom(msg.sender, l.seller, sellerCut);
             }
 
             IERC721(l.collection).safeTransferFrom(l.seller, msg.sender, l.tokenId);
-            emit ListingFilled(lid, msg.sender, royalty, fee, sellerCut);
+            emit ListingFilled(lid, msg.sender, royalty, protocolFee, sellerCut);
             unchecked { ++i; }
         }
         // ETH refund for unused balance (e.g. mixed-token sweep where the
@@ -321,24 +361,25 @@ contract AgentMarketplace is
             openListingOf[l.collection][l.tokenId] = 0;
         }
 
-        (uint256 royalty, uint256 fee, uint256 sellerCut, address royaltyReceiver) =
+        (uint256 royalty, uint256 sellerFee, uint256 sellerCut, address royaltyReceiver) =
             _computeSplits(l.collection, l.tokenId, l.price);
+        uint256 protocolFee = sellerFee + _buyerFee(l.price);
 
         if (l.paymentToken == address(0)) {
-            if (msg.value != l.price) revert WrongPayment();
+            if (msg.value != l.price + _buyerFee(l.price)) revert WrongPayment();
             _payETH(royaltyReceiver, royalty);
-            _payETH(feeRecipient, fee);
+            _payETH(feeRecipient, protocolFee);
             _payETH(l.seller, sellerCut);
         } else {
             if (msg.value != 0) revert WrongPayment();
             IERC20 t = IERC20(l.paymentToken);
-            if (royalty > 0) t.safeTransferFrom(msg.sender, royaltyReceiver, royalty);
-            if (fee > 0)     t.safeTransferFrom(msg.sender, feeRecipient,    fee);
+            if (royalty > 0)     t.safeTransferFrom(msg.sender, royaltyReceiver, royalty);
+            if (protocolFee > 0) t.safeTransferFrom(msg.sender, feeRecipient, protocolFee);
             t.safeTransferFrom(msg.sender, l.seller, sellerCut);
         }
 
         IERC721(l.collection).safeTransferFrom(l.seller, msg.sender, l.tokenId);
-        emit ListingFilled(listingId, msg.sender, royalty, fee, sellerCut);
+        emit ListingFilled(listingId, msg.sender, royalty, protocolFee, sellerCut);
     }
 
     // ─── Offers ──────────────────────────────────────────────────────
@@ -360,11 +401,12 @@ contract AgentMarketplace is
         if (expiresAt != 0 && expiresAt <= block.timestamp) revert InvalidExpiry();
         if (IERC721(collection).ownerOf(tokenId) == msg.sender) revert NoSelfTrade();
 
+        uint256 escrow = price + _buyerFee(price);
         if (paymentToken == address(0)) {
-            if (msg.value != price) revert WrongPayment();
+            if (msg.value != escrow) revert WrongPayment();
         } else {
             if (msg.value != 0) revert WrongPayment();
-            IERC20(paymentToken).safeTransferFrom(msg.sender, address(this), price);
+            IERC20(paymentToken).safeTransferFrom(msg.sender, address(this), escrow);
         }
 
         offerId = ++offerCount;
@@ -414,22 +456,23 @@ contract AgentMarketplace is
             emit ListingCancelled(lid);
         }
 
-        (uint256 royalty, uint256 fee, uint256 sellerCut, address royaltyReceiver) =
+        (uint256 royalty, uint256 sellerFee, uint256 sellerCut, address royaltyReceiver) =
             _computeSplits(o.collection, o.tokenId, o.price);
+        uint256 protocolFee = sellerFee + _buyerFee(o.price);
 
         if (o.paymentToken == address(0)) {
             _payETH(royaltyReceiver, royalty);
-            _payETH(feeRecipient, fee);
+            _payETH(feeRecipient, protocolFee);
             _payETH(msg.sender, sellerCut);
         } else {
             IERC20 t = IERC20(o.paymentToken);
-            if (royalty > 0) t.safeTransfer(royaltyReceiver, royalty);
-            if (fee > 0)     t.safeTransfer(feeRecipient,    fee);
+            if (royalty > 0)     t.safeTransfer(royaltyReceiver, royalty);
+            if (protocolFee > 0) t.safeTransfer(feeRecipient, protocolFee);
             t.safeTransfer(msg.sender, sellerCut);
         }
 
         nft.safeTransferFrom(msg.sender, o.bidder, o.tokenId);
-        emit OfferAccepted(offerId, msg.sender, royalty, fee, sellerCut);
+        emit OfferAccepted(offerId, msg.sender, royalty, protocolFee, sellerCut);
     }
 
     // ─── Internals ───────────────────────────────────────────────────
@@ -462,11 +505,16 @@ contract AgentMarketplace is
         sellerCut = price - take;
     }
 
+    function _buyerFee(uint256 price) internal view returns (uint256) {
+        return (price * buyerFeeBps) / BPS_DENOM;
+    }
+
     function _refundEscrow(Offer storage o) internal {
+        uint256 escrow = o.price + _buyerFee(o.price);
         if (o.paymentToken == address(0)) {
-            _payETH(o.bidder, o.price);
+            _payETH(o.bidder, escrow);
         } else {
-            IERC20(o.paymentToken).safeTransfer(o.bidder, o.price);
+            IERC20(o.paymentToken).safeTransfer(o.bidder, escrow);
         }
     }
 
@@ -696,21 +744,22 @@ contract AgentMarketplace is
 
         // 7. Settlement splits (computed on the *resolved* tokenId so
         //    ERC-2981 royaltyInfo reflects the actual traded token).
-        (uint256 royalty, uint256 fee, uint256 offererProceeds, address royaltyReceiver) =
+        (uint256 royalty, uint256 sellerFee, uint256 offererProceeds, address royaltyReceiver) =
             _computeSplits(o.collection, resolvedTokenId, o.price);
+        uint256 protocolFee = sellerFee + _buyerFee(o.price);
 
         if (o.side == OrderSide.ASK) {
             // offerer is seller, msg.sender is buyer.
             if (o.paymentToken == address(0)) {
-                if (ethValue != o.price) revert WrongPayment();
+                if (ethValue != o.price + _buyerFee(o.price)) revert WrongPayment();
                 _payETH(royaltyReceiver, royalty);
-                _payETH(feeRecipient,    fee);
+                _payETH(feeRecipient,    protocolFee);
                 _payETH(o.offerer,       offererProceeds);
             } else {
                 if (ethValue != 0) revert WrongPayment();
                 IERC20 t = IERC20(o.paymentToken);
-                if (royalty > 0) t.safeTransferFrom(msg.sender, royaltyReceiver, royalty);
-                if (fee > 0)     t.safeTransferFrom(msg.sender, feeRecipient,    fee);
+                if (royalty > 0)     t.safeTransferFrom(msg.sender, royaltyReceiver, royalty);
+                if (protocolFee > 0) t.safeTransferFrom(msg.sender, feeRecipient, protocolFee);
                 t.safeTransferFrom(msg.sender, o.offerer, offererProceeds);
             }
             // Verify NFT ownership at fill time and pull from seller.
@@ -734,8 +783,8 @@ contract AgentMarketplace is
             if (nft.ownerOf(resolvedTokenId) != msg.sender) revert NotOwner();
 
             IERC20 t = IERC20(o.paymentToken);
-            if (royalty > 0) t.safeTransferFrom(o.offerer, royaltyReceiver, royalty);
-            if (fee > 0)     t.safeTransferFrom(o.offerer, feeRecipient,    fee);
+            if (royalty > 0)     t.safeTransferFrom(o.offerer, royaltyReceiver, royalty);
+            if (protocolFee > 0) t.safeTransferFrom(o.offerer, feeRecipient, protocolFee);
             t.safeTransferFrom(o.offerer, msg.sender, offererProceeds);
 
             nft.safeTransferFrom(msg.sender, o.offerer, resolvedTokenId);
@@ -744,7 +793,7 @@ contract AgentMarketplace is
         emit OrderFulfilled(
             h, o.offerer, msg.sender, o.side,
             o.collection, resolvedTokenId, o.paymentToken, o.price,
-            royalty, fee, offererProceeds
+            royalty, protocolFee, offererProceeds
         );
     }
 
@@ -771,5 +820,5 @@ contract AgentMarketplace is
     }
 
     /// @notice Storage gap for future upgrades.
-    uint256[40] private __gap;
+    uint256[38] private __gap;
 }

@@ -70,6 +70,18 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "buyerFeeBps",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "cancelListing",
     "inputs": [
       {
@@ -314,6 +326,18 @@ const abi = [
       {
         "name": "",
         "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "feesLocked",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
       }
     ],
     "stateMutability": "view"
@@ -789,6 +813,30 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "initializeWithFees",
+    "inputs": [
+      {
+        "name": "admin",
+        "type": "address"
+      },
+      {
+        "name": "feeRecipient_",
+        "type": "address"
+      },
+      {
+        "name": "buyerFeeBps_",
+        "type": "uint256"
+      },
+      {
+        "name": "sellerFeeBps_",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "listingCount",
     "inputs": [],
     "outputs": [
@@ -843,6 +891,13 @@ const abi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "lockProtocolFees",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1062,6 +1117,26 @@ const abi = [
     "inputs": [
       {
         "name": "newBps",
+        "type": "uint256"
+      },
+      {
+        "name": "recipient",
+        "type": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setProtocolFees",
+    "inputs": [
+      {
+        "name": "newBuyerBps",
+        "type": "uint256"
+      },
+      {
+        "name": "newSellerBps",
         "type": "uint256"
       },
       {
@@ -1449,6 +1524,28 @@ const abi = [
   },
   {
     "type": "event",
+    "name": "ProtocolFeesUpdated",
+    "inputs": [
+      {
+        "name": "buyerBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "sellerBps",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Upgraded",
     "inputs": [
       {
@@ -1536,12 +1633,22 @@ const abi = [
   },
   {
     "type": "error",
+    "name": "FeesLocked",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidCriteriaProof",
     "inputs": []
   },
   {
     "type": "error",
     "name": "InvalidExpiry",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidFeeRecipient",
     "inputs": []
   },
   {

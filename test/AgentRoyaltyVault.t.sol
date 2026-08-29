@@ -21,7 +21,7 @@ contract AgentRoyaltyVaultTest is Test {
     address internal buyer    = makeAddr("buyer");
 
     uint256 internal constant DEFAULT_CREATOR_BPS = 1000; // 10%
-    uint256 internal constant DEFAULT_SYSTEM_BPS  = 100;  // 1%
+    uint256 internal constant DEFAULT_SYSTEM_BPS  = 50;   // 0.5%
 
     function setUp() public {
         AgentIdentityRegistry impl = new AgentIdentityRegistry();
@@ -89,8 +89,8 @@ contract AgentRoyaltyVaultTest is Test {
         // Vault is the receiver (deterministic, even before deployment).
         assertEq(receiver, registry.royaltyVaultAddress(agentId));
 
-        // (1000 + 100) / 10000 * 10000 ether = 1_100 ether
-        assertEq(amount, 1_100 ether);
+        // (1000 + 50) / 10000 * 10000 ether = 1_050 ether
+        assertEq(amount, 1_050 ether);
     }
 
     function test_RoyaltyVaultAddressIsDeterministic() public {
@@ -123,8 +123,8 @@ contract AgentRoyaltyVaultTest is Test {
         uint256 agentId = _mint(creator, DEFAULT_CREATOR_BPS);
         AgentRoyaltyVault vault = AgentRoyaltyVault(payable(registry.deployRoyaltyVault(agentId)));
 
-        // Buyer pays the *combined* royalty amount (1_100 of every 10_000 sale).
-        uint256 totalRoyalty = 1_100 ether;
+        // Buyer pays the *combined* royalty amount (1_050 of every 10_000 sale).
+        uint256 totalRoyalty = 1_050 ether;
         vm.deal(buyer, totalRoyalty);
         vm.prank(buyer);
         (bool ok,) = address(vault).call{value: totalRoyalty}("");
@@ -135,8 +135,8 @@ contract AgentRoyaltyVaultTest is Test {
 
         vault.release();
 
-        // Of 1100 wei, treasury gets 100/1100 share = 100 ether, creator gets 1000 ether.
-        assertEq(treasury.balance - treasuryBefore, 100 ether);
+        // Of 1050 ether, treasury gets 50 ether and the creator gets 1000 ether.
+        assertEq(treasury.balance - treasuryBefore, 50 ether);
         assertEq(creator.balance  - creatorBefore,  1_000 ether);
         assertEq(address(vault).balance,            0);
     }
@@ -153,7 +153,7 @@ contract AgentRoyaltyVaultTest is Test {
         // Creator royalty is committed at mint (immutable post-mint), but
         // the secondary system fee is governance-mutable. This test pokes
         // the live system-fee path: after the owner raises the system fee
-        // from 100 (1%) to 250 (2.5% — the cap), `royaltyInfo` and the
+        // from 50 (0.5%) to 250 (2.5% — the cap), `royaltyInfo` and the
         // vault split must reflect the new split deterministically.
         uint256 agentId = _mint(creator, 2500); // creator bps locked at mint
         AgentRoyaltyVault vault = AgentRoyaltyVault(payable(registry.deployRoyaltyVault(agentId)));
@@ -184,11 +184,11 @@ contract AgentRoyaltyVaultTest is Test {
         AgentRoyaltyVault vault = AgentRoyaltyVault(payable(registry.deployRoyaltyVault(agentId)));
 
         MockToken tok = new MockToken();
-        tok.mint(address(vault), 1_100 * 1e6);
+        tok.mint(address(vault), 1_050 * 1e6);
 
         vault.releaseToken(tok);
 
-        assertEq(tok.balanceOf(treasury), 100 * 1e6);
+        assertEq(tok.balanceOf(treasury), 50 * 1e6);
         assertEq(tok.balanceOf(creator),  1_000 * 1e6);
         assertEq(tok.balanceOf(address(vault)), 0);
     }
@@ -209,21 +209,21 @@ contract AgentRoyaltyVaultTest is Test {
         address predicted = registry.royaltyVaultAddress(agentId);
 
         // Marketplace sends royalty before vault is deployed.
-        vm.deal(buyer, 1_100 ether);
+        vm.deal(buyer, 1_050 ether);
         vm.prank(buyer);
-        (bool ok,) = predicted.call{value: 1_100 ether}("");
+        (bool ok,) = predicted.call{value: 1_050 ether}("");
         assertTrue(ok);
-        assertEq(predicted.balance, 1_100 ether);
+        assertEq(predicted.balance, 1_050 ether);
 
         // Now anyone deploys the vault.
         registry.deployRoyaltyVault(agentId);
         AgentRoyaltyVault vault = AgentRoyaltyVault(payable(predicted));
 
         // Funds survived the deploy (CREATE2 preserves balance).
-        assertEq(address(vault).balance, 1_100 ether);
+        assertEq(address(vault).balance, 1_050 ether);
 
         vault.release();
-        assertEq(treasury.balance, 100 ether);
+        assertEq(treasury.balance, 50 ether);
         assertEq(creator.balance,  1_000 ether);
     }
 
@@ -232,17 +232,17 @@ contract AgentRoyaltyVaultTest is Test {
     function test_CreatorBpsCanBeZero() public {
         uint256 agentId = _mint(creator, 0);
 
-        // royaltyInfo: 0 + 100 = 100 bps total → only the system fee survives.
+        // royaltyInfo: 0 + 50 = 50 bps total → only the system fee survives.
         (address receiver, uint256 amount) = registry.royaltyInfo(agentId, 10_000 ether);
         assertEq(receiver, registry.royaltyVaultAddress(agentId));
-        assertEq(amount, 100 ether); // 1% of 10_000
+        assertEq(amount, 50 ether); // 0.5% of 10_000
 
         AgentRoyaltyVault vault = AgentRoyaltyVault(payable(registry.deployRoyaltyVault(agentId)));
-        vm.deal(address(vault), 100 ether);
+        vm.deal(address(vault), 50 ether);
         vault.release();
 
         // Treasury sweeps everything; creator gets 0.
-        assertEq(treasury.balance, 100 ether);
+        assertEq(treasury.balance, 50 ether);
         assertEq(creator.balance,  0);
     }
 
@@ -281,11 +281,11 @@ contract AgentRoyaltyVaultTest is Test {
 
         (address receiver, uint256 amount) = registry.royaltyInfo(agentId, salePrice);
         assertEq(receiver, registry.royaltyVaultAddress(agentId));
-        assertEq(amount, (uint256(salePrice) * (creatorBps + 100)) / 10_000);
+        assertEq(amount, (uint256(salePrice) * (creatorBps + DEFAULT_SYSTEM_BPS)) / 10_000);
     }
 
     function testFuzz_SplitProducesNoDust(uint96 totalRoyalty) public {
-        vm.assume(totalRoyalty >= 1100); // ratio 100:1000
+        vm.assume(totalRoyalty >= 1050); // ratio 50:1000
         uint256 agentId = _mint(creator, DEFAULT_CREATOR_BPS);
         AgentRoyaltyVault vault = AgentRoyaltyVault(payable(registry.deployRoyaltyVault(agentId)));
 

@@ -144,10 +144,10 @@ contract AgentMarketplaceSignedTest is Test {
         vm.prank(buyer);
         market.fulfillOrder{value: 1 ether}(o, sig);
 
-        // 11% to vault, 2.5% to feeRecv, 86.5% to seller.
-        assertEq(vault.balance,                  0.11 ether,  "vault");
+        // 10.5% to vault, 2.5% to feeRecv, 87% to seller.
+        assertEq(vault.balance,                  0.105 ether,  "vault");
         assertEq(feeRecv.balance - feeRecvBefore, 0.025 ether, "feeRecv");
-        assertEq(seller.balance - sellerBefore,   0.865 ether, "seller");
+        assertEq(seller.balance - sellerBefore,   0.87 ether, "seller");
         assertEq(identity.ownerOf(agentId),       buyer,        "transfer");
         assertTrue(market.orderFilled(market.hashOrder(o)), "filled flag");
     }
@@ -166,9 +166,9 @@ contract AgentMarketplaceSignedTest is Test {
         market.fulfillOrder(o, sig);
 
         address vault = identity.royaltyVaultAddress(agentId);
-        assertEq(usdc.balanceOf(vault),    11_000_000);
+        assertEq(usdc.balanceOf(vault),    10_500_000);
         assertEq(usdc.balanceOf(feeRecv),   2_500_000);
-        assertEq(usdc.balanceOf(seller),   86_500_000);
+        assertEq(usdc.balanceOf(seller),   87_000_000);
         assertEq(identity.ownerOf(agentId), buyer);
     }
 
@@ -267,9 +267,9 @@ contract AgentMarketplaceSignedTest is Test {
         market.fulfillOrder(o, sig);
 
         address vault = identity.royaltyVaultAddress(agentId);
-        assertEq(usdc.balanceOf(vault),    11_000_000);
+        assertEq(usdc.balanceOf(vault),    10_500_000);
         assertEq(usdc.balanceOf(feeRecv),   2_500_000);
-        assertEq(usdc.balanceOf(seller),   86_500_000);
+        assertEq(usdc.balanceOf(seller),   87_000_000);
         assertEq(identity.ownerOf(agentId), bidder);
     }
 
@@ -362,6 +362,6 @@ contract AgentMarketplaceSignedTest is Test {
         market.fulfillOrder{value: 1 ether}(o, sig);
 
         assertEq(identity.ownerOf(agentId), buyer);
-        assertEq(address(wallet).balance - walletBefore, 0.865 ether, "wallet proceeds");
+        assertEq(address(wallet).balance - walletBefore, 0.87 ether, "wallet proceeds");
     }
 }
