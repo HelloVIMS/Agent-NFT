@@ -337,7 +337,7 @@ contract AgentCollectionImplAudit is Test {
         vm.expectRevert(AgentCollectionImpl.NotCreator.selector);
         c.registerAgentWithRoyalty("free", "ipfs://free", 8000, 8000);
         vm.expectRevert(AgentCollectionImpl.NotCreator.selector);
-        c.mintAgentWithSVG("free", "<svg/>");
+        c.mintAgentWithSVG("free", "<svg/>", "");
         vm.stopPrank();
         vm.prank(creator);
         uint256 id = c.registerAgent("mine", "ipfs://mine");

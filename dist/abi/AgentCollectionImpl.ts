@@ -1384,6 +1384,10 @@ const abi = [
       {
         "name": "svg",
         "type": "string"
+      },
+      {
+        "name": "agentURI",
+        "type": "string"
       }
     ],
     "outputs": [

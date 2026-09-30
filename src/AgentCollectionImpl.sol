@@ -361,10 +361,14 @@ contract AgentCollectionImpl is
 
     /// @notice Mint an agent and atomically commit its on-chain SVG.
     ///         Mode locked to `OnChainSVG`; mutation restricted to the
-    ///         same mode via {setSVGImage}.
+    ///         same mode via {setSVGImage}. `agentURI` (optional) is the
+    ///         agent's metadata document — services manifest, avatars —
+    ///         served as `agent_uri` in tokenURI; the owner updates it with
+    ///         {updateAgentURI}.
     function mintAgentWithSVG(
         string calldata name_,
-        string calldata svg
+        string calldata svg,
+        string calldata agentURI
     ) external returns (uint256 agentId) {
         if (msg.sender != collectionCreator) revert NotCreator();
         if (locked) revert CollectionLocked();
@@ -376,6 +380,9 @@ contract AgentCollectionImpl is
         _commitAgent(agentId, name_, defaultSalesRoyaltyBps, defaultServiceRoyaltyBps);
         metadataMode[agentId] = MetadataMode.OnChainSVG;
         _svgImages[agentId]   = svg;
+        // The agent's metadata document (services manifest, avatars), served
+        // as agent_uri alongside the on-chain art.
+        if (bytes(agentURI).length > 0) _setTokenURI(agentId, agentURI);
 
         emit AgentRegistered(agentId, msg.sender, name_, "");
         emit CreatorRoyaltySet(agentId, msg.sender, defaultSalesRoyaltyBps, defaultServiceRoyaltyBps);
@@ -617,8 +624,9 @@ contract AgentCollectionImpl is
 
     function updateAgentURI(uint256 agentId, string calldata newURI) external {
         if (ownerOf(agentId) != msg.sender) revert NotOwner();
-        // Mode lock: only ExplicitURI tokens accept URI updates.
-        if (metadataMode[agentId] != MetadataMode.ExplicitURI) revert MetadataModeLocked();
+        // BaseURI tokens resolve through the collection; the others hold their
+        // own URI (for OnChainSVG, the metadata document served as agent_uri).
+        if (metadataMode[agentId] == MetadataMode.BaseURI) revert MetadataModeLocked();
         if (bytes(newURI).length == 0) revert EmptyInput();
         _setTokenURI(agentId, newURI);
     }
@@ -895,7 +903,8 @@ contract AgentCollectionImpl is
                 serviceBps:            _serviceRoyaltyBps[tokenId],
                 pixeVersionsLen:       _pixeVersions[tokenId].length,
                 createdAt:             a.createdAt,
-                agentCreator:          _agentCreator[tokenId]
+                agentCreator:          _agentCreator[tokenId],
+                agentURI:              super.tokenURI(tokenId)
             }));
         }
 

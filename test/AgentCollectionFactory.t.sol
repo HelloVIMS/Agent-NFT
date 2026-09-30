@@ -327,7 +327,7 @@ contract AgentCollectionFactoryTest is Test {
 
         string memory svg1 = "<svg><circle cx='50' cy='50' r='40'/></svg>";
         _asCreator(collection);
-        uint256 agentId = collection.mintAgentWithSVG("Agent1", svg1);
+        uint256 agentId = collection.mintAgentWithSVG("Agent1", svg1, "");
         assertTrue(collection.hasSVGImage(agentId));
         assertEq(collection.getSVGImage(agentId), svg1);
         assertEq(uint8(collection.metadataMode(agentId)), uint8(AgentCollectionImpl.MetadataMode.OnChainSVG));
@@ -371,11 +371,11 @@ contract AgentCollectionFactoryTest is Test {
         // Mint path rejects oversize SVG.
         _asCreator(collection);
         vm.expectRevert(AgentCollectionImpl.TooLarge.selector);
-        collection.mintAgentWithSVG("Agent1", string(largeSvg));
+        collection.mintAgentWithSVG("Agent1", string(largeSvg), "");
 
         // Update path on a valid OnChainSVG token also rejects oversize.
         _asCreator(collection);
-        uint256 agentId = collection.mintAgentWithSVG("Agent1", "<svg/>");
+        uint256 agentId = collection.mintAgentWithSVG("Agent1", "<svg/>", "");
         vm.prank(creator1);
         vm.expectRevert(AgentCollectionImpl.TooLarge.selector);
         collection.setSVGImage(agentId, string(largeSvg));
@@ -542,7 +542,7 @@ contract AgentCollectionFactoryTest is Test {
 
         // OnChainSVG mode — rendered as data:application/json;base64,...
         _asCreator(collection);
-        uint256 svgId = collection.mintAgentWithSVG("Agent2", "<svg><rect/></svg>");
+        uint256 svgId = collection.mintAgentWithSVG("Agent2", "<svg><rect/></svg>", "");
         assertEq(uint8(collection.metadataMode(svgId)), uint8(AgentCollectionImpl.MetadataMode.OnChainSVG));
 
         string memory uri2 = collection.tokenURI(svgId);
@@ -658,10 +658,10 @@ contract AgentCollectionFactoryTest is Test {
 
         _asCreator(collection);
         vm.expectRevert(AgentCollectionImpl.EmptyInput.selector);
-        collection.mintAgentWithSVG("Agent1", "");
+        collection.mintAgentWithSVG("Agent1", "", "");
 
         _asCreator(collection);
-        uint256 agentId = collection.mintAgentWithSVG("Agent2", "<svg/>");
+        uint256 agentId = collection.mintAgentWithSVG("Agent2", "<svg/>", "");
         vm.prank(creator1);
         vm.expectRevert(AgentCollectionImpl.EmptyInput.selector);
         collection.setSVGImage(agentId, "");

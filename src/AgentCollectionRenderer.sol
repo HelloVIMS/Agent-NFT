@@ -37,6 +37,7 @@ library AgentCollectionRenderer {
         uint256 pixeVersionsLen;
         uint256 createdAt;
         address agentCreator;
+        string  agentURI;        // the agent's metadata document (services, avatars); "" = none
     }
 
     /**
@@ -50,17 +51,20 @@ library AgentCollectionRenderer {
             ? string(abi.encodePacked("#", i.tokenId.toString(), " of ", i.maxSupply.toString()))
             : string(abi.encodePacked("#", i.tokenId.toString()));
 
+        // The agent's own metadata document (services manifest, avatars)
+        // lives at agent_uri; the art here stays on-chain.
         bytes memory part1 = abi.encodePacked(
-            '{"name":"', i.agentName, '",',
-            '"description":"', i.collectionDescription, '",',
+            '{"name":"', escapeJSON(i.agentName), '",',
+            '"description":"', escapeJSON(i.collectionDescription), '",',
             '"image":"data:image/svg+xml;base64,', svgBase64, '",',
+            bytes(i.agentURI).length > 0 ? abi.encodePacked('"agent_uri":"', escapeJSON(i.agentURI), '",') : bytes(""),
             '"external_url":"https://bots.vims.com/agent/', i.tokenId.toString(), '",'
         );
 
         bytes memory part2 = abi.encodePacked(
             '"attributes":[',
             '{"trait_type":"Edition","value":"', editionStr, '"},',
-            '{"trait_type":"Collection","value":"', i.collectionName, '"},',
+            '{"trait_type":"Collection","value":"', escapeJSON(i.collectionName), '"},',
             '{"trait_type":"Status","value":"', i.active ? "Active" : "Inactive", '"},',
             '{"trait_type":"Sales Royalty","value":"', (i.salesBps / 100).toString(), '%"},',
             '{"trait_type":"Service Royalty","value":"', (i.serviceBps / 100).toString(), '%"},'
@@ -78,6 +82,37 @@ library AgentCollectionRenderer {
             "data:application/json;base64,",
             Base64.encode(abi.encodePacked(part1, part2, part3))
         ));
+    }
+
+    /// @notice `s` as the body of a JSON string: quotes, backslashes and
+    ///         control characters escaped, so user-supplied names and URIs
+    ///         can't break or inject into the generated metadata.
+    function escapeJSON(string memory s) internal pure returns (string memory) {
+        bytes memory b = bytes(s);
+        uint256 extra;
+        for (uint256 k; k < b.length; ++k) {
+            bytes1 c = b[k];
+            if (c == '"' || c == "\\") extra += 1;
+            else if (uint8(c) < 0x20) extra += 5;
+        }
+        if (extra == 0) return s;
+        bytes memory out = new bytes(b.length + extra);
+        bytes16 hexChars = "0123456789abcdef";
+        uint256 j;
+        for (uint256 k; k < b.length; ++k) {
+            bytes1 c = b[k];
+            if (c == '"' || c == "\\") {
+                out[j++] = "\\";
+                out[j++] = c;
+            } else if (uint8(c) < 0x20) {
+                out[j++] = "\\"; out[j++] = "u"; out[j++] = "0"; out[j++] = "0";
+                out[j++] = hexChars[uint8(c) >> 4];
+                out[j++] = hexChars[uint8(c) & 0x0f];
+            } else {
+                out[j++] = c;
+            }
+        }
+        return string(out);
     }
 
     /**

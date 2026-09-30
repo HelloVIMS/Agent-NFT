@@ -41,8 +41,8 @@ contract HookLifecycleE2EScript is Script {
         (, address addr) = factory.createCollection("Hook E2E", "HOOK", 10, 500, 500, "Evolution hooks on a live collection");
         AgentCollectionImpl c = AgentCollectionImpl(addr);
         string memory art = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect width="200" height="200" fill="#111"/></svg>';
-        uint256 a = c.mintAgentWithSVG("Recolor", art);
-        uint256 b = c.mintAgentWithSVG("Tiered", art);
+        uint256 a = c.mintAgentWithSVG("Recolor", art, "");
+        uint256 b = c.mintAgentWithSVG("Tiered", art, "");
         c.setCollectionHook(address(recolor));
 
         // A sale, then a redraw from the collection's own count.

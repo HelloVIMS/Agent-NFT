@@ -32,7 +32,7 @@
     "AgentMemory": "0xEE3B214e08d54042Ae72991DF8D67D9Abb839F6A",
     "AgentX402Receiver": "0xf1126e12c7bea39383A0f13e0Adf7Af0Efd64799",
     "AgentMarketplace": "0xcc1E532C8148278c56DBBBcb02f23648C06C2950",
-    "AgentCollectionImpl": "0x19DAaa46d5ACf28FC30935Eb53A4CeF9d2453dd5",
+    "AgentCollectionImpl": "0xDcBF7187E116577491B65C0E8b0c2aE30e4393c4",
     "AgentAvatarExtension": "0x5b20645870604D9CbB153dE9eb6012Ae42Dfea5b",
     "AgentIdentityKeyExtension": "0x06216a771Fe62A0043E173d185A6744b1C498348"
   },
@@ -57,7 +57,7 @@
         "notes": "second testnet deploy"
       }
     ],
-    "implementation": "0x19DAaa46d5ACf28FC30935Eb53A4CeF9d2453dd5",
+    "implementation": "0xDcBF7187E116577491B65C0E8b0c2aE30e4393c4",
     "implementationLegacy": [
       {
         "address": "0xE5a34709CCb56acA387A43afb8D008aEA4bBba86",
@@ -76,6 +76,11 @@
         "address": "0x5e8548c19bC8748A34aFAb30dC771a75aa26fb08",
         "replacedAt": "2026-09-30",
         "notes": "free mint paths were open to anyone"
+      },
+      {
+        "address": "0x19DAaa46d5ACf28FC30935Eb53A4CeF9d2453dd5",
+        "replacedAt": "2026-09-30",
+        "notes": "on-chain SVG tokens had no metadata document"
       }
     ],
     "beacon": "0xA28E020f8E6258B890e78630C0A5034642f97f2C",
