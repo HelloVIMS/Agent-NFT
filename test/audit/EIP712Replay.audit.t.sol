@@ -24,6 +24,18 @@ contract _KeeperHook is BaseEvolutionHook {
 ///         agentId, nonce) so a signature minted in one context cannot be
 ///         replayed in another.
 contract EIP712ReplayAudit is Test {
+
+    /// @dev An agent owned by `to`: the creator mints it through the free
+    ///      path (creator-only) and hands it over.
+    function _registerFor(AgentCollectionImpl c, address to, string memory name_, string memory uri) internal returns (uint256 id) {
+        address creator_ = c.collectionCreator();
+        vm.prank(creator_);
+        id = c.registerAgent(name_, uri);
+        if (to != creator_) {
+            vm.prank(creator_);
+            c.transferFrom(creator_, to, id);
+        }
+    }
     AgentCollectionFactory factory;
     AgentCollectionImpl    impl;
 
@@ -53,10 +65,8 @@ contract EIP712ReplayAudit is Test {
             c.setCollectionHook(address(hook));
             vm.prank(creator);
             c.setEvolutionKeeper(keeper);
-            vm.prank(minter);
-            c.registerAgent("a","ipfs://a"); // mint id=1
-            vm.prank(minter);
-            c.registerAgent("b","ipfs://b"); // mint id=2
+            _registerFor(c, minter, "a","ipfs://a"); // mint id=1
+            _registerFor(c, minter, "b","ipfs://b"); // mint id=2
         }
     }
 

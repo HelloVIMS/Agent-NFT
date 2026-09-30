@@ -8,6 +8,18 @@ import {EvolutionTypes} from "../src/hooks/EvolutionTypes.sol";
 import {EvolutionStagesHook} from "../src/hooks/EvolutionStagesHook.sol";
 
 contract EvolutionStagesHookTest is Test {
+
+    /// @dev An agent owned by `to`: the creator mints it through the free
+    ///      path (creator-only) and hands it over.
+    function _registerFor(AgentCollectionImpl c, address to, string memory name_, string memory uri) internal returns (uint256 id) {
+        address creator_ = c.collectionCreator();
+        vm.prank(creator_);
+        id = c.registerAgent(name_, uri);
+        if (to != creator_) {
+            vm.prank(creator_);
+            c.transferFrom(creator_, to, id);
+        }
+    }
     AgentCollectionFactory factory;
     AgentCollectionImpl    impl;
     AgentCollectionImpl    collection;
@@ -74,8 +86,7 @@ contract EvolutionStagesHookTest is Test {
     }
 
     function test_firstTrigger_seedsStageZero() public {
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
+        uint256 id = _registerFor(collection, minter, "A", "uri");
         assertFalse(_seeded(id));
         _trigger(id);
         assertTrue(_seeded(id));
@@ -84,8 +95,7 @@ contract EvolutionStagesHookTest is Test {
     }
 
     function test_advancesOncePerInterval() public {
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
+        uint256 id = _registerFor(collection, minter, "A", "uri");
         _trigger(id);
         bytes[4] memory want = [SVG_EGG, SVG_BABY, SVG_ADULT, SVG_ELDER];
         for (uint8 i = 1; i < 4; i++) {
@@ -99,8 +109,7 @@ contract EvolutionStagesHookTest is Test {
     /// Anyone may call triggerEvolve: without the interval a stranger could
     /// fast-forward an agent to its last stage in a few calls.
     function test_strangerCannotFastForward() public {
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
+        uint256 id = _registerFor(collection, minter, "A", "uri");
         _trigger(id);
         vm.startPrank(address(0xBAD));
         for (uint256 i; i < 10; i++) _trigger(id);
@@ -117,8 +126,7 @@ contract EvolutionStagesHookTest is Test {
 
     /// Calling the hook directly only touches the caller's own namespace.
     function test_directHookCallsDontMoveACollection() public {
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
+        uint256 id = _registerFor(collection, minter, "A", "uri");
         _trigger(id);
         vm.startPrank(address(0xBAD));
         for (uint256 i; i < 5; i++) {
@@ -132,8 +140,7 @@ contract EvolutionStagesHookTest is Test {
     }
 
     function test_finalStage_isSticky() public {
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
+        uint256 id = _registerFor(collection, minter, "A", "uri");
         _trigger(id);
         for (uint256 i = 0; i < 3; i++) {
             _advance(INTERVAL);
@@ -150,17 +157,14 @@ contract EvolutionStagesHookTest is Test {
     }
 
     function test_stagesArePerAgentAndPerCollection() public {
-        vm.prank(minter);
-        uint256 a = collection.registerAgent("A", "uri");
-        vm.prank(minter);
-        uint256 b = collection.registerAgent("B", "uri");
+        uint256 a = _registerFor(collection, minter, "A", "uri");
+        uint256 b = _registerFor(collection, minter, "B", "uri");
         vm.prank(creator);
         (, address addr2) = factory.createCollection("Stages2", "ST2", 100, 1000, 500, "");
         AgentCollectionImpl other = AgentCollectionImpl(addr2);
         vm.prank(creator);
         other.setCollectionHook(address(stages));
-        vm.prank(minter);
-        uint256 a2 = other.registerAgent("A2", "uri");
+        uint256 a2 = _registerFor(other, minter, "A2", "uri");
         assertEq(a2, a, "same token id in another collection");
 
         _trigger(a);

@@ -6,6 +6,24 @@ import "../src/AgentCollectionImpl.sol";
 import "../src/AgentCollectionFactory.sol";
 
 contract AgentCollectionFactoryTest is Test {
+
+    /// @dev The next call comes from `c`'s creator (the free mint paths are creator-only).
+    function _asCreator(AgentCollectionImpl c) internal {
+        address creator_ = c.collectionCreator();
+        vm.prank(creator_);
+    }
+
+    /// @dev An agent owned by `to`: the creator mints it through the free
+    ///      path (creator-only) and hands it over.
+    function _registerFor(AgentCollectionImpl c, address to, string memory name_, string memory uri) internal returns (uint256 id) {
+        address creator_ = c.collectionCreator();
+        _asCreator(c);
+        id = c.registerAgent(name_, uri);
+        if (to != creator_) {
+            vm.prank(creator_);
+            c.transferFrom(creator_, to, id);
+        }
+    }
     AgentCollectionFactory public factory;
     AgentCollectionImpl public implementation;
     
@@ -182,8 +200,7 @@ contract AgentCollectionFactoryTest is Test {
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
         // Mint an agent
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "ipfs://metadata1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "ipfs://metadata1");
         
         assertEq(agentId, 1);
         assertEq(collection.ownerOf(1), minter);
@@ -196,7 +213,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.startPrank(minter);
+        vm.startPrank(creator1);
         collection.registerAgent("Agent1", "uri1");
         collection.registerAgent("Agent2", "uri2");
         
@@ -213,8 +230,7 @@ contract AgentCollectionFactoryTest is Test {
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
         // Mint before lock
-        vm.prank(minter);
-        collection.registerAgent("Agent1", "uri1");
+        _registerFor(collection, minter, "Agent1", "uri1");
         
         // Lock collection
         vm.prank(creator1);
@@ -223,7 +239,7 @@ contract AgentCollectionFactoryTest is Test {
         assertTrue(collection.locked());
         
         // Mint after lock should fail
-        vm.prank(minter);
+        _asCreator(collection);
         vm.expectRevert(AgentCollectionImpl.CollectionLocked.selector);
         collection.registerAgent("Agent2", "uri2");
     }
@@ -247,13 +263,12 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         // Check royalty info
         (address receiver, uint256 royaltyAmount) = collection.royaltyInfo(agentId, 10000);
         
-        assertEq(receiver, minter); // Creator of the agent
+        assertEq(receiver, creator1); // Creator of the agent
         assertEq(royaltyAmount, 1500); // 15% of 10000
     }
     
@@ -263,12 +278,12 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
+        _asCreator(collection);
         uint256 agentId = collection.registerAgentWithRoyalty("Agent1", "uri1", 2500, 1000); // 25% sales, 10% service
         
         (address receiver, uint256 royaltyAmount) = collection.royaltyInfo(agentId, 10000);
         
-        assertEq(receiver, minter);
+        assertEq(receiver, creator1);
         assertEq(royaltyAmount, 2500); // Sales royalty used for ERC-2981
     }
     
@@ -280,22 +295,22 @@ contract AgentCollectionFactoryTest is Test {
         
         // Boundary: MAX_ROYALTY_BPS = 8000 (80%). Anything above must revert.
         // Too high sales royalty (8001 = 80.01%)
-        vm.prank(minter);
+        _asCreator(collection);
         vm.expectRevert(AgentCollectionImpl.InvalidValue.selector);
         collection.registerAgentWithRoyalty("Agent1", "uri1", 8001, 500);
 
         // Too high service royalty (8001 = 80.01%)
-        vm.prank(minter);
+        _asCreator(collection);
         vm.expectRevert(AgentCollectionImpl.InvalidValue.selector);
         collection.registerAgentWithRoyalty("Agent1", "uri1", 500, 8001);
 
         // Exactly at the cap is allowed (8000 = 80%)
-        vm.prank(minter);
+        _asCreator(collection);
         uint256 idCap = collection.registerAgentWithRoyalty("Agent1", "uri1", 8000, 8000);
         assertEq(idCap, 1);
 
         // 0% is allowed (no min — creators may waive)
-        vm.prank(minter);
+        _asCreator(collection);
         uint256 agentId = collection.registerAgentWithRoyalty("Agent2", "uri2", 0, 0);
         assertEq(agentId, 2);
     }
@@ -311,7 +326,7 @@ contract AgentCollectionFactoryTest is Test {
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
 
         string memory svg1 = "<svg><circle cx='50' cy='50' r='40'/></svg>";
-        vm.prank(minter);
+        _asCreator(collection);
         uint256 agentId = collection.mintAgentWithSVG("Agent1", svg1);
         assertTrue(collection.hasSVGImage(agentId));
         assertEq(collection.getSVGImage(agentId), svg1);
@@ -319,13 +334,12 @@ contract AgentCollectionFactoryTest is Test {
 
         // Owner can update the SVG payload of an already-OnChainSVG token.
         string memory svg2 = "<svg><rect width='10' height='10'/></svg>";
-        vm.prank(minter);
+        vm.prank(creator1);
         collection.setSVGImage(agentId, svg2);
         assertEq(collection.getSVGImage(agentId), svg2);
 
         // ExplicitURI tokens MUST reject setSVGImage — no silent mode flip.
-        vm.prank(minter);
-        uint256 uriId = collection.registerAgent("Agent2", "ipfs://uri");
+        uint256 uriId = _registerFor(collection, minter, "Agent2", "ipfs://uri");
         vm.prank(minter);
         vm.expectRevert(AgentCollectionImpl.MetadataModeLocked.selector);
         collection.setSVGImage(uriId, svg1);
@@ -337,8 +351,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         vm.prank(creator2);
         vm.expectRevert(AgentCollectionImpl.NotOwner.selector);
@@ -356,14 +369,14 @@ contract AgentCollectionFactoryTest is Test {
         for (uint256 i = 0; i < 50000; i++) largeSvg[i] = "x";
 
         // Mint path rejects oversize SVG.
-        vm.prank(minter);
+        _asCreator(collection);
         vm.expectRevert(AgentCollectionImpl.TooLarge.selector);
         collection.mintAgentWithSVG("Agent1", string(largeSvg));
 
         // Update path on a valid OnChainSVG token also rejects oversize.
-        vm.prank(minter);
+        _asCreator(collection);
         uint256 agentId = collection.mintAgentWithSVG("Agent1", "<svg/>");
-        vm.prank(minter);
+        vm.prank(creator1);
         vm.expectRevert(AgentCollectionImpl.TooLarge.selector);
         collection.setSVGImage(agentId, string(largeSvg));
     }
@@ -376,8 +389,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         bytes32 contentHash = keccak256("pixe content");
         
@@ -394,8 +406,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         vm.startPrank(minter);
         collection.addPixeVersion(agentId, "ar://tx1", keccak256("v1"), "Version 1");
@@ -419,8 +430,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         address tba = address(0x999);
         
@@ -437,8 +447,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         vm.startPrank(minter);
         collection.setTBAAddress(agentId, address(0x999));
@@ -456,8 +465,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         // Initially active
         (,,, bool active,) = collection.getAgent(agentId);
@@ -508,7 +516,7 @@ contract AgentCollectionFactoryTest is Test {
         assertEq(collection.maxSupply(), 0);
         
         // Should be able to mint many
-        vm.startPrank(minter);
+        vm.startPrank(creator1);
         for (uint256 i = 0; i < 10; i++) {
             collection.registerAgent(string(abi.encodePacked("Agent", i)), "uri");
         }
@@ -528,13 +536,12 @@ contract AgentCollectionFactoryTest is Test {
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
 
         // ExplicitURI mode — the URI is the canonical answer; never an SVG.
-        vm.prank(minter);
-        uint256 uriId = collection.registerAgent("Agent1", "ipfs://fallback");
+        uint256 uriId = _registerFor(collection, minter, "Agent1", "ipfs://fallback");
         assertEq(collection.tokenURI(uriId), "ipfs://fallback");
         assertEq(uint8(collection.metadataMode(uriId)), uint8(AgentCollectionImpl.MetadataMode.ExplicitURI));
 
         // OnChainSVG mode — rendered as data:application/json;base64,...
-        vm.prank(minter);
+        _asCreator(collection);
         uint256 svgId = collection.mintAgentWithSVG("Agent2", "<svg><rect/></svg>");
         assertEq(uint8(collection.metadataMode(svgId)), uint8(AgentCollectionImpl.MetadataMode.OnChainSVG));
 
@@ -554,8 +561,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         // Check initial owner
         uint256[] memory minterAgents = collection.getAgentsByOwner(minter);
@@ -582,19 +588,19 @@ contract AgentCollectionFactoryTest is Test {
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
         // Mint multiple agents
-        vm.startPrank(minter);
+        vm.startPrank(creator1);
         collection.registerAgent("Agent1", "uri1");
         collection.registerAgent("Agent2", "uri2");
         collection.registerAgent("Agent3", "uri3");
         vm.stopPrank();
         
-        assertEq(collection.getAgentsByOwner(minter).length, 3);
+        assertEq(collection.getAgentsByOwner(creator1).length, 3);
         
         // Transfer one
-        vm.prank(minter);
-        collection.transferFrom(minter, creator2, 2);
+        vm.prank(creator1);
+        collection.transferFrom(creator1, creator2, 2);
         
-        assertEq(collection.getAgentsByOwner(minter).length, 2);
+        assertEq(collection.getAgentsByOwner(creator1).length, 2);
         assertEq(collection.getAgentsByOwner(creator2).length, 1);
     }
     
@@ -606,8 +612,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         // Transfer to creator2
         vm.prank(minter);
@@ -615,7 +620,7 @@ contract AgentCollectionFactoryTest is Test {
         
         // Creator should still be original minter
         address originalCreator = collection.agentCreator(agentId);
-        assertEq(originalCreator, minter);
+        assertEq(originalCreator, creator1);
         
         // Royalties are committed at mint and immutable thereafter — the
         // legacy `updateSalesRoyalty` selector is gone, so neither the
@@ -635,8 +640,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         (uint256 creatorCut, uint256 ownerCut) = collection.calculateSalesRoyaltySplit(agentId, 10000);
         
@@ -652,13 +656,13 @@ contract AgentCollectionFactoryTest is Test {
         (, address collectionAddr) = factory.createCollection("Empty", "EMP", 100, 1000, 500, "");
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
 
-        vm.prank(minter);
+        _asCreator(collection);
         vm.expectRevert(AgentCollectionImpl.EmptyInput.selector);
         collection.mintAgentWithSVG("Agent1", "");
 
-        vm.prank(minter);
+        _asCreator(collection);
         uint256 agentId = collection.mintAgentWithSVG("Agent2", "<svg/>");
-        vm.prank(minter);
+        vm.prank(creator1);
         vm.expectRevert(AgentCollectionImpl.EmptyInput.selector);
         collection.setSVGImage(agentId, "");
     }
@@ -669,8 +673,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         vm.prank(minter);
         vm.expectRevert(AgentCollectionImpl.EmptyInput.selector);
@@ -683,8 +686,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         vm.prank(minter);
         vm.expectRevert(AgentCollectionImpl.EmptyInput.selector);
@@ -699,8 +701,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         // Add initial version (consolidated by default)
         vm.startPrank(minter);
@@ -731,8 +732,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         vm.prank(minter);
         vm.expectRevert(AgentCollectionImpl.NotExists.selector);
@@ -769,8 +769,7 @@ contract AgentCollectionFactoryTest is Test {
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
         // Mint and lock
-        vm.prank(minter);
-        collection.registerAgent("Agent1", "uri1");
+        _registerFor(collection, minter, "Agent1", "uri1");
         
         vm.prank(creator1);
         collection.lockCollection();
@@ -787,7 +786,7 @@ contract AgentCollectionFactoryTest is Test {
         assertTrue(collection.locked());
         
         // Minting should still fail
-        vm.prank(minter);
+        _asCreator(collection);
         vm.expectRevert(AgentCollectionImpl.CollectionLocked.selector);
         collection.registerAgent("Agent2", "uri2");
     }
@@ -800,8 +799,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         vm.prank(minter);
         vm.expectRevert(AgentCollectionImpl.InvalidAddress.selector);
@@ -834,8 +832,7 @@ contract AgentCollectionFactoryTest is Test {
 
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
 
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
 
         // The old `updateSalesRoyalty` / `updateServiceRoyalty` selectors
         // are gone — calls fall through to the empty fallback path and
@@ -879,11 +876,10 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(addr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         (address receiver, uint256 amount) = collection.royaltyInfo(agentId, 10000);
-        assertEq(receiver, minter);
+        assertEq(receiver, creator1);
         assertEq(amount, royaltyBps);
     }
     
@@ -896,8 +892,7 @@ contract AgentCollectionFactoryTest is Test {
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
         // Should allow empty name (names are optional metadata)
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "", "uri1");
         assertEq(agentId, 1);
     }
     
@@ -942,33 +937,35 @@ contract AgentCollectionFactoryTest is Test {
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
         // Mint 20 tokens to same owner
-        vm.startPrank(minter);
+        vm.startPrank(creator1);
         for (uint256 i = 0; i < 20; i++) {
             collection.registerAgent(string(abi.encodePacked("Agent", i)), "uri");
         }
         vm.stopPrank();
         
-        assertEq(collection.getAgentsByOwner(minter).length, 20);
+        assertEq(collection.getAgentsByOwner(creator1).length, 20);
         
         // Transfer first token - should still work efficiently
         uint256 gasBefore = gasleft();
-        vm.prank(minter);
-        collection.transferFrom(minter, creator2, 1);
+        vm.prank(creator1);
+        collection.transferFrom(creator1, creator2, 1);
         uint256 gasUsed = gasBefore - gasleft();
         
         // Gas should be reasonable (< 100k for worst case)
         assertTrue(gasUsed < 100000);
-        assertEq(collection.getAgentsByOwner(minter).length, 19);
+        assertEq(collection.getAgentsByOwner(creator1).length, 19);
     }
     
     function test_SafeMintReentrancy() public {
-        vm.prank(creator1);
+        // The attacker is the collection's creator: the free path is creator-only.
+        ReentrancyAttacker attacker = new ReentrancyAttacker();
+        vm.prank(address(attacker));
         (, address collectionAddr) = factory.createCollection("Reentry", "REE", 100, 1000, 500, "");
+        attacker.setTarget(collectionAddr);
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
         // Deploy attacker contract
-        ReentrancyAttacker attacker = new ReentrancyAttacker(address(collection));
         
         // Reentrancy during safeMint succeeds but is harmless
         // Each mint is independent - no exploitable state
@@ -991,8 +988,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         // Add max versions (should succeed up to limit)
         // Note: Testing with smaller number to avoid gas issues
@@ -1049,11 +1045,10 @@ contract AgentCollectionFactoryTest is Test {
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
         // First mint succeeds
-        vm.prank(minter);
-        collection.registerAgent("Agent1", "uri1");
+        _registerFor(collection, minter, "Agent1", "uri1");
         
         // Second mint fails
-        vm.prank(creator2);
+        _asCreator(collection);
         vm.expectRevert(AgentCollectionImpl.MaxSupplyReached.selector);
         collection.registerAgent("Agent2", "uri2");
     }
@@ -1064,8 +1059,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         // Cannot deactivate twice
         vm.startPrank(minter);
@@ -1090,8 +1084,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "ipfs://metadata");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "ipfs://metadata");
         
         // Without SVG set, should return the stored URI
         string memory uri = collection.tokenURI(agentId);
@@ -1104,8 +1097,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         vm.expectRevert(AgentCollectionImpl.NotExists.selector);
         collection.getLatestPixe(agentId);
@@ -1117,8 +1109,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         vm.expectRevert(AgentCollectionImpl.NotExists.selector);
         collection.getLatestConsolidatedPixe(agentId);
@@ -1130,8 +1121,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         vm.prank(minter);
         collection.addPixeVersion(agentId, "ar://tx1", keccak256("hash1"), "v1");
@@ -1147,8 +1137,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         vm.expectRevert(AgentCollectionImpl.NotExists.selector);
         collection.verifyContentHash(agentId, 0, keccak256("test"));
@@ -1160,8 +1149,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         vm.expectRevert(AgentCollectionImpl.NotExists.selector);
         collection.getPixeURL(agentId, 0);
@@ -1173,8 +1161,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         // Add first version (consolidated type)
         vm.prank(minter);
@@ -1193,11 +1180,11 @@ contract AgentCollectionFactoryTest is Test {
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
         // Use registerAgentWithRoyalty directly with custom royalty
-        vm.prank(minter);
+        _asCreator(collection);
         uint256 agentId = collection.registerAgentWithRoyalty("Agent1", "uri1", 2500, 1000); // 25% sales, 10% service
         
         (address creator, uint256 salesRoyalty, uint256 serviceRoyalty) = collection.getCreatorRoyalty(agentId);
-        assertEq(creator, minter);
+        assertEq(creator, creator1);
         assertEq(salesRoyalty, 2500);
         assertEq(serviceRoyalty, 1000);
     }
@@ -1208,8 +1195,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         vm.prank(minter);
         collection.updateAgentURI(agentId, "newUri");
@@ -1224,8 +1210,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         vm.startPrank(minter);
         collection.addPixeVersion(agentId, "ar://tx1", keccak256("hash1"), "v1");
@@ -1242,8 +1227,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         AgentCollectionImpl.ConsolidationRecord[] memory records = collection.getConsolidationHistory(agentId);
         assertEq(records.length, 0);
@@ -1255,8 +1239,7 @@ contract AgentCollectionFactoryTest is Test {
         
         AgentCollectionImpl collection = AgentCollectionImpl(collectionAddr);
         
-        vm.prank(minter);
-        uint256 agentId = collection.registerAgent("Agent1", "uri1");
+        uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         vm.startPrank(minter);
         collection.deactivateAgent(agentId);
@@ -1610,10 +1593,10 @@ contract ReentrancyAttacker {
     AgentCollectionImpl public target;
     uint256 public attackCount;
     
-    constructor(address _target) {
+    function setTarget(address _target) external {
         target = AgentCollectionImpl(_target);
     }
-    
+
     function attack() external {
         target.registerAgent("Attacker", "uri");
     }

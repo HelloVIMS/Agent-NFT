@@ -179,11 +179,11 @@ contract AgentCollectionImplAudit is Test {
     function testFuzz_AUDIT_royaltyBoundsExact(uint16 bps) public {
         AgentCollectionImpl c = _newCollection(100, 1000, 500);
         if (bps > c.MAX_ROYALTY_BPS()) {
-            vm.prank(user);
+            vm.prank(creator);
             vm.expectRevert(AgentCollectionImpl.InvalidValue.selector);
             c.registerAgentWithRoyalty("a","ipfs://a", bps, 0);
         } else {
-            vm.prank(user);
+            vm.prank(creator);
             uint256 id = c.registerAgentWithRoyalty("a","ipfs://a", bps, 0);
             (, uint256 amount) = c.royaltyInfo(id, 1 ether);
             // amount = 1e18 * bps / 10000
@@ -269,7 +269,7 @@ contract AgentCollectionImplAudit is Test {
         vm.expectRevert(AgentCollectionImpl.CollectionLocked.selector);
         c.mintAgent("post","ipfs://post");
 
-        vm.prank(user);
+        vm.prank(creator);
         vm.expectRevert(AgentCollectionImpl.CollectionLocked.selector);
         c.registerAgent("post","ipfs://post");
     }
@@ -323,5 +323,24 @@ contract AgentCollectionImplAudit is Test {
         vm.prank(user);
         vm.expectRevert(); // hook reverts with "transfer trapped"
         c.transferFrom(user, user2, id);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // The free mint paths are the creator's: anyone else goes through the
+    // paid, phase-gated mints.
+    // ─────────────────────────────────────────────────────────────────────
+    function test_AUDIT_freeMintPathsAreCreatorOnly() public {
+        AgentCollectionImpl c = _newCollection(100, 1000, 500);
+        vm.startPrank(user);
+        vm.expectRevert(AgentCollectionImpl.NotCreator.selector);
+        c.registerAgent("free", "ipfs://free");
+        vm.expectRevert(AgentCollectionImpl.NotCreator.selector);
+        c.registerAgentWithRoyalty("free", "ipfs://free", 8000, 8000);
+        vm.expectRevert(AgentCollectionImpl.NotCreator.selector);
+        c.mintAgentWithSVG("free", "<svg/>");
+        vm.stopPrank();
+        vm.prank(creator);
+        uint256 id = c.registerAgent("mine", "ipfs://mine");
+        assertEq(c.ownerOf(id), creator);
     }
 }

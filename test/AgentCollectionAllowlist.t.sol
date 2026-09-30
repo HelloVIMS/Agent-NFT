@@ -221,7 +221,7 @@ contract AgentCollectionAllowlistTest is Test {
     }
 
     function test_RegisterAgentWith80PercentRoyalty() public {
-        vm.prank(alice);
+        vm.prank(creator);
         uint256 id = collection.registerAgentWithRoyalty("A", "ipfs://x", 8000, 8000);
         (, uint256 sales, uint256 service) = collection.getCreatorRoyalty(id);
         assertEq(sales, 8000);
@@ -229,7 +229,7 @@ contract AgentCollectionAllowlistTest is Test {
     }
 
     function test_Above80PercentRoyaltyReverts() public {
-        vm.prank(alice);
+        vm.prank(creator);
         vm.expectRevert(AgentCollectionImpl.InvalidValue.selector);
         collection.registerAgentWithRoyalty("A", "ipfs://x", 8001, 0);
     }

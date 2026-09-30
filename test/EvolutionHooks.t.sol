@@ -74,6 +74,24 @@ contract SellerTrapHook is BaseEvolutionHook {
 }
 
 contract EvolutionHooksTest is Test {
+
+    /// @dev The next call comes from `c`'s creator (the free mint paths are creator-only).
+    function _asCreator(AgentCollectionImpl c) internal {
+        address creator_ = c.collectionCreator();
+        vm.prank(creator_);
+    }
+
+    /// @dev An agent owned by `to`: the creator mints it through the free
+    ///      path (creator-only) and hands it over.
+    function _registerFor(AgentCollectionImpl c, address to, string memory name_, string memory uri) internal returns (uint256 id) {
+        address creator_ = c.collectionCreator();
+        _asCreator(c);
+        id = c.registerAgent(name_, uri);
+        if (to != creator_) {
+            vm.prank(creator_);
+            c.transferFrom(creator_, to, id);
+        }
+    }
     AgentCollectionFactory factory;
     AgentCollectionImpl    impl;
     AgentCollectionImpl    collection;
@@ -131,8 +149,7 @@ contract EvolutionHooksTest is Test {
         vm.prank(creator);
         collection.setCollectionHook(address(kHook));
 
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
+        uint256 id = _registerFor(collection, minter, "A", "uri");
 
         // Per-agent override
         vm.prank(minter);
@@ -143,8 +160,7 @@ contract EvolutionHooksTest is Test {
     }
 
     function test_setHook_onlyOwner() public {
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
+        uint256 id = _registerFor(collection, minter, "A", "uri");
 
         vm.prank(buyer);
         vm.expectRevert(AgentCollectionImpl.NotOwner.selector);
@@ -156,11 +172,9 @@ contract EvolutionHooksTest is Test {
     // ─────────────────────────────────────────────────────────────────────────
 
     function test_afterTransfer_firesOnTransfer_notOnMint() public {
+        uint256 id = _registerFor(collection, minter, "A", "uri");
         vm.prank(creator);
         collection.setCollectionHook(address(recolor));
-
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
 
         // Mint did NOT count as a transfer
         assertEq(recolor.transferCount(address(collection), id), 0);
@@ -173,11 +187,9 @@ contract EvolutionHooksTest is Test {
 
     function test_beforeTransfer_canBlockTransfer() public {
         SoulboundHook sb = new SoulboundHook();
+        uint256 id = _registerFor(collection, minter, "A", "uri");
         vm.prank(creator);
         collection.setCollectionHook(address(sb));
-
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
 
         vm.prank(minter);
         vm.expectRevert(SoulboundHook.TransferBlocked.selector);
@@ -189,7 +201,7 @@ contract EvolutionHooksTest is Test {
         vm.prank(creator);
         collection.setCollectionHook(address(bad));
 
-        vm.prank(minter);
+        _asCreator(collection);
         vm.expectRevert(AgentCollectionImpl.HookInvalidReturn.selector);
         collection.registerAgent("A", "uri");
     }
@@ -199,11 +211,9 @@ contract EvolutionHooksTest is Test {
     // ─────────────────────────────────────────────────────────────────────────
 
     function test_triggerEvolve_inlineMutation() public {
+        uint256 id = _registerFor(collection, minter, "A", "uri");
         vm.prank(creator);
         collection.setCollectionHook(address(recolor));
-
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
 
         // Two transfers → counter = 2
         vm.prank(minter);
@@ -227,8 +237,7 @@ contract EvolutionHooksTest is Test {
     }
 
     function test_triggerEvolve_revertsWithoutHook() public {
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
+        uint256 id = _registerFor(collection, minter, "A", "uri");
 
         vm.expectRevert(AgentCollectionImpl.HookAddressInvalid.selector);
         collection.triggerEvolve(id, EvolutionTypes.TRIGGER_TRANSFER, "");
@@ -237,11 +246,9 @@ contract EvolutionHooksTest is Test {
     function test_triggerEvolve_revertsWithoutOnTriggerFlag() public {
         // Soulbound hook only declares FLAG_BEFORE_TRANSFER, no FLAG_ON_TRIGGER
         SoulboundHook sb = new SoulboundHook();
+        uint256 id = _registerFor(collection, minter, "A", "uri");
         vm.prank(creator);
         collection.setCollectionHook(address(sb));
-
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
 
         vm.expectRevert(abi.encodeWithSelector(
             AgentCollectionImpl.HookPermissionMissing.selector,
@@ -260,8 +267,7 @@ contract EvolutionHooksTest is Test {
         collection.setEvolutionKeeper(keeper);
         vm.stopPrank();
 
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
+        uint256 id = _registerFor(collection, minter, "A", "uri");
 
         // 1) Trigger should emit EvolutionRequested with nonce=1
         bytes memory payload = abi.encode("level-up", uint256(42));
@@ -297,8 +303,7 @@ contract EvolutionHooksTest is Test {
         collection.setEvolutionKeeper(keeper);
         vm.stopPrank();
 
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
+        uint256 id = _registerFor(collection, minter, "A", "uri");
 
         EvolutionTypes.EvolutionResult memory r;
         r.svgChanged   = true;
@@ -322,8 +327,7 @@ contract EvolutionHooksTest is Test {
         collection.setEvolutionKeeper(keeper);
         vm.stopPrank();
 
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
+        uint256 id = _registerFor(collection, minter, "A", "uri");
 
         EvolutionTypes.EvolutionResult memory r;
         r.svgChanged = true;
@@ -344,8 +348,7 @@ contract EvolutionHooksTest is Test {
         collection.setEvolutionKeeper(keeper);
         vm.stopPrank();
 
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
+        uint256 id = _registerFor(collection, minter, "A", "uri");
 
         EvolutionTypes.EvolutionResult memory r;
         r.svgChanged = true;
@@ -371,11 +374,9 @@ contract EvolutionHooksTest is Test {
     function testFuzz_transferCount(uint8 n) public {
         n = uint8(bound(n, 0, 20));
 
+        uint256 id = _registerFor(collection, minter, "A", "uri");
         vm.prank(creator);
         collection.setCollectionHook(address(recolor));
-
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
 
         address a = minter;
         address b = buyer;
@@ -453,8 +454,7 @@ contract EvolutionHooksTest is Test {
     // ─────────────────────────────────────────────────────────────────────────
 
     function _trappedSale() internal returns (uint256 id, SellerTrapHook trap) {
-        vm.prank(minter);
-        id = collection.registerAgent("A", "uri");
+        id = _registerFor(collection, minter, "A", "uri");
         trap = new SellerTrapHook(minter);
         vm.prank(minter);
         collection.setHook(id, address(trap));
@@ -497,8 +497,7 @@ contract EvolutionHooksTest is Test {
     }
 
     function test_clearingAnOverrideClearsItsSetter() public {
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "uri");
+        uint256 id = _registerFor(collection, minter, "A", "uri");
         vm.startPrank(minter);
         collection.setHook(id, address(recolor));
         assertEq(collection.hookSetter(id), minter);
@@ -510,8 +509,7 @@ contract EvolutionHooksTest is Test {
     /// Evolved art is served: a hook writing inline SVG moves the token to
     /// on-chain SVG metadata, whatever it was minted with.
     function test_evolvedArtIsServedByTokenURI() public {
-        vm.prank(minter);
-        uint256 id = collection.registerAgent("A", "ipfs://static");
+        uint256 id = _registerFor(collection, minter, "A", "ipfs://static");
         assertEq(collection.tokenURI(id), "ipfs://static");
         vm.prank(creator);
         collection.setCollectionHook(address(recolor));

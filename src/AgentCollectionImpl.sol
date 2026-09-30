@@ -289,6 +289,10 @@ contract AgentCollectionImpl is
         uint256 salesBps,
         uint256 serviceBps
     ) public returns (uint256 agentId) {
+        // The free mint paths are the creator's: everyone else mints through
+        // mintAgent / mintAgentAllowlist, which enforce price, phases, pause
+        // and per-wallet limits.
+        if (msg.sender != collectionCreator) revert NotCreator();
         if (locked) revert CollectionLocked();
         if (maxSupply > 0 && _nextTokenId > maxSupply) revert MaxSupplyReached();
         if (salesBps > MAX_ROYALTY_BPS) revert InvalidValue();
@@ -362,6 +366,7 @@ contract AgentCollectionImpl is
         string calldata name_,
         string calldata svg
     ) external returns (uint256 agentId) {
+        if (msg.sender != collectionCreator) revert NotCreator();
         if (locked) revert CollectionLocked();
         if (maxSupply > 0 && _nextTokenId > maxSupply) revert MaxSupplyReached();
         if (bytes(svg).length == 0) revert EmptyInput();
