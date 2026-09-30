@@ -10,6 +10,18 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "BINDING_TYPEHASH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_KEYS_PER_AGENT",
     "inputs": [],
     "outputs": [
@@ -79,6 +91,10 @@ const abi = [
       {
         "name": "permissions",
         "type": "uint96"
+      },
+      {
+        "name": "proof",
+        "type": "bytes"
       }
     ],
     "outputs": [
@@ -116,6 +132,10 @@ const abi = [
       {
         "name": "permissions",
         "type": "uint96"
+      },
+      {
+        "name": "proof",
+        "type": "bytes"
       }
     ],
     "outputs": [
@@ -125,6 +145,35 @@ const abi = [
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "bindingDigest",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "pubkey",
+        "type": "bytes32"
+      },
+      {
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -527,6 +576,10 @@ const abi = [
       {
         "name": "permissions",
         "type": "uint96"
+      },
+      {
+        "name": "proof",
+        "type": "bytes"
       }
     ],
     "outputs": [],
@@ -559,6 +612,10 @@ const abi = [
       {
         "name": "permissions",
         "type": "uint96"
+      },
+      {
+        "name": "proof",
+        "type": "bytes"
       }
     ],
     "outputs": [],
@@ -664,6 +721,10 @@ const abi = [
       {
         "name": "permissions",
         "type": "uint96"
+      },
+      {
+        "name": "proof",
+        "type": "bytes"
       }
     ],
     "outputs": [],
@@ -696,6 +757,10 @@ const abi = [
       {
         "name": "permissions",
         "type": "uint96"
+      },
+      {
+        "name": "proof",
+        "type": "bytes"
       }
     ],
     "outputs": [],
@@ -1044,6 +1109,11 @@ const abi = [
   {
     "type": "error",
     "name": "InvalidNFT",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidProof",
     "inputs": []
   },
   {

@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import {AgentIdentityKeyExtension} from "../src/AgentIdentityKeyExtension.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Bip340} from "../src/libraries/Bip340.sol";
+import {Bip340Signer} from "./helpers/Bip340Signer.sol";
 
 /// @dev Minimal stub honouring only `ownerOf`, the sole method
 ///      AgentIdentityKeyExtension calls on the identity registry.
@@ -27,9 +29,9 @@ contract AgentIdentityKeyExtensionTest is Test {
 
     // x-only secp256k1 pubkeys are 32 bytes, so an npub lands in bytes32
     // verbatim. These stand in for real ones.
-    bytes32 internal constant NPUB_1 = keccak256("npub-primary-1");
-    bytes32 internal constant NPUB_2 = keccak256("npub-secondary-2");
-    bytes32 internal constant NPUB_3 = keccak256("npub-tertiary-3");
+    bytes32 internal NPUB_1;
+    bytes32 internal NPUB_2;
+    bytes32 internal NPUB_3;
 
     string constant KIND = "nostr";
 
@@ -63,7 +65,29 @@ contract AgentIdentityKeyExtensionTest is Test {
     );
     event KeyDeactivated(uint256 indexed agentId, bytes32 indexed pubkey, uint256 index);
 
+    /// pubkey => the secret the test signs its binding proofs with.
+    mapping(bytes32 => uint256) internal secretOf;
+
+    /// A real x-only key from `seed`, remembered for {_proof}.
+    function _key(bytes32 seed) internal returns (bytes32 pk) {
+        uint256 sk = uint256(seed) % (Bip340.N - 1) + 1;
+        pk = Bip340Signer.pubkey(sk);
+        secretOf[pk] = sk;
+    }
+
+    /// The key's BIP-340 signature binding it to `agentId` for `owner_`
+    /// (empty for keys the test doesn't hold). Called before vm.prank:
+    /// its calls would otherwise consume the prank.
+    function _proof(uint256 agentId, bytes32 pubkey, address owner_) internal view returns (bytes memory) {
+        uint256 sk = secretOf[pubkey];
+        if (sk == 0) return "";
+        return Bip340Signer.sign(sk, ext.bindingDigest(address(idReg), agentId, pubkey, owner_));
+    }
+
     function setUp() public {
+        NPUB_1 = _key(keccak256("npub-primary-1"));
+        NPUB_2 = _key(keccak256("npub-secondary-2"));
+        NPUB_3 = _key(keccak256("npub-tertiary-3"));
         idReg = new MockKeyIdentityRegistry();
         idReg.setOwner(AGENT_A, agentEoa);
         idReg.setOwner(AGENT_B, buyer);
@@ -76,8 +100,9 @@ contract AgentIdentityKeyExtensionTest is Test {
     }
 
     function _registerPrimary(uint256 agentId, address owner_, bytes32 pubkey) internal {
+        bytes memory proof1 = _proof(agentId, pubkey, owner_);
         vm.prank(owner_);
-        ext.registerPrimaryKey(agentId, pubkey, KIND, "primary", PERM_PAY);
+        ext.registerPrimaryKey(agentId, pubkey, KIND, "primary", PERM_PAY, proof1);
     }
 
     // ── init ──────────────────────────────────────────────────────
@@ -118,9 +143,10 @@ contract AgentIdentityKeyExtensionTest is Test {
     }
 
     function test_registerPrimaryKey_strangerReverts() public {
+        bytes memory proof2 = _proof(AGENT_A, NPUB_1, stranger);
         vm.prank(stranger);
         vm.expectRevert(AgentIdentityKeyExtension.NotOwner.selector);
-        ext.registerPrimaryKey(AGENT_A, NPUB_1, KIND, "primary", PERM_PAY);
+        ext.registerPrimaryKey(AGENT_A, NPUB_1, KIND, "primary", PERM_PAY, proof2);
     }
 
     /// Same hole that existed in AgentAvatarExtension: an unowned token
@@ -128,49 +154,57 @@ contract AgentIdentityKeyExtensionTest is Test {
     /// address(0) claim an identity for a token that does not exist.
     function test_registerPrimaryKey_unmintedTokenIsWritableByNobody() public {
         uint256 unminted = 999;
+        bytes memory proof3 = _proof(unminted, NPUB_1, agentEoa);
         vm.prank(agentEoa);
         vm.expectRevert(AgentIdentityKeyExtension.NotExists.selector);
-        ext.registerPrimaryKey(unminted, NPUB_1, KIND, "primary", PERM_PAY);
+        ext.registerPrimaryKey(unminted, NPUB_1, KIND, "primary", PERM_PAY, proof3);
 
+        bytes memory proof4 = _proof(unminted, NPUB_1, address(0));
         vm.prank(address(0));
         vm.expectRevert(AgentIdentityKeyExtension.NotExists.selector);
-        ext.registerPrimaryKey(unminted, NPUB_1, KIND, "primary", PERM_PAY);
+        ext.registerPrimaryKey(unminted, NPUB_1, KIND, "primary", PERM_PAY, proof4);
     }
 
     function test_registerPrimaryKey_twiceReverts() public {
         _registerPrimary(AGENT_A, agentEoa, NPUB_1);
+        bytes memory proof5 = _proof(AGENT_A, NPUB_2, agentEoa);
         vm.prank(agentEoa);
         vm.expectRevert(AgentIdentityKeyExtension.PrimaryAlreadySet.selector);
-        ext.registerPrimaryKey(AGENT_A, NPUB_2, KIND, "second attempt", PERM_PAY);
+        ext.registerPrimaryKey(AGENT_A, NPUB_2, KIND, "second attempt", PERM_PAY, proof5);
     }
 
     function test_registerPrimaryKey_rejectsEmptyInputs() public {
+        bytes memory proof6 = _proof(AGENT_A, bytes32(0), agentEoa);
         vm.prank(agentEoa);
         vm.expectRevert(AgentIdentityKeyExtension.EmptyInput.selector);
-        ext.registerPrimaryKey(AGENT_A, bytes32(0), KIND, "primary", PERM_PAY);
+        ext.registerPrimaryKey(AGENT_A, bytes32(0), KIND, "primary", PERM_PAY, proof6);
 
+        bytes memory proof7 = _proof(AGENT_A, NPUB_1, agentEoa);
         vm.prank(agentEoa);
         vm.expectRevert(AgentIdentityKeyExtension.EmptyInput.selector);
-        ext.registerPrimaryKey(AGENT_A, NPUB_1, "", "primary", PERM_PAY);
+        ext.registerPrimaryKey(AGENT_A, NPUB_1, "", "primary", PERM_PAY, proof7);
     }
 
     function test_registerPrimaryKey_rejectsOversizedStrings() public {
         string memory longKind = _repeat("k", ext.MAX_KEY_KIND_BYTES() + 1);
+        bytes memory proof8 = _proof(AGENT_A, NPUB_1, agentEoa);
         vm.prank(agentEoa);
         vm.expectRevert(AgentIdentityKeyExtension.TooLarge.selector);
-        ext.registerPrimaryKey(AGENT_A, NPUB_1, longKind, "primary", PERM_PAY);
+        ext.registerPrimaryKey(AGENT_A, NPUB_1, longKind, "primary", PERM_PAY, proof8);
 
         string memory longLabel = _repeat("l", ext.MAX_LABEL_BYTES() + 1);
+        bytes memory proof9 = _proof(AGENT_A, NPUB_1, agentEoa);
         vm.prank(agentEoa);
         vm.expectRevert(AgentIdentityKeyExtension.TooLarge.selector);
-        ext.registerPrimaryKey(AGENT_A, NPUB_1, KIND, longLabel, PERM_PAY);
+        ext.registerPrimaryKey(AGENT_A, NPUB_1, KIND, longLabel, PERM_PAY, proof9);
     }
 
     function test_registerPrimaryKey_atExactlyMaxStringLengthsIsAccepted() public {
         string memory kindAtLimit = _repeat("k", ext.MAX_KEY_KIND_BYTES());
         string memory labelAtLimit = _repeat("l", ext.MAX_LABEL_BYTES());
+        bytes memory proof10 = _proof(AGENT_A, NPUB_1, agentEoa);
         vm.prank(agentEoa);
-        ext.registerPrimaryKey(AGENT_A, NPUB_1, kindAtLimit, labelAtLimit, PERM_PAY);
+        ext.registerPrimaryKey(AGENT_A, NPUB_1, kindAtLimit, labelAtLimit, PERM_PAY, proof10);
         assertEq(ext.primaryKey(AGENT_A).keyKind, kindAtLimit);
     }
 
@@ -184,10 +218,11 @@ contract AgentIdentityKeyExtensionTest is Test {
     function test_addKey_appendsAndIndexes() public {
         _registerPrimary(AGENT_A, agentEoa, NPUB_1);
 
+        bytes memory proof11 = _proof(AGENT_A, NPUB_2, agentEoa);
         vm.expectEmit(true, true, true, true, address(ext));
         emit KeyAdded(AGENT_A, NPUB_2, agentEoa, 1, KIND, "laptop", PERM_CONTEXT_WRITE);
         vm.prank(agentEoa);
-        uint256 idx = ext.addKey(AGENT_A, NPUB_2, KIND, "laptop", PERM_CONTEXT_WRITE);
+        uint256 idx = ext.addKey(AGENT_A, NPUB_2, KIND, "laptop", PERM_CONTEXT_WRITE, proof11);
 
         assertEq(idx, 1, "second key must land at index 1");
         assertEq(ext.keyCount(AGENT_A), 2);
@@ -199,16 +234,18 @@ contract AgentIdentityKeyExtensionTest is Test {
     /// Index 0 has to be the primary, or every consumer resolving "the
     /// agent's identity" by index gets an arbitrary extra key instead.
     function test_addKey_withoutPrimaryReverts() public {
+        bytes memory proof12 = _proof(AGENT_A, NPUB_2, agentEoa);
         vm.prank(agentEoa);
         vm.expectRevert(AgentIdentityKeyExtension.PrimaryNotSet.selector);
-        ext.addKey(AGENT_A, NPUB_2, KIND, "laptop", PERM_CONTEXT_WRITE);
+        ext.addKey(AGENT_A, NPUB_2, KIND, "laptop", PERM_CONTEXT_WRITE, proof12);
     }
 
     function test_addKey_strangerReverts() public {
         _registerPrimary(AGENT_A, agentEoa, NPUB_1);
+        bytes memory proof13 = _proof(AGENT_A, NPUB_2, stranger);
         vm.prank(stranger);
         vm.expectRevert(AgentIdentityKeyExtension.NotOwner.selector);
-        ext.addKey(AGENT_A, NPUB_2, KIND, "laptop", PERM_CONTEXT_WRITE);
+        ext.addKey(AGENT_A, NPUB_2, KIND, "laptop", PERM_CONTEXT_WRITE, proof13);
     }
 
     /// One pubkey must never claim to speak for two agents — the
@@ -218,14 +255,16 @@ contract AgentIdentityKeyExtensionTest is Test {
         _registerPrimary(AGENT_B, buyer, NPUB_2);
 
         // Same agent, same key twice.
+        bytes memory proof14 = _proof(AGENT_A, NPUB_1, agentEoa);
         vm.prank(agentEoa);
         vm.expectRevert(AgentIdentityKeyExtension.AlreadyBound.selector);
-        ext.addKey(AGENT_A, NPUB_1, KIND, "dupe", PERM_PAY);
+        ext.addKey(AGENT_A, NPUB_1, KIND, "dupe", PERM_PAY, proof14);
 
         // Different agent trying to claim agent A's key.
+        bytes memory proof15 = _proof(AGENT_B, NPUB_1, buyer);
         vm.prank(buyer);
         vm.expectRevert(AgentIdentityKeyExtension.AlreadyBound.selector);
-        ext.addKey(AGENT_B, NPUB_1, KIND, "steal", PERM_PAY);
+        ext.addKey(AGENT_B, NPUB_1, KIND, "steal", PERM_PAY, proof15);
     }
 
     function test_addKey_capIsEnforced() public {
@@ -233,14 +272,18 @@ contract AgentIdentityKeyExtensionTest is Test {
         uint256 max = ext.MAX_KEYS_PER_AGENT();
         // Fill to the cap (primary already occupies one slot).
         for (uint256 i = 1; i < max; ++i) {
+            bytes32 fill = _key(keccak256(abi.encode("fill", i)));
+            bytes memory proof16 = _proof(AGENT_A, fill, agentEoa);
             vm.prank(agentEoa);
-            ext.addKey(AGENT_A, keccak256(abi.encode("fill", i)), KIND, "fill", 0);
+            ext.addKey(AGENT_A, fill, KIND, "fill", 0, proof16);
         }
         assertEq(ext.keyCount(AGENT_A), max);
 
+        bytes32 over = _key(keccak256("one-too-many"));
+        bytes memory proof17 = _proof(AGENT_A, over, agentEoa);
         vm.prank(agentEoa);
         vm.expectRevert(AgentIdentityKeyExtension.MaxKeys.selector);
-        ext.addKey(AGENT_A, keccak256("one-too-many"), KIND, "over", 0);
+        ext.addKey(AGENT_A, over, KIND, "over", 0, proof17);
     }
 
     // ── rotation ──────────────────────────────────────────────────
@@ -248,10 +291,11 @@ contract AgentIdentityKeyExtensionTest is Test {
     function test_rotatePrimaryKey_replacesAtomically() public {
         _registerPrimary(AGENT_A, agentEoa, NPUB_1);
 
+        bytes memory proof18 = _proof(AGENT_A, NPUB_2, agentEoa);
         vm.expectEmit(true, true, true, true, address(ext));
         emit PrimaryKeyRotated(AGENT_A, NPUB_1, NPUB_2, agentEoa);
         vm.prank(agentEoa);
-        ext.rotatePrimaryKey(AGENT_A, NPUB_2, KIND, "rotated", PERM_PAY);
+        ext.rotatePrimaryKey(AGENT_A, NPUB_2, KIND, "rotated", PERM_PAY, proof18);
 
         assertEq(ext.primaryKey(AGENT_A).pubkey, NPUB_2);
         assertEq(ext.keyCount(AGENT_A), 1, "rotation must replace, not append");
@@ -268,9 +312,10 @@ contract AgentIdentityKeyExtensionTest is Test {
 
     function test_rotatePrimaryKey_toSameKeyReverts() public {
         _registerPrimary(AGENT_A, agentEoa, NPUB_1);
+        bytes memory proof19 = _proof(AGENT_A, NPUB_1, agentEoa);
         vm.prank(agentEoa);
         vm.expectRevert(AgentIdentityKeyExtension.Unchanged.selector);
-        ext.rotatePrimaryKey(AGENT_A, NPUB_1, KIND, "same", PERM_PAY);
+        ext.rotatePrimaryKey(AGENT_A, NPUB_1, KIND, "same", PERM_PAY, proof19);
     }
 
     /// Rotation unbinds the old key before binding the new one, so a
@@ -280,9 +325,10 @@ contract AgentIdentityKeyExtensionTest is Test {
         _registerPrimary(AGENT_A, agentEoa, NPUB_1);
         _registerPrimary(AGENT_B, buyer, NPUB_2);
 
+        bytes memory proof20 = _proof(AGENT_A, NPUB_2, agentEoa);
         vm.prank(agentEoa);
         vm.expectRevert(AgentIdentityKeyExtension.AlreadyBound.selector);
-        ext.rotatePrimaryKey(AGENT_A, NPUB_2, KIND, "steal", PERM_PAY);
+        ext.rotatePrimaryKey(AGENT_A, NPUB_2, KIND, "steal", PERM_PAY, proof20);
 
         assertEq(ext.primaryKey(AGENT_A).pubkey, NPUB_1, "failed rotation lost the primary");
         (uint256 agentId,, bool bound,,) = ext.resolveKey(NPUB_1);
@@ -291,17 +337,19 @@ contract AgentIdentityKeyExtensionTest is Test {
     }
 
     function test_rotatePrimaryKey_withoutPrimaryReverts() public {
+        bytes memory proof21 = _proof(AGENT_A, NPUB_1, agentEoa);
         vm.prank(agentEoa);
         vm.expectRevert(AgentIdentityKeyExtension.PrimaryNotSet.selector);
-        ext.rotatePrimaryKey(AGENT_A, NPUB_1, KIND, "rotated", PERM_PAY);
+        ext.rotatePrimaryKey(AGENT_A, NPUB_1, KIND, "rotated", PERM_PAY, proof21);
     }
 
     // ── deactivation ──────────────────────────────────────────────
 
     function test_deactivateKey_freesPubkeyAndKeepsHistory() public {
         _registerPrimary(AGENT_A, agentEoa, NPUB_1);
+        bytes memory proof22 = _proof(AGENT_A, NPUB_2, agentEoa);
         vm.prank(agentEoa);
-        ext.addKey(AGENT_A, NPUB_2, KIND, "laptop", PERM_CONTEXT_WRITE);
+        ext.addKey(AGENT_A, NPUB_2, KIND, "laptop", PERM_CONTEXT_WRITE, proof22);
 
         vm.expectEmit(true, true, false, true, address(ext));
         emit KeyDeactivated(AGENT_A, NPUB_2, 1);
@@ -320,8 +368,9 @@ contract AgentIdentityKeyExtensionTest is Test {
 
         // Freed, so it can be re-registered — as revokeSubaccount frees
         // an address.
+        bytes memory proof23 = _proof(AGENT_A, NPUB_2, agentEoa);
         vm.prank(agentEoa);
-        uint256 idx = ext.addKey(AGENT_A, NPUB_2, KIND, "relinked", PERM_PAY);
+        uint256 idx = ext.addKey(AGENT_A, NPUB_2, KIND, "relinked", PERM_PAY, proof23);
         assertEq(idx, 2);
         (uint256 agentId,, bool reBound, bool active,) = ext.resolveKey(NPUB_2);
         assertTrue(reBound);
@@ -340,8 +389,9 @@ contract AgentIdentityKeyExtensionTest is Test {
 
     function test_deactivateKey_twiceReverts() public {
         _registerPrimary(AGENT_A, agentEoa, NPUB_1);
+        bytes memory proof24 = _proof(AGENT_A, NPUB_2, agentEoa);
         vm.prank(agentEoa);
-        ext.addKey(AGENT_A, NPUB_2, KIND, "laptop", 0);
+        ext.addKey(AGENT_A, NPUB_2, KIND, "laptop", 0, proof24);
         vm.prank(agentEoa);
         ext.deactivateKey(AGENT_A, NPUB_2);
 
@@ -353,8 +403,9 @@ contract AgentIdentityKeyExtensionTest is Test {
     function test_deactivateKey_otherAgentsKeyReverts() public {
         _registerPrimary(AGENT_A, agentEoa, NPUB_1);
         _registerPrimary(AGENT_B, buyer, NPUB_2);
+        bytes memory proof25 = _proof(AGENT_B, NPUB_3, buyer);
         vm.prank(buyer);
-        ext.addKey(AGENT_B, NPUB_3, KIND, "b-extra", 0);
+        ext.addKey(AGENT_B, NPUB_3, KIND, "b-extra", 0, proof25);
 
         vm.prank(agentEoa);
         vm.expectRevert(AgentIdentityKeyExtension.NotBound.selector);
@@ -404,13 +455,15 @@ contract AgentIdentityKeyExtensionTest is Test {
         assertTrue(ext.keysStale(AGENT_A), "keys must be stale for the new owner");
 
         // The old owner can no longer touch them.
+        bytes memory proof26 = _proof(AGENT_A, NPUB_2, agentEoa);
         vm.prank(agentEoa);
         vm.expectRevert(AgentIdentityKeyExtension.NotOwner.selector);
-        ext.rotatePrimaryKey(AGENT_A, NPUB_2, KIND, "old owner", PERM_PAY);
+        ext.rotatePrimaryKey(AGENT_A, NPUB_2, KIND, "old owner", PERM_PAY, proof26);
 
         // Rotate-on-acquire clears it.
+        bytes memory proof27 = _proof(AGENT_A, NPUB_2, buyer);
         vm.prank(buyer);
-        ext.rotatePrimaryKey(AGENT_A, NPUB_2, KIND, "buyer key", PERM_PAY);
+        ext.rotatePrimaryKey(AGENT_A, NPUB_2, KIND, "buyer key", PERM_PAY, proof27);
         assertFalse(ext.keysStale(AGENT_A), "rotation by the new owner must clear staleness");
         assertEq(ext.boundOwner(AGENT_A), buyer);
         assertEq(ext.primaryKey(AGENT_A).pubkey, NPUB_2);
@@ -451,8 +504,9 @@ contract AgentIdentityKeyExtensionTest is Test {
 
     function test_getKeys_returnsFullHistory() public {
         _registerPrimary(AGENT_A, agentEoa, NPUB_1);
+        bytes memory proof28 = _proof(AGENT_A, NPUB_2, agentEoa);
         vm.prank(agentEoa);
-        ext.addKey(AGENT_A, NPUB_2, KIND, "laptop", 0);
+        ext.addKey(AGENT_A, NPUB_2, KIND, "laptop", 0, proof28);
         vm.prank(agentEoa);
         ext.deactivateKey(AGENT_A, NPUB_2);
 
@@ -482,8 +536,9 @@ contract AgentIdentityKeyExtensionTest is Test {
     /// so. Assert the state, not just that the call succeeded.
     function test_upgrade_preservesKeysAndBindings() public {
         _registerPrimary(AGENT_A, agentEoa, NPUB_1);
+        bytes memory proof29 = _proof(AGENT_A, NPUB_2, agentEoa);
         vm.prank(agentEoa);
-        ext.addKey(AGENT_A, NPUB_2, KIND, "laptop", PERM_CONTEXT_WRITE);
+        ext.addKey(AGENT_A, NPUB_2, KIND, "laptop", PERM_CONTEXT_WRITE, proof29);
         _registerPrimary(AGENT_B, buyer, NPUB_3);
 
         AgentIdentityKeyExtension impl2 = new AgentIdentityKeyExtension();
@@ -505,8 +560,10 @@ contract AgentIdentityKeyExtensionTest is Test {
         assertEq(agentId, AGENT_A);
 
         // And the contract stays writable.
+        bytes32 postUpgrade = _key(keccak256("post-upgrade"));
+        bytes memory proof30 = _proof(AGENT_A, postUpgrade, agentEoa);
         vm.prank(agentEoa);
-        ext.addKey(AGENT_A, keccak256("post-upgrade"), KIND, "new", 0);
+        ext.addKey(AGENT_A, postUpgrade, KIND, "new", 0, proof30);
         assertEq(ext.keyCount(AGENT_A), 3);
     }
 
@@ -514,16 +571,17 @@ contract AgentIdentityKeyExtensionTest is Test {
 
     function testFuzz_registerPrimaryKey_arbitraryValidInput(
         uint256 agentId,
-        bytes32 pubkey,
+        bytes32 keySeed,
         uint96 permissions
     ) public {
-        vm.assume(pubkey != bytes32(0));
+        bytes32 pubkey = _key(keySeed);
         // address(0) can never be an owner, and agentId must be ownable.
         agentId = bound(agentId, 1, type(uint128).max);
         idReg.setOwner(agentId, agentEoa);
 
+        bytes memory proof31 = _proof(agentId, pubkey, agentEoa);
         vm.prank(agentEoa);
-        ext.registerPrimaryKey(agentId, pubkey, KIND, "fuzz", permissions);
+        ext.registerPrimaryKey(agentId, pubkey, KIND, "fuzz", permissions, proof31);
 
         AgentIdentityKeyExtension.IdentityKey memory k = ext.primaryKey(agentId);
         assertEq(k.pubkey, pubkey);

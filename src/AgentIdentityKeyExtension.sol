@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "./interfaces/IAgentIdentityRegistry.sol";
 import "./AgentNFTRefs.sol";
+import {Bip340} from "./libraries/Bip340.sol";
 
 /**
  * @title AgentIdentityKeyExtension
@@ -70,6 +71,7 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
     error MaxKeys();
     error Unchanged();
     error ZeroIdentityRegistry();
+    error InvalidProof();
 
     // ── Storage ───────────────────────────────────────────────────
 
@@ -202,9 +204,10 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         bytes32 pubkey,
         string calldata keyKind,
         string calldata label,
-        uint96  permissions
+        uint96  permissions,
+        bytes calldata proof
     ) external {
-        _registerPrimaryKey(agentId, pubkey, keyKind, label, permissions);
+        _registerPrimaryKey(agentId, pubkey, keyKind, label, permissions, proof);
     }
 
     /// @notice {registerPrimaryKey} for token `tokenId` of `nft`.
@@ -214,9 +217,10 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         bytes32 pubkey,
         string calldata keyKind,
         string calldata label,
-        uint96  permissions
+        uint96  permissions,
+        bytes calldata proof
     ) external {
-        _registerPrimaryKey(_bindRef(nft, tokenId), pubkey, keyKind, label, permissions);
+        _registerPrimaryKey(_bindRef(nft, tokenId), pubkey, keyKind, label, permissions, proof);
     }
 
     function _registerPrimaryKey(
@@ -224,10 +228,12 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         bytes32 pubkey,
         string calldata keyKind,
         string calldata label,
-        uint96  permissions
+        uint96  permissions,
+        bytes calldata proof
     ) private onlyAgentOwner(agentId) {
         if (_keys[agentId].length != 0) revert PrimaryAlreadySet();
         _validate(pubkey, keyKind, label);
+        _requireProof(agentId, pubkey, proof);
         _bind(agentId, pubkey, keyKind, label, permissions, 0);
         emit PrimaryKeyRegistered(agentId, pubkey, msg.sender, keyKind, label, permissions);
     }
@@ -244,9 +250,10 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         bytes32 pubkey,
         string calldata keyKind,
         string calldata label,
-        uint96  permissions
+        uint96  permissions,
+        bytes calldata proof
     ) external returns (uint256 index) {
-        return _addKey(agentId, pubkey, keyKind, label, permissions);
+        return _addKey(agentId, pubkey, keyKind, label, permissions, proof);
     }
 
     /// @notice {addKey} for token `tokenId` of `nft`.
@@ -256,9 +263,10 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         bytes32 pubkey,
         string calldata keyKind,
         string calldata label,
-        uint96  permissions
+        uint96  permissions,
+        bytes calldata proof
     ) external returns (uint256 index) {
-        return _addKey(_bindRef(nft, tokenId), pubkey, keyKind, label, permissions);
+        return _addKey(_bindRef(nft, tokenId), pubkey, keyKind, label, permissions, proof);
     }
 
     function _addKey(
@@ -266,11 +274,13 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         bytes32 pubkey,
         string calldata keyKind,
         string calldata label,
-        uint96  permissions
+        uint96  permissions,
+        bytes calldata proof
     ) private onlyAgentOwner(agentId) returns (uint256 index) {
         if (_keys[agentId].length == 0) revert PrimaryNotSet();
         if (_keys[agentId].length >= MAX_KEYS_PER_AGENT) revert MaxKeys();
         _validate(pubkey, keyKind, label);
+        _requireProof(agentId, pubkey, proof);
         index = _keys[agentId].length;
         _bind(agentId, pubkey, keyKind, label, permissions, index);
         emit KeyAdded(agentId, pubkey, msg.sender, index, keyKind, label, permissions);
@@ -289,9 +299,10 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         bytes32 newPubkey,
         string calldata keyKind,
         string calldata label,
-        uint96  permissions
+        uint96  permissions,
+        bytes calldata proof
     ) external {
-        _rotatePrimaryKey(agentId, newPubkey, keyKind, label, permissions);
+        _rotatePrimaryKey(agentId, newPubkey, keyKind, label, permissions, proof);
     }
 
     /// @notice {rotatePrimaryKey} for token `tokenId` of `nft`.
@@ -301,9 +312,10 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         bytes32 newPubkey,
         string calldata keyKind,
         string calldata label,
-        uint96  permissions
+        uint96  permissions,
+        bytes calldata proof
     ) external {
-        _rotatePrimaryKey(refOf(nft, tokenId), newPubkey, keyKind, label, permissions);
+        _rotatePrimaryKey(refOf(nft, tokenId), newPubkey, keyKind, label, permissions, proof);
     }
 
     function _rotatePrimaryKey(
@@ -311,10 +323,12 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         bytes32 newPubkey,
         string calldata keyKind,
         string calldata label,
-        uint96  permissions
+        uint96  permissions,
+        bytes calldata proof
     ) private onlyAgentOwner(agentId) {
         if (_keys[agentId].length == 0) revert PrimaryNotSet();
         _validate(newPubkey, keyKind, label);
+        _requireProof(agentId, newPubkey, proof);
 
         IdentityKey storage k = _keys[agentId][0];
         bytes32 old = k.pubkey;
@@ -493,6 +507,30 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
     }
 
     // ── Internal ──────────────────────────────────────────────────
+
+    // ── Proof of control ──────────────────────────────────────────
+    //
+    // Every binding carries a BIP-340 signature by the key itself over
+    // {bindingDigest}: without one, anyone could bind a known npub to an
+    // agent of their own first — one pubkey speaks for one agent — and
+    // lock its real owner out, or claim to speak as it.
+
+    bytes32 public constant BINDING_TYPEHASH = keccak256(
+        "VIMSIdentityKeyBinding(uint256 chainId,address extension,address nft,uint256 tokenId,bytes32 pubkey,address owner)"
+    );
+
+    /// @notice The 32-byte message the key signs (BIP-340) to be bound to
+    ///         token `tokenId` of `nft` by `owner`: chain, this contract,
+    ///         the agent and its owner, so a proof can't be replayed for
+    ///         another agent, owner, deployment or chain.
+    function bindingDigest(address nft, uint256 tokenId, bytes32 pubkey, address owner) public view returns (bytes32) {
+        return keccak256(abi.encode(BINDING_TYPEHASH, block.chainid, address(this), nft, tokenId, pubkey, owner));
+    }
+
+    function _requireProof(uint256 ref, bytes32 pubkey, bytes calldata proof) private view {
+        (address nft, uint256 tokenId) = nftOf(ref);
+        if (!Bip340.verify(pubkey, bindingDigest(nft, tokenId, pubkey, msg.sender), proof)) revert InvalidProof();
+    }
 
     function _validate(bytes32 pubkey, string calldata keyKind, string calldata label) private pure {
         if (pubkey == bytes32(0)) revert EmptyInput();

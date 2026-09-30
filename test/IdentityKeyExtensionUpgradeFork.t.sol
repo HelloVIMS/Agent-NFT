@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import {AgentIdentityKeyExtension} from "../src/AgentIdentityKeyExtension.sol";
+import {Bip340Signer} from "./helpers/Bip340Signer.sol";
 
 /**
  * Upgrades the live Base Sepolia AgentIdentityKeyExtension in a fork and
@@ -35,9 +36,11 @@ contract IdentityKeyExtensionUpgradeFork is Test {
         (bool ok, bytes memory out) = COLLECTION.staticcall(abi.encodeWithSignature("ownerOf(uint256)", 1));
         require(ok, "collection token");
         address collectionOwner = abi.decode(out, (address));
+        bytes32 key = Bip340Signer.pubkey(uint256(keccak256("fork-key")));
+        bytes memory proof = Bip340Signer.sign(uint256(keccak256("fork-key")), EXT.bindingDigest(COLLECTION, 1, key, collectionOwner));
         vm.prank(collectionOwner);
-        EXT.registerPrimaryKeyFor(COLLECTION, 1, keccak256("fork-key"), "nostr", "", 0);
-        (address nft, uint256 tokenId,,,,) = EXT.resolveKeyFor(keccak256("fork-key"));
+        EXT.registerPrimaryKeyFor(COLLECTION, 1, key, "nostr", "", 0, proof);
+        (address nft, uint256 tokenId,,,,) = EXT.resolveKeyFor(key);
         assertEq(nft, COLLECTION);
         assertEq(tokenId, 1);
     }

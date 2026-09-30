@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import {AgentReputationRegistry} from "../src/AgentReputationRegistry.sol";
 import {AgentIdentityKeyExtension} from "../src/AgentIdentityKeyExtension.sol";
+import {Bip340Signer} from "./helpers/Bip340Signer.sol";
 import {AgentMemory} from "../src/AgentMemory.sol";
 import {AgentAvatarExtension} from "../src/AgentAvatarExtension.sol";
 
@@ -54,8 +55,10 @@ contract AgentNFTRefsUpgradeFork is Test {
         (bool ok, bytes memory out) = COLLECTION.staticcall(abi.encodeWithSignature("ownerOf(uint256)", 1));
         require(ok, "collection token");
         address holder = abi.decode(out, (address));
+        bytes32 key = Bip340Signer.pubkey(uint256(keccak256("refs-fork")));
+        bytes memory proof = Bip340Signer.sign(uint256(keccak256("refs-fork")), KEYS.bindingDigest(COLLECTION, 1, key, holder));
         vm.startPrank(holder);
-        KEYS.registerPrimaryKeyFor(COLLECTION, 1, keccak256("refs-fork"), "nostr", "", 0);
+        KEYS.registerPrimaryKeyFor(COLLECTION, 1, key, "nostr", "", 0, proof);
         MEM.addVersionFor(COLLECTION, 1, "ipfs://fork", keccak256("fork"), 3, 0, 0, 0, "fork");
         AV.setAvatarManifestFor(COLLECTION, 1, "ipfs://avatars", keccak256("avatars"), 1);
         vm.stopPrank();
