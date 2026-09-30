@@ -27,10 +27,10 @@
   },
   "implementations": {
     "AgentIdentityRegistry": "0xCBBa112c05A97E1880e21504984acf40351D94b3",
-    "AgentReputationRegistry": "0xE5617A99133AC28F43CE7dC4eB5cA8D90c9b22eA",
+    "AgentReputationRegistry": "0x9473FBa41a5a0E6b2DFa62a28c4a2B71043f1243",
     "AgentContextRegistry": "0x5a31595F915dC8e2b67A1397BaDdA19D1d734ca3",
     "AgentMemory": "0xEE3B214e08d54042Ae72991DF8D67D9Abb839F6A",
-    "AgentX402Receiver": "0xf1126e12c7bea39383A0f13e0Adf7Af0Efd64799",
+    "AgentX402Receiver": "0xb880a889d60380F7F9D96472263eaDc521bD78DD",
     "AgentMarketplace": "0xcc1E532C8148278c56DBBBcb02f23648C06C2950",
     "AgentCollectionImpl": "0xDcBF7187E116577491B65C0E8b0c2aE30e4393c4",
     "AgentAvatarExtension": "0x5b20645870604D9CbB153dE9eb6012Ae42Dfea5b",

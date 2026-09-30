@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./AgentIdentityRegistry.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 /**
  * @title AgentReputationRegistry
@@ -113,6 +114,16 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
     mapping(address => bool) public settlementRecorders;                    // payment contracts
     mapping(address => bool) public disputeRecorders;                       // escrow contracts
 
+    // ── agents of any ERC-721 (v3) ───────────────────────────────────
+    //
+    // Every agentId-keyed function also takes the reference of an agent
+    // that isn't an identity-registry token: `refOf(nft, tokenId)`, the
+    // same top-bit-tagged subject AgentIdentityKeyExtension uses, so it
+    // never equals an identity token id. Eras, paid-only attestations and
+    // system stats work identically; the owner is the NFT contract's.
+    struct NFTRef { address nft; uint256 tokenId; }
+    mapping(uint256 => NFTRef) internal _refNFT;                            // tagged ref => agent NFT
+
     event EraStarted(uint256 indexed agentId, uint256 indexed era, address indexed owner, bytes32 subject);
     event SettlementRecorded(uint256 indexed agentId, uint256 indexed era, address indexed client, bytes32 serviceId, uint256 amount, bool counted);
     event DisputeRecorded(uint256 indexed agentId, uint256 indexed era, address indexed client, bytes32 ref);
@@ -147,6 +158,45 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
         emit DisputeRecorderSet(recorder, allowed);
     }
 
+    uint256 private constant _NFT_REF_TAG = 1 << 255;
+
+    event AgentRefBound(uint256 indexed ref, address indexed nft, uint256 indexed tokenId);
+
+    /// @notice The agentId every function takes for token `tokenId` of `nft`.
+    function refOf(address nft, uint256 tokenId) public view returns (uint256) {
+        if (nft == address(identityRegistry)) return tokenId;
+        return uint256(keccak256(abi.encode(nft, tokenId))) | _NFT_REF_TAG;
+    }
+
+    /// @notice The agent NFT a reference names.
+    function nftOf(uint256 ref) external view returns (address nft, uint256 tokenId) {
+        NFTRef storage r = _refNFT[ref];
+        return r.nft == address(0) ? (address(identityRegistry), ref) : (r.nft, r.tokenId);
+    }
+
+    function _ownerOfRef(uint256 ref) internal view returns (address) {
+        NFTRef storage r = _refNFT[ref];
+        if (r.nft == address(0)) return identityRegistry.ownerOf(ref);
+        return IERC721(r.nft).ownerOf(r.tokenId);
+    }
+
+    /**
+     * @notice {recordSettlement} for an agent of any ERC-721 — a collection
+     *         agent paid through the payment contract's NFT path. Records
+     *         which NFT the reference names on first use.
+     */
+    function recordSettlementForNFT(address nft, uint256 tokenId, address payer, bytes32 serviceId, uint256 amount)
+        external
+        onlySettlementRecorder
+    {
+        uint256 ref = refOf(nft, tokenId);
+        if (ref != tokenId && _refNFT[ref].nft == address(0)) {
+            _refNFT[ref] = NFTRef(nft, tokenId);
+            emit AgentRefBound(ref, nft, tokenId);
+        }
+        _recordSettlement(ref, payer, serviceId, amount);
+    }
+
     // ── eras ─────────────────────────────────────────────────────────
 
     function _eraSubject(uint256 agentId, uint256 era) internal pure returns (bytes32) {
@@ -156,7 +206,10 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
     /// @dev The current era index: the last recorded era while its owner
     ///      still holds the NFT, otherwise the (not yet recorded) next one.
     function _currentEra(uint256 agentId) internal view returns (uint256 era, bool recorded) {
-        address owner = identityRegistry.ownerOf(agentId);
+        return _currentEraOf(agentId, _ownerOfRef(agentId));
+    }
+
+    function _currentEraOf(uint256 agentId, address owner) internal view returns (uint256 era, bool recorded) {
         Era[] storage list = _eras[agentId];
         uint256 n = list.length;
         if (n > 0 && list[n - 1].owner == owner) return (n - 1, true);
@@ -165,11 +218,16 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
 
     /// @dev Materialises the current era (writes only).
     function _touchEra(uint256 agentId) internal returns (uint256 era, bytes32 subject) {
+        return _touchEraOf(agentId, _ownerOfRef(agentId));
+    }
+
+    /// @dev {_touchEra} with the agent's owner already read (one ownerOf
+    ///      per call: for collection agents it crosses a proxy).
+    function _touchEraOf(uint256 agentId, address owner) internal returns (uint256 era, bytes32 subject) {
         bool recorded;
-        (era, recorded) = _currentEra(agentId);
+        (era, recorded) = _currentEraOf(agentId, owner);
         subject = _eraSubject(agentId, era);
         if (!recorded) {
-            address owner = identityRegistry.ownerOf(agentId);
             _eras[agentId].push(Era({owner: owner, startedAt: uint64(block.timestamp)}));
             emit EraStarted(agentId, era, owner, subject);
         }
@@ -219,9 +277,14 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
         external
         onlySettlementRecorder
     {
-        (uint256 era, bytes32 subject) = _touchEra(agentId);
+        _recordSettlement(agentId, payer, serviceId, amount);
+    }
+
+    function _recordSettlement(uint256 agentId, address payer, bytes32 serviceId, uint256 amount) internal {
+        address agentOwner = _ownerOfRef(agentId);
+        (uint256 era, bytes32 subject) = _touchEraOf(agentId, agentOwner);
         address client = _canonicalPayer(payer);
-        bool counted = client != identityRegistry.ownerOf(agentId);
+        bool counted = client != agentOwner;
         if (counted) {
             EraStats storage st = _eraStats[subject];
             st.settlements += 1;
@@ -257,14 +320,14 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
         string calldata tag2,
         string calldata feedbackURI
     ) external {
-        address agentOwner = identityRegistry.ownerOf(agentId); // reverts for a missing agent
+        address agentOwner = _ownerOfRef(agentId); // reverts for a missing agent
         if (decimals != 0 || value < -1 || value > 1) revert ScoreOutOfRange();
 
         (address client, uint256 callerAgentId, bool isBound) = _canonicalClient(msg.sender);
         require(agentOwner != client, "Cannot review own agent");
         if (isBound) require(callerAgentId != agentId, "Cannot review own agent");
 
-        (, bytes32 subject) = _touchEra(agentId);
+        (, bytes32 subject) = _touchEraOf(agentId, agentOwner);
         if (paidSettlements[subject][client] == 0) revert NotAPayingClient();
         require(!clientHasFeedback[subject][client], "Already gave feedback");
 
@@ -431,7 +494,7 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
             startedAt = list[era].startedAt;
             if (era + 1 < list.length) endedAt = list[era + 1].startedAt;
         } else {
-            owner = identityRegistry.ownerOf(agentId); // current era, nothing recorded yet
+            owner = _ownerOfRef(agentId); // current era, nothing recorded yet
         }
     }
 

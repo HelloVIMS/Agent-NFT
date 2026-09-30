@@ -25,6 +25,7 @@ interface ICollectionCreatorReadable {
 /// @dev AgentReputationRegistry's settlement hook (v2).
 interface IReputationSettlements {
     function recordSettlement(uint256 agentId, address payer, bytes32 serviceId, uint256 amount) external;
+    function recordSettlementForNFT(address nft, uint256 tokenId, address payer, bytes32 serviceId, uint256 amount) external;
 }
 
 /**
@@ -652,8 +653,8 @@ contract AgentX402Receiver is
             nft, tokenId, serviceId, from, svc.token, gross,
             systemCut, creatorCut, agentCut, agentRecipient
         );
-        // Reputation is keyed by identity agent ids; other collections have none.
         if (nft == address(identityRegistry)) _recordSettlement(tokenId, from, serviceId, gross);
+        else _recordSettlementForNFT(nft, tokenId, from, serviceId, gross);
         _recordNFTStats(nft, tokenId, from, ad.ownerOf(tokenId), svc.token, gross);
     }
 
@@ -680,6 +681,10 @@ contract AgentX402Receiver is
     ///         a buyer from ever being able to attest. Payments revert
     ///         unless the full stipend is available.
     uint256 public constant REPUTATION_GAS = 200_000;
+    /// @notice The stipend for a collection agent's settlement: its owner is
+    ///         read through the collection's proxy, and the first one also
+    ///         records which NFT the agent's reference names.
+    uint256 public constant REPUTATION_GAS_NFT = 320_000;
 
     error InsufficientGasForReputation();
 
@@ -691,6 +696,17 @@ contract AgentX402Receiver is
         try rep.recordSettlement{gas: REPUTATION_GAS}(agentId, payer, serviceId, gross) {
         } catch (bytes memory reason) {
             emit ReputationRecordFailed(agentId, payer, serviceId, reason);
+        }
+    }
+
+    /// @dev {_recordSettlement} for a collection agent (reputation v3).
+    function _recordSettlementForNFT(address nft, uint256 tokenId, address payer, bytes32 serviceId, uint256 gross) internal {
+        IReputationSettlements rep = reputationRegistry;
+        if (address(rep) == address(0)) return;
+        if (gasleft() < (REPUTATION_GAS_NFT * 64) / 63 + 5_000) revert InsufficientGasForReputation();
+        try rep.recordSettlementForNFT{gas: REPUTATION_GAS_NFT}(nft, tokenId, payer, serviceId, gross) {
+        } catch (bytes memory reason) {
+            emit ReputationRecordFailed(tokenId, payer, serviceId, reason);
         }
     }
 
