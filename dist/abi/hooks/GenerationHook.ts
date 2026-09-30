@@ -157,6 +157,10 @@ const abi = [
     "inputs": [
       {
         "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
         "type": "uint256"
       }
     ],
@@ -299,6 +303,11 @@ const abi = [
     "type": "event",
     "name": "GenerationAdvanced",
     "inputs": [
+      {
+        "name": "host",
+        "type": "address",
+        "indexed": true
+      },
       {
         "name": "agentId",
         "type": "uint256",

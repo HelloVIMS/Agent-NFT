@@ -289,6 +289,10 @@ const abi = [
     "name": "setStage",
     "inputs": [
       {
+        "name": "host",
+        "type": "address"
+      },
+      {
         "name": "agentId",
         "type": "uint256"
       },
@@ -304,6 +308,10 @@ const abi = [
     "type": "function",
     "name": "stage",
     "inputs": [
+      {
+        "name": "",
+        "type": "address"
+      },
       {
         "name": "",
         "type": "uint256"
@@ -365,6 +373,11 @@ const abi = [
     "type": "event",
     "name": "StageAdvanced",
     "inputs": [
+      {
+        "name": "host",
+        "type": "address",
+        "indexed": true
+      },
       {
         "name": "agentId",
         "type": "uint256",

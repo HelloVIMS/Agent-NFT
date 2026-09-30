@@ -4,42 +4,33 @@ pragma solidity ^0.8.20;
 import {BaseEvolutionHook} from "./BaseEvolutionHook.sol";
 import {EvolutionTypes}    from "./EvolutionTypes.sol";
 import {VimsProvenance}    from "../VimsProvenance.sol";
+import {Strings}           from "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
  * @title GenerationHook
- * @notice Counts the number of times a token has been transferred between
- *         non-zero addresses ("generations"). Re-renders the SVG with a
- *         generation badge each time the count changes.
- *
- * @dev    Permission set: FLAG_AFTER_TRANSFER | FLAG_ON_TRIGGER. Mints and
- *         burns do NOT increment the counter (only owner-to-owner moves).
- *         The hook is observe-only on transfer; it cannot block one.
+ * @notice Counts owner-to-owner transfers ("generations") and renders a badge.
+ * @dev    FLAG_AFTER_TRANSFER | FLAG_ON_TRIGGER. Observe-only: it can't block
+ *         a transfer. Counts are per host collection — see BaseEvolutionHook.
  */
 contract GenerationHook is BaseEvolutionHook, VimsProvenance {
     function _vimsContractName() internal pure override returns (string memory) {
         return "GenerationHook";
     }
 
-    /// @notice Number of owner-to-owner transfers per agentId.
-    mapping(uint256 => uint32) public generation;
+    /// @notice host collection => token id => generation.
+    mapping(address => mapping(uint256 => uint32)) public generation;
 
-    event GenerationAdvanced(uint256 indexed agentId, uint32 newGeneration);
+    event GenerationAdvanced(address indexed host, uint256 indexed agentId, uint32 newGeneration);
 
     function getPermissions() public pure override returns (uint256) {
         return EvolutionTypes.FLAG_AFTER_TRANSFER | EvolutionTypes.FLAG_ON_TRIGGER;
     }
 
-    function afterTransfer(uint256 agentId, address from, address to)
-        external
-        override
-        returns (bytes4)
-    {
+    function afterTransfer(uint256 agentId, address from, address to) external override returns (bytes4) {
         if (from != address(0) && to != address(0)) {
-            unchecked {
-                uint32 g = generation[agentId] + 1;
-                generation[agentId] = g;
-                emit GenerationAdvanced(agentId, g);
-            }
+            uint32 g = generation[msg.sender][agentId] + 1;
+            generation[msg.sender][agentId] = g;
+            emit GenerationAdvanced(msg.sender, agentId, g);
         }
         return this.afterTransfer.selector;
     }
@@ -51,31 +42,16 @@ contract GenerationHook is BaseEvolutionHook, VimsProvenance {
         returns (EvolutionTypes.EvolutionResult memory r)
     {
         if (triggerKind != EvolutionTypes.TRIGGER_TRANSFER) return EvolutionTypes.noOp();
-        uint32 g = generation[agentId];
+        uint32 g = generation[msg.sender][agentId];
+        string memory hue = Strings.toString((uint256(g) * 37) % 360);
         r.svgChanged   = true;
-        r.newSvgInline = _render(g);
-        r.newStateHash = keccak256(abi.encode("gen", agentId, g));
-    }
-
-    function _render(uint32 g) internal pure returns (bytes memory) {
-        // Saturate hue based on generation count, capped at 360.
-        uint256 hue = (uint256(g) * 37) % 360;
-        return abi.encodePacked(
+        r.newSvgInline = abi.encodePacked(
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">',
-            '<rect width="200" height="200" fill="hsl(', _u(hue), ',60%,15%)"/>',
-            '<circle cx="100" cy="100" r="60" fill="hsl(', _u(hue), ',80%,55%)"/>',
+            '<rect width="200" height="200" fill="hsl(', hue, ',60%,15%)"/>',
+            '<circle cx="100" cy="100" r="60" fill="hsl(', hue, ',80%,55%)"/>',
             '<text x="100" y="115" text-anchor="middle" font-family="monospace" font-size="44" fill="#fff">G',
-            _u(uint256(g)), '</text>',
-            '</svg>'
+            Strings.toString(uint256(g)), '</text></svg>'
         );
-    }
-
-    function _u(uint256 v) internal pure returns (bytes memory) {
-        if (v == 0) return bytes("0");
-        uint256 tmp = v; uint256 d;
-        while (tmp != 0) { d++; tmp /= 10; }
-        bytes memory b = new bytes(d);
-        while (v != 0) { d--; b[d] = bytes1(uint8(48 + v % 10)); v /= 10; }
-        return b;
+        r.newStateHash = keccak256(abi.encode("gen", msg.sender, agentId, g));
     }
 }

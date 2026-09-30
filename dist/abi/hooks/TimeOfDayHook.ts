@@ -184,7 +184,7 @@ const abi = [
         ]
       }
     ],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -197,23 +197,6 @@ const abi = [
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "event",
-    "name": "PhaseChanged",
-    "inputs": [
-      {
-        "name": "agentId",
-        "type": "uint256",
-        "indexed": true
-      },
-      {
-        "name": "phase",
-        "type": "uint8",
-        "indexed": false
-      }
-    ],
-    "anonymous": false
   },
   {
     "type": "error",

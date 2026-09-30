@@ -4,16 +4,6 @@
 
 const abi = [
   {
-    "type": "constructor",
-    "inputs": [
-      {
-        "name": "_registry",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
     "type": "function",
     "name": "VIMS_AUTHOR",
     "inputs": [],
@@ -163,23 +153,6 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "currentStatus",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint8"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getPermissions",
     "inputs": [],
     "outputs": [
@@ -194,6 +167,10 @@ const abi = [
     "type": "function",
     "name": "getStatus",
     "inputs": [
+      {
+        "name": "host",
+        "type": "address"
+      },
       {
         "name": "agentId",
         "type": "uint256"
@@ -225,34 +202,25 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "isRunning",
+    "name": "isAuthorised",
     "inputs": [
+      {
+        "name": "host",
+        "type": "address"
+      },
       {
         "name": "agentId",
         "type": "uint256"
+      },
+      {
+        "name": "caller",
+        "type": "address"
       }
     ],
     "outputs": [
       {
         "name": "",
         "type": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "lastUpdate",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint64"
       }
     ],
     "stateMutability": "view"
@@ -310,7 +278,15 @@ const abi = [
     "inputs": [
       {
         "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
         "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "address"
       },
       {
         "name": "",
@@ -339,20 +315,12 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "registry",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "setOperator",
     "inputs": [
+      {
+        "name": "host",
+        "type": "address"
+      },
       {
         "name": "agentId",
         "type": "uint256"
@@ -374,6 +342,10 @@ const abi = [
     "name": "setStatus",
     "inputs": [
       {
+        "name": "host",
+        "type": "address"
+      },
+      {
         "name": "agentId",
         "type": "uint256"
       },
@@ -384,6 +356,31 @@ const abi = [
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "state",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "status",
+        "type": "uint8"
+      },
+      {
+        "name": "updatedAt",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -434,6 +431,11 @@ const abi = [
     "name": "OperatorUpdated",
     "inputs": [
       {
+        "name": "host",
+        "type": "address",
+        "indexed": true
+      },
+      {
         "name": "agentId",
         "type": "uint256",
         "indexed": true
@@ -442,6 +444,11 @@ const abi = [
         "name": "operator",
         "type": "address",
         "indexed": true
+      },
+      {
+        "name": "owner",
+        "type": "address",
+        "indexed": false
       },
       {
         "name": "allowed",
@@ -456,6 +463,11 @@ const abi = [
     "name": "StatusChanged",
     "inputs": [
       {
+        "name": "host",
+        "type": "address",
+        "indexed": true
+      },
+      {
         "name": "agentId",
         "type": "uint256",
         "indexed": true
@@ -463,21 +475,16 @@ const abi = [
       {
         "name": "previous",
         "type": "uint8",
-        "indexed": true
+        "indexed": false
       },
       {
         "name": "next",
         "type": "uint8",
-        "indexed": true
+        "indexed": false
       },
       {
         "name": "by",
         "type": "address",
-        "indexed": false
-      },
-      {
-        "name": "at",
-        "type": "uint64",
         "indexed": false
       }
     ],
@@ -501,11 +508,6 @@ const abi = [
   {
     "type": "error",
     "name": "UnknownStatus",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ZeroRegistry",
     "inputs": []
   }
 ] as const;

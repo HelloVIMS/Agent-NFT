@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {IAgentEvolutionHook} from "./IAgentEvolutionHook.sol";
 import {EvolutionTypes} from "./EvolutionTypes.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 /**
  * @title BaseEvolutionHook
@@ -31,6 +32,22 @@ abstract contract BaseEvolutionHook is IAgentEvolutionHook {
 
     /// @notice Subclasses override to declare lifecycle support.
     function getPermissions() public pure virtual returns (uint256);
+
+    // ── Host scoping ─────────────────────────────────────────────────────
+    //
+    // One deployed hook serves many collections, and its callbacks are
+    // plain external functions anyone can call. Stateful hooks therefore
+    // key state by the host that reports it (msg.sender in callbacks, an
+    // explicit `host` in user-facing calls): a direct call only touches the
+    // caller's own namespace, and token ids in different collections never
+    // collide.
+
+    /// @dev Current owner of `tokenId` in `host`, or address(0) if the host
+    ///      isn't an ERC-721 or the token doesn't exist.
+    function _tokenOwner(address host, uint256 tokenId) internal view returns (address owner) {
+        if (host.code.length == 0) return address(0);
+        try IERC721(host).ownerOf(tokenId) returns (address o) { owner = o; } catch {}
+    }
 
     /// @inheritdoc IAgentEvolutionHook
     function permissions() external view returns (uint256) {

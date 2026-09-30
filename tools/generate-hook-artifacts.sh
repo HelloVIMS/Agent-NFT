@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Regenerate vimsbot-marketplace/src/lib/hook-artifacts.ts from the latest
-# foundry build outputs. Required after any change to a hook constructor.
+# Regenerate vimsbot-sdk/src/v7/hook-artifacts.ts (the one copy; agent.vims.com
+# imports it from vimsbot-sdk/v7) from the latest foundry build outputs.
+# Required after any change to a hook.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -21,6 +22,7 @@ hooks = [
   ("reputation-level", "ReputationLevelHook.sol/ReputationLevelHook.json"),
   ("evolution-stages", "EvolutionStagesHook.sol/EvolutionStagesHook.json"),
   ("vote-gated",       "VoteGatedHook.sol/VoteGatedHook.json"),
+  ("agent-status",     "AgentStatusHook.sol/AgentStatusHook.json"),
 ]
 arts = {}
 for hid, p in hooks:
@@ -29,7 +31,7 @@ for hid, p in hooks:
   ctor = next((e for e in a["abi"] if e.get("type")=="constructor"), {"inputs":[]})
   arts[hid] = {"bytecode": a["bytecode"]["object"], "ctorAbi": ctor}
 
-out_path = "../vimsbot-marketplace/src/lib/hook-artifacts.ts"
+out_path = "../vimsbot-sdk/src/v7/hook-artifacts.ts"
 with open(out_path, "w") as f:
   f.write("// AUTO-GENERATED — do not edit by hand.\n")
   f.write("// Source: vimsbot-contracts/out/<Hook>.sol/<Hook>.json (foundry artifact).\n")

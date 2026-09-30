@@ -4,16 +4,6 @@
 
 const abi = [
   {
-    "type": "constructor",
-    "inputs": [
-      {
-        "name": "_resolver",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
     "type": "function",
     "name": "TRIG_TIP_JAR",
     "inputs": [],
@@ -199,8 +189,12 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "lastTip",
+    "name": "jars",
     "inputs": [
+      {
+        "name": "",
+        "type": "address"
+      },
       {
         "name": "",
         "type": "uint256"
@@ -208,8 +202,16 @@ const abi = [
     ],
     "outputs": [
       {
-        "name": "",
+        "name": "total",
         "type": "uint256"
+      },
+      {
+        "name": "last",
+        "type": "uint256"
+      },
+      {
+        "name": "count",
+        "type": "uint32"
       }
     ],
     "stateMutability": "view"
@@ -275,20 +277,12 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "resolver",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "tip",
     "inputs": [
+      {
+        "name": "host",
+        "type": "address"
+      },
       {
         "name": "agentId",
         "type": "uint256"
@@ -296,40 +290,6 @@ const abi = [
     ],
     "outputs": [],
     "stateMutability": "payable"
-  },
-  {
-    "type": "function",
-    "name": "tipCount",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "tipped",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -380,6 +340,11 @@ const abi = [
     "name": "Tipped",
     "inputs": [
       {
+        "name": "host",
+        "type": "address",
+        "indexed": true
+      },
+      {
         "name": "agentId",
         "type": "uint256",
         "indexed": true
@@ -390,17 +355,27 @@ const abi = [
         "indexed": true
       },
       {
+        "name": "to",
+        "type": "address",
+        "indexed": false
+      },
+      {
         "name": "amount",
         "type": "uint256",
         "indexed": false
       },
       {
-        "name": "cumulative",
+        "name": "total",
         "type": "uint256",
         "indexed": false
       }
     ],
     "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "NoSuchToken",
+    "inputs": []
   },
   {
     "type": "error",
@@ -420,11 +395,6 @@ const abi = [
   {
     "type": "error",
     "name": "ZeroAmount",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ZeroBeneficiary",
     "inputs": []
   }
 ] as const;

@@ -45,11 +45,11 @@
         "type": "uint256"
       },
       {
-        "name": "",
+        "name": "from",
         "type": "address"
       },
       {
-        "name": "",
+        "name": "to",
         "type": "address"
       }
     ],
@@ -200,6 +200,10 @@
     "inputs": [
       {
         "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
         "type": "uint256"
       }
     ],
@@ -215,6 +219,11 @@
     "type": "event",
     "name": "Recolored",
     "inputs": [
+      {
+        "name": "host",
+        "type": "address",
+        "indexed": true
+      },
       {
         "name": "agentId",
         "type": "uint256",

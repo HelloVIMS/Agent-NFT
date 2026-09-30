@@ -238,7 +238,7 @@ const abi = [
         ]
       }
     ],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -267,28 +267,6 @@ const abi = [
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "event",
-    "name": "Bucketed",
-    "inputs": [
-      {
-        "name": "agentId",
-        "type": "uint256",
-        "indexed": true
-      },
-      {
-        "name": "price",
-        "type": "int256",
-        "indexed": false
-      },
-      {
-        "name": "band",
-        "type": "uint8",
-        "indexed": false
-      }
-    ],
-    "anonymous": false
   },
   {
     "type": "error",

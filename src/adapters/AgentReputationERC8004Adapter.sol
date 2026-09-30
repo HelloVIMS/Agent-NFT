@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity ^0.8.20;
 
-import {IERC8004Reputation} from "../hooks/ReputationLevelHook.sol";
+import {IERC8004Reputation} from "../interfaces/IERC8004Reputation.sol";
 
 /// @notice Surface of the existing (non-spec-compliant) AgentReputationRegistry
 ///         this adapter wraps.

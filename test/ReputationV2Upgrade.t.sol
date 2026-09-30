@@ -98,8 +98,14 @@ contract ReputationV2UpgradeFork is Test {
             keccak256(abi.encode(RECEIVE_TYPEHASH, buyer, address(RECV), svcBefore.price, uint256(0), deadline, nonce))));
         (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(buyerPk, authDigest);
         (uint8 cv, bytes32 cr, bytes32 cs) = vm.sign(buyerPk, RECV.hashPaymentCommitment(AGENT, SVC, address(USDC), svcBefore.price, nonce, deadline));
+        (bool hasStats,) = address(RECV).staticcall(abi.encodeWithSignature("nftSettlements(address,uint256)", address(ID), AGENT));
+        uint64 hiresBefore = hasStats ? RECV.nftSettlements(address(ID), AGENT) : 0;
+        uint256 volumeBefore = hasStats ? RECV.nftVolume(address(ID), AGENT, address(USDC)) : 0;
         RECV.payForService(AGENT, SVC, buyer, 0, deadline, nonce, v1, r1, s1, cv, cr, cs);
         assertEq(USDC.balanceOf(buyer), 0, "buyer paid");
+        // v3: per-NFT paid-hire stats, which the evolution hooks level by.
+        assertEq(RECV.nftSettlements(address(ID), AGENT), hiresBefore + 1, "per-NFT hire recorded");
+        assertEq(RECV.nftVolume(address(ID), AGENT, address(USDC)), volumeBefore + svcBefore.price, "per-NFT volume recorded");
 
         AgentReputationRegistry.EraStats memory st = REP.eraStats(AGENT, era);
         assertEq(st.settlements, before.settlements + 1, "settlement recorded");

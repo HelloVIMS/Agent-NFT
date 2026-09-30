@@ -30,7 +30,7 @@
     "AgentReputationRegistry": "0xE5617A99133AC28F43CE7dC4eB5cA8D90c9b22eA",
     "AgentContextRegistry": "0x5a31595F915dC8e2b67A1397BaDdA19D1d734ca3",
     "AgentMemory": "0xEE3B214e08d54042Ae72991DF8D67D9Abb839F6A",
-    "AgentX402Receiver": "0xa1F2A5C4D679f15134B9DFa7a9AE990e4DCB9Aac",
+    "AgentX402Receiver": "0xf1126e12c7bea39383A0f13e0Adf7Af0Efd64799",
     "AgentMarketplace": "0xcc1E532C8148278c56DBBBcb02f23648C06C2950",
     "AgentCollectionImpl": "0x9A0E93F14385e94F50284Ab4D973fbCBa3746f9d",
     "AgentAvatarExtension": "0x5b20645870604D9CbB153dE9eb6012Ae42Dfea5b",
@@ -121,6 +121,13 @@
         "to": "0xa1F2A5C4D679f15134B9DFa7a9AE990e4DCB9Aac"
       },
       "wiring": "reputation.setSettlementRecorder(receiver,true); receiver.setReputationRegistry(reputation)"
+    },
+    "receiver-v3-nft-stats-2026-09-30": {
+      "AgentX402Receiver": {
+        "from": "0xa1F2A5C4D679f15134B9DFa7a9AE990e4DCB9Aac",
+        "to": "0xf1126e12c7bea39383A0f13e0Adf7Af0Efd64799"
+      },
+      "adds": "nftSettlements / nftVolume per-NFT paid-hire stats"
     }
   },
   "secondaryRoyalty": {
@@ -133,46 +140,77 @@
     "notes": "royaltyInfo() returns the per-agent vault address as receiver and (creatorBps + 50) as the total bps. Marketplace sends combined royalty to vault; anyone can call vault.release() (ETH) or vault.releaseToken(token) to split into creator + treasury."
   },
   "evolutionHooks": {
-    "deployedAt": "2026-05-08T16:37:00Z",
-    "missingHooksDeployedAt": "2026-05-10T05:35:00Z",
+    "deployedAt": "2026-09-30",
+    "script": "script/DeployHooks.s.sol",
     "deployer": "0xE48840eD6678218Bd21dF2671b98bCF23de661b9",
-    "TransferRecolorHook": "0xB8D4F540DFB9fdF52F397Bc3AC8fc83780E4F041",
-    "GenerationHook": "0x81F246384E9D569A3B1132B5548e69C10c201F87",
-    "SoulboundHook": "0xc5f78D3Fe55bd43CBe59420c17F572508DF2Ee1E",
-    "TimeOfDayHook": "0xa2f14D44F97e0CA6E8318215fd7dC6078eCBbEaB",
-    "SeasonalHook": "0xc2d3167D78905a85F78ee3c70824abb20EFc0221",
-    "HueRotateHook": "0xf1081ab35eaE7587607AbddEd038167a2e98Abb2",
-    "RevenueLevelHook": "0x7B4f44FAF4775F07fcE3f1e328863e9E57eBb295",
-    "TipJarHook": "0x89fBfa76df1ADc174116FC809719c13B15dEBCB0",
-    "OracleHook": "0xEc0f1A9944bCf8F7F7c62a6eD2d902EecC7449C6",
-    "ReputationLevelHook": "0x6518354AecD89890F0EC2A7132A2F8ff4F2b7805",
-    "EvolutionStagesHook": "0x915600dBe61B8495e49B5d2666cE3BDA1e74ccD3",
-    "VoteGatedHook": "0x3f3b94f2437D72F05105ad2B3948d3f7C00A6392",
-    "adapters": {
-      "IdentityTipBeneficiaryResolver": "0x59713745374f8da99eDF620F144f5B793e0Fbdb7"
-    },
+    "TransferRecolorHook": "0x0C817c57A11F3106cb5A1849a54E89a953B57198",
+    "GenerationHook": "0x582E668aeF52C8e82E0a016FF8d406492576cA72",
+    "SoulboundHook": "0x677DcD7197914efC5cDD3Ce61E23AEDD78f77332",
+    "TimeOfDayHook": "0x40AE0390c816F65Ba4B7Ffa891E4A2ac07b1C971",
+    "SeasonalHook": "0x6824E40190d5b4614caCF6cEc2fD7B7Fe45D8956",
+    "HueRotateHook": "0xfb00D445676A8223e8856c54ae89A1336e9fFa51",
+    "RevenueLevelHook": "0x494b00f78d33eD5a6F838f1dE01446Bd46003A44",
+    "TipJarHook": "0x8f0C2EE384fdC230862859a873798d00938A78dA",
+    "OracleHook": "0xC1317C719e636521E499E12030BF2c455d298519",
+    "ReputationLevelHook": "0xC5cD42f6f104F2D8f3272bbEF12D654D8e687406",
+    "EvolutionStagesHook": "0xA9f41e1F4a12f8091840153656C05a7ec34b9a8d",
+    "VoteGatedHook": "0xB6DCB793B070Ba16B4Da23E58d38896605403aC4",
+    "AgentStatusHook": "0x0aea20ba4649D88cBb93B0287CF2fed2743Bc41e",
     "config": {
-      "paymentRouter": "0x1d4320d0cdcbA7d60dc1A76cE63AA13a2Cd43b97",
-      "identityRegistry": "0xfE1ef66Ba95891d3cDf6FB83FE1444Bc3bB9FEeF",
+      "x402Receiver": "0xd180DC89270Df505F5d4B7B36e83318f330014A7",
       "reputationRegistry": "0x5563EE2939F6839CE82B3cA6E50AA285e8d1C316",
+      "usdc": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
       "priceFeed": "0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1",
       "bearThresholdE8": 200000000000,
       "bullThresholdE8": 350000000000,
       "soulboundUnlocksAt": 0,
       "hueRotateSecondsPerStep": 60,
-      "voteGovernor": "0xE48840eD6678218Bd21dF2671b98bCF23de661b9",
-      "voteMaxStage": 4,
-      "reputationThresholdsScaled1e18": [
-        10,
-        50,
+      "revenueThresholdsUSDC6": [
+        1000000,
+        10000000,
+        100000000,
+        1000000000,
+        10000000000
+      ],
+      "reputationHireThresholds": [
+        1,
+        5,
+        25,
         100,
         500
-      ]
+      ],
+      "stageMinSeconds": 3600,
+      "voteGovernor": "0xE48840eD6678218Bd21dF2671b98bCF23de661b9",
+      "voteMaxStage": 4
     },
-    "notes": "Reference deployments with safe defaults. Creators may deploy bespoke instances via the marketplace's 'Customize & deploy' flow (EvolutionHooksCard \u2192 HookCustomizer); the resulting address is wired in via setCollectionHook on the per-collection AgentCollection contract."
+    "verifiedOnChain": "script/HookLifecycleE2E.s.sol \u2014 collection 0xEAE0488CeD784A4C39ad7503396f976b4988286e",
+    "notes": "v2 hooks: state keyed by host collection (direct calls only touch the caller's namespace; token ids never collide across collections); stages advance at most once per stageMinSeconds; tips go to the token's owner in the named collection; revenue and reputation levels read AgentX402Receiver per-NFT paid-hire stats (v3) and, for identity agents, the reputation v2 current owner era; stateless hooks emit no events."
   },
   "frontend": {
     "mintUI": "https://agent.vims.com",
     "exportName": "BASE_SEPOLIA_AGENT_NFT"
-  }
+  },
+  "evolutionHooksLegacy": [
+    {
+      "replacedAt": "2026-09-30",
+      "hooks": {
+        "TransferRecolorHook": "0xB8D4F540DFB9fdF52F397Bc3AC8fc83780E4F041",
+        "GenerationHook": "0x81F246384E9D569A3B1132B5548e69C10c201F87",
+        "SoulboundHook": "0xc5f78D3Fe55bd43CBe59420c17F572508DF2Ee1E",
+        "TimeOfDayHook": "0xa2f14D44F97e0CA6E8318215fd7dC6078eCBbEaB",
+        "SeasonalHook": "0xc2d3167D78905a85F78ee3c70824abb20EFc0221",
+        "HueRotateHook": "0xf1081ab35eaE7587607AbddEd038167a2e98Abb2",
+        "RevenueLevelHook": "0x7B4f44FAF4775F07fcE3f1e328863e9E57eBb295",
+        "TipJarHook": "0x89fBfa76df1ADc174116FC809719c13B15dEBCB0",
+        "OracleHook": "0xEc0f1A9944bCf8F7F7c62a6eD2d902EecC7449C6",
+        "ReputationLevelHook": "0x6518354AecD89890F0EC2A7132A2F8ff4F2b7805",
+        "EvolutionStagesHook": "0x915600dBe61B8495e49B5d2666cE3BDA1e74ccD3",
+        "VoteGatedHook": "0x3f3b94f2437D72F05105ad2B3948d3f7C00A6392"
+      },
+      "adapters": {
+        "IdentityTipBeneficiaryResolver": "0x59713745374f8da99eDF620F144f5B793e0Fbdb7"
+      },
+      "why": "state keyed by token id only (anyone could inflate counters or fast-forward stages; collections collided); ReputationLevelHook reverted on every call; RevenueLevelHook's recorder never called; TipJar paid identity-agent owners for collection tokens."
+    }
+  ]
 }

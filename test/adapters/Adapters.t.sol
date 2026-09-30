@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import {AgentReputationERC8004Adapter, ILegacyReputationRegistry} from "../../src/adapters/AgentReputationERC8004Adapter.sol";
-import {IdentityTipBeneficiaryResolver, IIdentityRegistryView}    from "../../src/adapters/IdentityTipBeneficiaryResolver.sol";
 
 /// @dev Mock the legacy registry surface (mirrors AgentReputationRegistry's
 ///      tuple-returning storage layout for `feedbacks(agentId, idx)`).
@@ -30,26 +29,6 @@ contract MockLegacyReg is ILegacyReputationRegistry {
 }
 
 /// @dev Mock the identity registry surface used by the tip resolver.
-contract MockIdentity is IIdentityRegistryView {
-    struct A { string name; address tba; uint256 createdAt; bool active; }
-    mapping(uint256 => A) internal _agents;
-    mapping(uint256 => address) internal _owner;
-
-    function setAgent(uint256 id, address holder, address tba, bool active) external {
-        _agents[id] = A({ name: "", tba: tba, createdAt: 1, active: active });
-        _owner[id] = holder;
-    }
-    function agents(uint256 id) external view returns (string memory, address, uint256, bool, address) {
-        A storage a = _agents[id];
-        return (a.name, a.tba, a.createdAt, a.active, address(0));
-    }
-    function ownerOf(uint256 id) external view returns (address) {
-        address o = _owner[id];
-        require(o != address(0), "nonexistent");
-        return o;
-    }
-}
-
 contract AdaptersTest is Test {
     address constant ALICE = address(0xA11CE);
     address constant BOB   = address(0xB0B);
@@ -131,42 +110,5 @@ contract AdaptersTest is Test {
         assertEq(c, 2); assertEq(dec, 2);
         // (99 + 100) / 2 = 99 (integer division)
         assertEq(v, int128(99));
-    }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // IdentityTipBeneficiaryResolver
-    // ─────────────────────────────────────────────────────────────────────
-
-    function test_resolver_zeroRegistryReverts() public {
-        vm.expectRevert(IdentityTipBeneficiaryResolver.ZeroRegistry.selector);
-        new IdentityTipBeneficiaryResolver(address(0));
-    }
-
-    function test_resolver_returnsTBAWhenSet() public {
-        MockIdentity id = new MockIdentity();
-        id.setAgent(1, ALICE, address(0xBADBADBA), true);
-        IdentityTipBeneficiaryResolver r = new IdentityTipBeneficiaryResolver(address(id));
-        assertEq(r.tipBeneficiary(1), address(0xBADBADBA));
-    }
-
-    function test_resolver_fallsBackToHolderWhenNoTBA() public {
-        MockIdentity id = new MockIdentity();
-        id.setAgent(1, ALICE, address(0), true);
-        IdentityTipBeneficiaryResolver r = new IdentityTipBeneficiaryResolver(address(id));
-        assertEq(r.tipBeneficiary(1), ALICE);
-    }
-
-    function test_resolver_inactiveAgentReturnsZero() public {
-        MockIdentity id = new MockIdentity();
-        id.setAgent(1, ALICE, address(0xBADBADBA), false);
-        IdentityTipBeneficiaryResolver r = new IdentityTipBeneficiaryResolver(address(id));
-        assertEq(r.tipBeneficiary(1), address(0));
-    }
-
-    function test_resolver_nonexistentAgentReverts() public {
-        MockIdentity id = new MockIdentity();
-        IdentityTipBeneficiaryResolver r = new IdentityTipBeneficiaryResolver(address(id));
-        vm.expectRevert();
-        r.tipBeneficiary(999);
     }
 }

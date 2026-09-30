@@ -7,24 +7,16 @@ const abi = [
     "type": "constructor",
     "inputs": [
       {
-        "name": "_oracle",
+        "name": "_receiver",
         "type": "address"
       },
       {
-        "name": "_attestors",
-        "type": "address[]"
+        "name": "_reputation",
+        "type": "address"
       },
       {
         "name": "_thresholds",
-        "type": "int128[]"
-      },
-      {
-        "name": "_tag1",
-        "type": "string"
-      },
-      {
-        "name": "_tag2",
-        "type": "string"
+        "type": "uint256[]"
       }
     ],
     "stateMutability": "nonpayable"
@@ -129,23 +121,6 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "attestors",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "beforeMint",
     "inputs": [
       {
@@ -208,6 +183,23 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "hireThresholds",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "hookInterfaceId",
     "inputs": [],
     "outputs": [
@@ -217,6 +209,18 @@ const abi = [
       }
     ],
     "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "identityRegistry",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -263,18 +267,6 @@ const abi = [
         ]
       }
     ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "oracle",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address"
-      }
-    ],
     "stateMutability": "view"
   },
   {
@@ -291,41 +283,24 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "tag1",
+    "name": "receiver",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "string"
+        "type": "address"
       }
     ],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "tag2",
+    "name": "reputation",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "string"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "thresholds",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "int128"
+        "type": "address"
       }
     ],
     "stateMutability": "view"
@@ -334,6 +309,10 @@ const abi = [
     "type": "function",
     "name": "tierOf",
     "inputs": [
+      {
+        "name": "host",
+        "type": "address"
+      },
       {
         "name": "agentId",
         "type": "uint256"
@@ -345,12 +324,12 @@ const abi = [
         "type": "uint8"
       },
       {
-        "name": "summaryValue",
-        "type": "int128"
+        "name": "hires",
+        "type": "uint64"
       },
       {
-        "name": "count",
-        "type": "uint64"
+        "name": "ratingSum",
+        "type": "int128"
       }
     ],
     "stateMutability": "view"
@@ -400,33 +379,6 @@ const abi = [
     "stateMutability": "view"
   },
   {
-    "type": "event",
-    "name": "TierObserved",
-    "inputs": [
-      {
-        "name": "agentId",
-        "type": "uint256",
-        "indexed": true
-      },
-      {
-        "name": "tier",
-        "type": "uint8",
-        "indexed": false
-      },
-      {
-        "name": "summaryValue",
-        "type": "int128",
-        "indexed": false
-      },
-      {
-        "name": "count",
-        "type": "uint64",
-        "indexed": false
-      }
-    ],
-    "anonymous": false
-  },
-  {
     "type": "error",
     "name": "PermissionNotDeclared",
     "inputs": [
@@ -443,7 +395,7 @@ const abi = [
   },
   {
     "type": "error",
-    "name": "ZeroOracle",
+    "name": "ZeroAddress",
     "inputs": []
   }
 ] as const;

@@ -140,12 +140,12 @@ contract EvolutionHooksTest is Test {
         uint256 id = collection.registerAgent("A", "uri");
 
         // Mint did NOT count as a transfer
-        assertEq(recolor.transferCount(id), 0);
+        assertEq(recolor.transferCount(address(collection), id), 0);
 
         vm.prank(minter);
         collection.transferFrom(minter, buyer, id);
 
-        assertEq(recolor.transferCount(id), 1);
+        assertEq(recolor.transferCount(address(collection), id), 1);
     }
 
     function test_beforeTransfer_canBlockTransfer() public {
@@ -361,7 +361,7 @@ contract EvolutionHooksTest is Test {
             collection.transferFrom(a, b, id);
             (a, b) = (b, a);
         }
-        assertEq(recolor.transferCount(id), n);
+        assertEq(recolor.transferCount(address(collection), id), n);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

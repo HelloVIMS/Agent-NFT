@@ -9,6 +9,10 @@ const abi = [
       {
         "name": "stageSvgs",
         "type": "bytes[]"
+      },
+      {
+        "name": "_minSecondsPerStage",
+        "type": "uint256"
       }
     ],
     "stateMutability": "nonpayable"
@@ -139,6 +143,39 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "minSecondsPerStage",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "nextAdvanceAt",
+    "inputs": [
+      {
+        "name": "host",
+        "type": "address"
+      },
+      {
+        "name": "agentId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "onTrigger",
     "inputs": [
       {
@@ -198,8 +235,12 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "seeded",
+    "name": "progress",
     "inputs": [
+      {
+        "name": "",
+        "type": "address"
+      },
       {
         "name": "",
         "type": "uint256"
@@ -207,25 +248,16 @@ const abi = [
     ],
     "outputs": [
       {
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "stage",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
+        "name": "stage",
         "type": "uint8"
+      },
+      {
+        "name": "seeded",
+        "type": "bool"
+      },
+      {
+        "name": "advancedAt",
+        "type": "uint64"
       }
     ],
     "stateMutability": "view"
@@ -263,6 +295,11 @@ const abi = [
     "type": "event",
     "name": "Advanced",
     "inputs": [
+      {
+        "name": "host",
+        "type": "address",
+        "indexed": true
+      },
       {
         "name": "agentId",
         "type": "uint256",

@@ -18,8 +18,6 @@ import {EvolutionTypes}    from "./EvolutionTypes.sol";
 contract TimeOfDayHook is BaseEvolutionHook {
     enum Phase { Dawn, Noon, Dusk, Night }
 
-    event PhaseChanged(uint256 indexed agentId, Phase phase);
-
     function getPermissions() public pure override returns (uint256) {
         return EvolutionTypes.FLAG_ON_TRIGGER;
     }
@@ -35,6 +33,7 @@ contract TimeOfDayHook is BaseEvolutionHook {
 
     function onTrigger(uint256 agentId, bytes32 triggerKind, bytes calldata)
         external
+        view
         override
         returns (EvolutionTypes.EvolutionResult memory r)
     {
@@ -51,7 +50,6 @@ contract TimeOfDayHook is BaseEvolutionHook {
         r.svgChanged   = true;
         r.newSvgInline = svg;
         r.newStateHash = keccak256(abi.encode("time", agentId, p));
-        emit PhaseChanged(agentId, p);
         return r;
     }
 

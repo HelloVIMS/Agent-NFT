@@ -10,14 +10,9 @@ import {TipJarHook}           from "../src/hooks/TipJarHook.sol";
 import {ReputationLevelHook}  from "../src/hooks/ReputationLevelHook.sol";
 import {VoteGatedHook}        from "../src/hooks/VoteGatedHook.sol";
 
-/// @dev Minimal stub TBA resolver for the TipJarHook constructor.
-contract _StubResolver {
-    function tipBeneficiary(uint256) external pure returns (address) { return address(0xBEEF); }
-}
-/// @dev Minimal stub ERC-8004 oracle for the ReputationLevelHook constructor.
-contract _StubRep {
-    function getSummary(uint256, address[] calldata, string calldata, string calldata)
-        external pure returns (uint64, int128, uint8) { return (0, 0, 0); }
+/// @dev Minimal stub of the payment contract for the ReputationLevelHook constructor.
+contract _StubReceiver {
+    function identityRegistry() external pure returns (address) { return address(0x1D); }
 }
 
 contract VimsProvenanceTest is Test {
@@ -91,11 +86,10 @@ contract VimsProvenanceTest is Test {
         deployments[1] = address(new GenerationHook());
         deployments[2] = address(new SeasonalHook());
         deployments[3] = address(new HueRotateHook(60));
-        deployments[4] = address(new TipJarHook(address(new _StubResolver())));
+        deployments[4] = address(new TipJarHook());
         {
-            address[] memory att = new address[](1); att[0] = address(0xAA1);
-            int128[]  memory th  = new int128[](1);  th[0]  = 50;
-            deployments[5] = address(new ReputationLevelHook(address(new _StubRep()), att, th, "", ""));
+            uint256[] memory th = new uint256[](1); th[0] = 1;
+            deployments[5] = address(new ReputationLevelHook(address(new _StubReceiver()), address(0xAE9), th));
         }
         deployments[6] = address(new VoteGatedHook(address(0xC0DE), 5));
 

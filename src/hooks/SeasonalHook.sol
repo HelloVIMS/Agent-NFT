@@ -23,8 +23,6 @@ contract SeasonalHook is BaseEvolutionHook, VimsProvenance {
 
     enum Season { Winter, Spring, Summer, Autumn }
 
-    event SeasonChanged(uint256 indexed agentId, Season season, uint16 year, uint8 month);
-
     function getPermissions() public pure override returns (uint256) {
         return EvolutionTypes.FLAG_ON_TRIGGER;
     }
@@ -39,6 +37,7 @@ contract SeasonalHook is BaseEvolutionHook, VimsProvenance {
 
     function onTrigger(uint256 agentId, bytes32 triggerKind, bytes calldata)
         external
+        view
         override
         returns (EvolutionTypes.EvolutionResult memory r)
     {
@@ -47,7 +46,6 @@ contract SeasonalHook is BaseEvolutionHook, VimsProvenance {
         r.svgChanged   = true;
         r.newSvgInline = _render(s);
         r.newStateHash = keccak256(abi.encode("season", agentId, s, year, month));
-        emit SeasonChanged(agentId, s, year, month);
     }
 
     function _render(Season s) internal pure returns (bytes memory) {

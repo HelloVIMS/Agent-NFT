@@ -9,6 +9,8 @@ import "../src/AgentIdentityRegistry.sol";
 import "../src/AgentX402Receiver.sol";
 import "../src/AgentTBARegistry.sol";
 import "../src/AgentReputationRegistry.sol";
+import {RevenueLevelHook} from "../src/hooks/RevenueLevelHook.sol";
+import {ReputationLevelHook} from "../src/hooks/ReputationLevelHook.sol";
 
 /// @dev ERC-3009-shaped USDC mock. Same shape as the lifecycle suite mock
 ///      so we don't drift; the EIP-3009 ECDSA sig is unit-tested elsewhere
@@ -425,5 +427,68 @@ contract BuyerSellerAgentEconomyTest is Test {
         vm.prank(buyer);
         vm.expectRevert(bytes("Cannot review own agent"));
         reputation.giveFeedback(buyerId, 1, 0, "", "", "");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Per-NFT paid-hire stats → evolution hooks (real receiver + registry)
+    // ─────────────────────────────────────────────────────────────────────
+
+    function test_ReceiverRecordsPaidHiresPerNFT() public {
+        (uint256 sellerId, ) = _mintSellerAgent();
+        _paySeller(sellerId, 1);
+        _paySeller(sellerId, 2);
+        assertEq(x402.nftSettlements(address(identity), sellerId), 2);
+        assertEq(x402.nftVolume(address(identity), sellerId, address(usdc)), 2 * SERVICE_PRICE);
+        assertEq(x402.nftVolume(address(identity), sellerId, address(0xDEAD)), 0);
+    }
+
+    /// An owner paying their own agent isn't a sale: no stats, no levels.
+    function test_SelfPaymentIsNotCounted() public {
+        uint256 selfPk = uint256(keccak256("buyer-payer-pk"));
+        address self = vm.addr(selfPk);
+        vm.prank(self);
+        (uint256 id, ) = identity.mintWithFullStack("Self", "ipfs://self", 0, address(0), TBA_SALT_B, SERVICE_ID, address(usdc), SERVICE_PRICE);
+        _paySeller(id, 1);
+        assertEq(x402.nftSettlements(address(identity), id), 0);
+        assertEq(x402.nftVolume(address(identity), id, address(usdc)), 0);
+    }
+
+    function test_HooksLevelFromRealSettlements() public {
+        (uint256 sellerId, ) = _mintSellerAgent();
+        uint256[] memory rev = new uint256[](2);
+        rev[0] = SERVICE_PRICE; rev[1] = 3 * SERVICE_PRICE;
+        RevenueLevelHook revenue = new RevenueLevelHook(address(x402), address(usdc), rev);
+        uint256[] memory hires = new uint256[](2);
+        hires[0] = 1; hires[1] = 2;
+        ReputationLevelHook tiers = new ReputationLevelHook(address(x402), address(reputation), hires);
+
+        (uint8 lvl,) = revenue.levelOf(address(identity), sellerId);
+        (uint8 tier,,) = tiers.tierOf(address(identity), sellerId);
+        assertEq(lvl, 0);
+        assertEq(tier, 0);
+
+        address payer = _paySeller(sellerId, 1);
+        _paySeller(sellerId, 2);
+        (lvl,) = revenue.levelOf(address(identity), sellerId);
+        (tier,,) = tiers.tierOf(address(identity), sellerId);
+        assertEq(lvl, 1, "200 USDC earned: past the first threshold only");
+        assertEq(tier, 2, "two paid hires");
+
+        // Net-negative ratings drop the tier to zero.
+        vm.prank(payer);
+        reputation.giveFeedback(sellerId, int128(-1), uint8(0), "x402", "svc", "");
+        (tier,,) = tiers.tierOf(address(identity), sellerId);
+        assertEq(tier, 0);
+
+        // A sale starts the new owner's era at tier 0; revenue is lifetime.
+        vm.prank(seller);
+        identity.transferFrom(seller, newOwner, sellerId);
+        (tier,,) = tiers.tierOf(address(identity), sellerId);
+        (lvl,) = revenue.levelOf(address(identity), sellerId);
+        assertEq(tier, 0);
+        assertEq(lvl, 1);
+        _paySeller(sellerId, 3);
+        (tier,,) = tiers.tierOf(address(identity), sellerId);
+        assertEq(tier, 1, "new owner's first paid hire");
     }
 }

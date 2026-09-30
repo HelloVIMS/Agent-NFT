@@ -7,7 +7,11 @@ const abi = [
     "type": "constructor",
     "inputs": [
       {
-        "name": "_revenueRecorder",
+        "name": "_receiver",
+        "type": "address"
+      },
+      {
+        "name": "_token",
         "type": "address"
       },
       {
@@ -119,23 +123,6 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "cumulativeRevenue",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getPermissions",
     "inputs": [],
     "outputs": [
@@ -160,17 +147,25 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "level",
+    "name": "levelOf",
     "inputs": [
       {
-        "name": "",
+        "name": "host",
+        "type": "address"
+      },
+      {
+        "name": "agentId",
         "type": "uint256"
       }
     ],
     "outputs": [
       {
-        "name": "",
+        "name": "lvl",
         "type": "uint8"
+      },
+      {
+        "name": "revenue",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -253,23 +248,7 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "recordRevenue",
-    "inputs": [
-      {
-        "name": "agentId",
-        "type": "uint256"
-      },
-      {
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "revenueRecorder",
+    "name": "receiver",
     "inputs": [],
     "outputs": [
       {
@@ -280,48 +259,16 @@ const abi = [
     "stateMutability": "view"
   },
   {
-    "type": "event",
-    "name": "LevelUp",
-    "inputs": [
+    "type": "function",
+    "name": "token",
+    "inputs": [],
+    "outputs": [
       {
-        "name": "agentId",
-        "type": "uint256",
-        "indexed": true
-      },
-      {
-        "name": "newLevel",
-        "type": "uint8",
-        "indexed": false
+        "name": "",
+        "type": "address"
       }
     ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "RevenueRecorded",
-    "inputs": [
-      {
-        "name": "agentId",
-        "type": "uint256",
-        "indexed": true
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "cumulative",
-        "type": "uint256",
-        "indexed": false
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "error",
-    "name": "NotRevenueRecorder",
-    "inputs": []
+    "stateMutability": "view"
   },
   {
     "type": "error",
@@ -332,6 +279,16 @@ const abi = [
         "type": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "ThresholdsNotIncreasing",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroAddress",
+    "inputs": []
   }
 ] as const;
 export default abi;

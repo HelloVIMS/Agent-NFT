@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import {TimeOfDayHook}     from "../../src/hooks/TimeOfDayHook.sol";
-import {RevenueLevelHook}  from "../../src/hooks/RevenueLevelHook.sol";
 import {OracleHook}        from "../../src/hooks/OracleHook.sol";
 import {EvolutionTypes}    from "../../src/hooks/EvolutionTypes.sol";
 
@@ -72,90 +71,6 @@ contract DeployedHooksAudit is Test {
         assertTrue(r.svgChanged);
         assertGt(r.newSvgInline.length, 100);
         assertTrue(r.newStateHash != bytes32(0));
-    }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // RevenueLevelHook
-    // ─────────────────────────────────────────────────────────────────────
-
-    function _newRevenueHook(address recorder) internal returns (RevenueLevelHook h) {
-        uint256[] memory th = new uint256[](4);
-        th[0] = 1 ether;
-        th[1] = 5 ether;
-        th[2] = 10 ether;
-        th[3] = 50 ether;
-        h = new RevenueLevelHook(recorder, th);
-    }
-
-    function test_AUDIT_RevenueLevel_recorderOnlyAuth() public {
-        address recorder = address(0xAAA1);
-        RevenueLevelHook h = _newRevenueHook(recorder);
-
-        // Random caller cannot record.
-        vm.expectRevert(RevenueLevelHook.NotRevenueRecorder.selector);
-        h.recordRevenue(1, 1 ether);
-
-        // Authorised caller works.
-        vm.prank(recorder);
-        h.recordRevenue(1, 1 ether);
-        assertEq(h.cumulativeRevenue(1), 1 ether);
-        assertEq(h.level(1), 1);
-    }
-
-    function test_AUDIT_RevenueLevel_singleCallSpansMultipleLevels() public {
-        // Adversarial: a single big inflow should advance through ALL crossed
-        // thresholds atomically, not just one level.
-        address recorder = address(0xAAA1);
-        RevenueLevelHook h = _newRevenueHook(recorder);
-
-        vm.prank(recorder);
-        h.recordRevenue(7, 12 ether); // crosses thresholds 0, 1, 2 in one shot
-
-        assertEq(h.level(7), 3); // levels 1, 2, 3 unlocked
-    }
-
-    function test_AUDIT_RevenueLevel_levelCappedAtThresholdsLength() public {
-        address recorder = address(0xAAA1);
-        RevenueLevelHook h = _newRevenueHook(recorder);
-
-        vm.prank(recorder);
-        h.recordRevenue(1, 1_000 ether); // way past all thresholds
-
-        assertEq(h.level(1), 4); // == thresholds.length
-    }
-
-    function testFuzz_AUDIT_RevenueLevel_monotonicLevel(uint8 calls) public {
-        // Level must be monotonically non-decreasing across any sequence
-        // of recordRevenue calls.
-        address recorder = address(0xAAA1);
-        RevenueLevelHook h = _newRevenueHook(recorder);
-
-        uint256 c = uint256(bound(calls, 1, 16));
-        uint8 lastLvl;
-        for (uint256 i; i < c; ++i) {
-            vm.prank(recorder);
-            h.recordRevenue(1, 0.5 ether);
-            uint8 lvl = h.level(1);
-            assertGe(lvl, lastLvl);
-            lastLvl = lvl;
-        }
-    }
-
-    function test_AUDIT_RevenueLevel_unsupportedTriggerIsNoop() public {
-        RevenueLevelHook h = _newRevenueHook(address(0xAAA1));
-        EvolutionTypes.EvolutionResult memory r = h.onTrigger(1, TRIG_TIME, "");
-        assertFalse(r.svgChanged);
-    }
-
-    function test_AUDIT_RevenueLevel_correctTriggerSvgChanges() public {
-        address recorder = address(0xAAA1);
-        RevenueLevelHook h = _newRevenueHook(recorder);
-        vm.prank(recorder);
-        h.recordRevenue(1, 6 ether);
-
-        EvolutionTypes.EvolutionResult memory r = h.onTrigger(1, TRIG_X402, "");
-        assertTrue(r.svgChanged);
-        assertGt(r.newSvgInline.length, 100);
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -244,22 +159,14 @@ contract DeployedHooksAudit is Test {
         assertFalse(r.svgChanged);
     }
 
-    function test_AUDIT_Oracle_correctTriggerEmitsBucketed() public {
+    /// onTrigger is view: anyone can call a hook directly, so events from it
+    /// (with no collection) would let anyone forge an agent's history.
+    function test_AUDIT_Oracle_triggerRendersBandWithoutEvents() public {
         (OracleHook h, MockPriceFeed feed) = _newOracle();
         feed.setAnswer(4_000_00000000, block.timestamp);
-
         vm.recordLogs();
         EvolutionTypes.EvolutionResult memory r = h.onTrigger(42, TRIG_ORACLE, "");
         assertTrue(r.svgChanged);
-
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        bool sawBucketed;
-        for (uint256 i; i < logs.length; ++i) {
-            if (logs[i].topics[0] == keccak256("Bucketed(uint256,int256,uint8)")) {
-                sawBucketed = true;
-                break;
-            }
-        }
-        assertTrue(sawBucketed, "Bucketed event must fire on oracle trigger");
+        assertEq(vm.getRecordedLogs().length, 0);
     }
 }

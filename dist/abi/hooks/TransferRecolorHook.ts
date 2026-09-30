@@ -49,11 +49,11 @@ const abi = [
         "type": "uint256"
       },
       {
-        "name": "",
+        "name": "from",
         "type": "address"
       },
       {
-        "name": "",
+        "name": "to",
         "type": "address"
       }
     ],
@@ -204,6 +204,10 @@ const abi = [
     "inputs": [
       {
         "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
         "type": "uint256"
       }
     ],
@@ -219,6 +223,11 @@ const abi = [
     "type": "event",
     "name": "Recolored",
     "inputs": [
+      {
+        "name": "host",
+        "type": "address",
+        "indexed": true
+      },
       {
         "name": "agentId",
         "type": "uint256",

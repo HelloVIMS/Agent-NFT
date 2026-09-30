@@ -240,7 +240,7 @@ const abi = [
         ]
       }
     ],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -297,33 +297,6 @@ const abi = [
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "event",
-    "name": "SeasonChanged",
-    "inputs": [
-      {
-        "name": "agentId",
-        "type": "uint256",
-        "indexed": true
-      },
-      {
-        "name": "season",
-        "type": "uint8",
-        "indexed": false
-      },
-      {
-        "name": "year",
-        "type": "uint16",
-        "indexed": false
-      },
-      {
-        "name": "month",
-        "type": "uint8",
-        "indexed": false
-      }
-    ],
-    "anonymous": false
   },
   {
     "type": "error",

@@ -6,83 +6,76 @@ import {EvolutionTypes}    from "./EvolutionTypes.sol";
 
 /**
  * @title EvolutionStagesHook
- * @notice Fully on-chain generative evolution. The collection creator registers
- *         an ordered list of stage SVGs at deploy time; each trigger advances
- *         the agent to the next stage (egg → baby → adult → elder …).
- *
- * @dev    Permission set: FLAG_ON_TRIGGER. Trigger kinds handled:
- *         TRIGGER_TRANSFER, TRIGGER_TIME_TICK, TRIGGER_CUSTOM. The hook does NOT
- *         call back into the host; it returns an EvolutionResult and the host
- *         applies it inline (v4 semantics — no keepers, no off-chain compute).
- *
- *         Stages are registered by the deployer and are immutable per hook
- *         instance. To use different stage sets per collection, deploy a new
- *         hook instance with that stage set.
+ * @notice Walks a token through a fixed list of stage SVGs: the first trigger
+ *         shows stage 0, each later one advances a stage until the last.
+ * @dev    FLAG_ON_TRIGGER. Hosts expose triggerEvolve to anyone, so a stage
+ *         advances at most once per `minSecondsPerStage` — otherwise a
+ *         stranger could fast-forward any agent to its final stage in a few
+ *         calls. State is per host collection (see BaseEvolutionHook).
  */
 contract EvolutionStagesHook is BaseEvolutionHook {
     error NoStages();
     error BadStageIndex();
 
-    /// @notice Immutable ordered list of stage SVG bodies (full `<svg>…</svg>`).
-    ///         Indexed from 0 = initial stage. Length = number of stages.
     bytes[] private _stageSvgs;
-    /// @notice Current stage index per agent. Starts at 0 on first trigger;
-    ///         advances by 1 each trigger until it reaches the last stage.
-    mapping(uint256 => uint8) public stage;
-    /// @notice Whether an agent has been touched by this hook at least once.
-    mapping(uint256 => bool) public seeded;
+    uint256 public immutable minSecondsPerStage;
 
-    event Advanced(uint256 indexed agentId, uint8 indexed newStage, uint256 totalStages);
+    struct Progress {
+        uint8  stage;
+        bool   seeded;
+        uint64 advancedAt;
+    }
+    /// @notice host collection => token id => progress.
+    mapping(address => mapping(uint256 => Progress)) public progress;
 
-    constructor(bytes[] memory stageSvgs) {
+    event Advanced(address indexed host, uint256 indexed agentId, uint8 indexed newStage, uint256 totalStages);
+
+    constructor(bytes[] memory stageSvgs, uint256 _minSecondsPerStage) {
         if (stageSvgs.length == 0) revert NoStages();
         if (stageSvgs.length > 64) revert BadStageIndex(); // sanity cap
         _stageSvgs = stageSvgs;
+        minSecondsPerStage = _minSecondsPerStage;
     }
 
     function getPermissions() public pure override returns (uint256) {
         return EvolutionTypes.FLAG_ON_TRIGGER;
     }
 
-    /// @notice Number of stages this hook advertises.
     function totalStages() external view returns (uint256) {
         return _stageSvgs.length;
     }
 
-    /// @notice Read a stage SVG (for UIs / explorers).
     function stageSvg(uint8 index) external view returns (bytes memory) {
         if (index >= _stageSvgs.length) revert BadStageIndex();
         return _stageSvgs[index];
     }
 
-    function onTrigger(uint256 agentId, bytes32 /*triggerKind*/, bytes calldata)
+    /// @notice When `agentId` in `host` can next advance (0 = now or never
+    ///         again — check `stage` against `totalStages`).
+    function nextAdvanceAt(address host, uint256 agentId) external view returns (uint256) {
+        Progress memory p = progress[host][agentId];
+        if (!p.seeded || p.stage + 1 >= _stageSvgs.length) return 0;
+        uint256 at = uint256(p.advancedAt) + minSecondsPerStage;
+        return at > block.timestamp ? at : 0;
+    }
+
+    function onTrigger(uint256 agentId, bytes32, bytes calldata)
         external
         override
         returns (EvolutionTypes.EvolutionResult memory r)
     {
-        if (!EvolutionTypes.hasFlag(_PERMISSIONS, EvolutionTypes.FLAG_ON_TRIGGER)) {
-            revert PermissionNotDeclared(EvolutionTypes.FLAG_ON_TRIGGER);
-        }
-
-        uint8 cur = stage[agentId];
-        uint256 last = _stageSvgs.length - 1;
-
-        // Seed stage 0 on the very first trigger; advance on every subsequent one.
-        if (!seeded[agentId]) {
-            seeded[agentId] = true;
-        } else if (cur < last) {
-            unchecked { cur += 1; }
-            stage[agentId] = cur;
+        Progress storage p = progress[msg.sender][agentId];
+        if (!p.seeded) {
+            p.seeded = true;
+        } else if (p.stage + 1 < _stageSvgs.length && block.timestamp >= uint256(p.advancedAt) + minSecondsPerStage) {
+            p.stage += 1;
         } else {
-            // Already at final stage — no-op but still emit so consumers can
-            // record the event. svgChanged = false → host skips the write.
             return EvolutionTypes.noOp();
         }
-
+        p.advancedAt = uint64(block.timestamp);
         r.svgChanged   = true;
-        r.newSvgInline = _stageSvgs[cur];
-        r.newStateHash = keccak256(abi.encode("stage", agentId, cur));
-        emit Advanced(agentId, cur, _stageSvgs.length);
-        return r;
+        r.newSvgInline = _stageSvgs[p.stage];
+        r.newStateHash = keccak256(abi.encode("stage", msg.sender, agentId, p.stage));
+        emit Advanced(msg.sender, agentId, p.stage, _stageSvgs.length);
     }
 }

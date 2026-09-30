@@ -321,6 +321,7 @@ contract AgentX402Receiver is
             systemCut, creatorCut, agentCut, agentRecipient
         );
         _recordSettlement(agentId, from, serviceId, gross);
+        _recordNFTStats(address(identityRegistry), agentId, from, identityRegistry.ownerOf(agentId), svc.token, gross);
     }
 
     // ============ View helpers ============
@@ -653,6 +654,7 @@ contract AgentX402Receiver is
         );
         // Reputation is keyed by identity agent ids; other collections have none.
         if (nft == address(identityRegistry)) _recordSettlement(tokenId, from, serviceId, gross);
+        _recordNFTStats(nft, tokenId, from, ad.ownerOf(tokenId), svc.token, gross);
     }
 
     // ============ Reputation (v2) ============
@@ -690,5 +692,21 @@ contract AgentX402Receiver is
         } catch (bytes memory reason) {
             emit ReputationRecordFailed(agentId, payer, serviceId, reason);
         }
+    }
+
+    // ============ Per-NFT paid-hire stats (v3) ============
+
+    /// @notice Paid hires of an agent NFT (identity or collection), counted
+    ///         once per settlement. What evolution hooks level agents by —
+    ///         reputation v2 covers identity agents only, and hooks run on
+    ///         collections. An owner paying their own agent isn't a sale.
+    mapping(address => mapping(uint256 => uint64)) public nftSettlements;
+    /// @notice Gross paid to an agent NFT, per payment token.
+    mapping(address => mapping(uint256 => mapping(address => uint256))) public nftVolume;
+
+    function _recordNFTStats(address nft, uint256 tokenId, address payer, address owner, address token, uint256 gross) internal {
+        if (payer == owner) return;
+        unchecked { nftSettlements[nft][tokenId] += 1; }
+        nftVolume[nft][tokenId][token] += gross;
     }
 }

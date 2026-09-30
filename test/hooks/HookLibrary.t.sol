@@ -2,54 +2,47 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
+import {ERC721}              from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {EvolutionTypes}      from "../../src/hooks/EvolutionTypes.sol";
 import {SoulboundHook}       from "../../src/hooks/SoulboundHook.sol";
 import {GenerationHook}      from "../../src/hooks/GenerationHook.sol";
+import {TransferRecolorHook} from "../../src/hooks/TransferRecolorHook.sol";
 import {SeasonalHook}        from "../../src/hooks/SeasonalHook.sol";
 import {HueRotateHook}       from "../../src/hooks/HueRotateHook.sol";
-import {TipJarHook, ITipBeneficiary} from "../../src/hooks/TipJarHook.sol";
-import {ReputationLevelHook, IERC8004Reputation} from "../../src/hooks/ReputationLevelHook.sol";
+import {TipJarHook}          from "../../src/hooks/TipJarHook.sol";
+import {RevenueLevelHook}    from "../../src/hooks/RevenueLevelHook.sol";
+import {ReputationLevelHook, IReputationEras} from "../../src/hooks/ReputationLevelHook.sol";
 import {VoteGatedHook}       from "../../src/hooks/VoteGatedHook.sol";
 
-/// @dev Mock TBA-style sink that tracks ETH received per-agent and refuses on a flag.
-contract MockBeneficiary is ITipBeneficiary {
-    mapping(uint256 => address payable) public sinks;
-    function setSink(uint256 agentId, address payable s) external { sinks[agentId] = s; }
-    function tipBeneficiary(uint256 agentId) external view returns (address) {
-        return sinks[agentId];
+/// @dev A minimal agent collection: an ERC-721 anyone can mint into.
+contract MockCollection is ERC721 {
+    constructor() ERC721("Mock", "M") {}
+    function mint(address to, uint256 id) external { _mint(to, id); }
+}
+
+/// @dev AgentX402Receiver's per-NFT stats surface, settable.
+contract MockNFTStats {
+    address public identityRegistry;
+    mapping(address => mapping(uint256 => uint64)) public nftSettlements;
+    mapping(address => mapping(uint256 => mapping(address => uint256))) public nftVolume;
+    constructor(address identity) { identityRegistry = identity; }
+    function set(address nft, uint256 id, uint64 hires, address token, uint256 volume) external {
+        nftSettlements[nft][id] = hires;
+        nftVolume[nft][id][token] = volume;
     }
 }
 
-/// @dev Mock ERC-8004 Reputation Registry. Stores a single int128 summary
-///      per (agentId, clientAddress, tag1, tag2) tuple and serves it via
-///      `getSummary` aggregating across the requested clients.
-contract MockERC8004Reputation is IERC8004Reputation {
-    struct K { uint256 a; address c; bytes32 t1; bytes32 t2; }
-    mapping(bytes32 => int128) public score;
-    mapping(bytes32 => bool)   public has;
-    uint8 public immutable dec;
-
-    constructor(uint8 _dec) { dec = _dec; }
-
-    function _k(uint256 a, address c, string memory t1, string memory t2) internal pure returns (bytes32) {
-        return keccak256(abi.encode(a, c, keccak256(bytes(t1)), keccak256(bytes(t2))));
+/// @dev AgentReputationRegistry v2's era surface, settable.
+contract MockEras {
+    mapping(uint256 => uint256) public currentEra;
+    mapping(uint256 => mapping(uint256 => IReputationEras.EraStats)) internal _stats;
+    function set(uint256 id, uint256 era, uint64 hires, int128 ratingSum) external {
+        currentEra[id] = era;
+        _stats[id][era].settlements = hires;
+        _stats[id][era].feedbackSum = ratingSum;
     }
-    function setScore(uint256 a, address c, string memory t1, string memory t2, int128 v) external {
-        bytes32 k = _k(a, c, t1, t2);
-        score[k] = v;
-        has[k]   = true;
-    }
-    function getSummary(uint256 a, address[] calldata clients, string calldata t1, string calldata t2)
-        external view returns (uint64 count, int128 summaryValue, uint8 summaryValueDecimals)
-    {
-        int256 acc;
-        uint64 hits;
-        for (uint256 i; i < clients.length; ++i) {
-            bytes32 k = _k(a, clients[i], t1, t2);
-            if (has[k]) { acc += int256(score[k]); unchecked { hits++; } }
-        }
-        if (hits == 0) return (0, 0, dec);
-        return (hits, int128(acc / int256(uint256(hits))), dec);
+    function eraStats(uint256 id, uint256 era) external view returns (IReputationEras.EraStats memory) {
+        return _stats[id][era];
     }
 }
 
@@ -62,7 +55,12 @@ contract HookLibraryTest is Test {
     bytes32 internal constant TRIG_TIME    = keccak256("time.tick");
     bytes32 internal constant TRIG_TRANSFER= keccak256("transfer");
     bytes32 internal constant TRIG_REP     = keccak256("reputation.update");
+    bytes32 internal constant TRIG_X402    = keccak256("service.x402");
     bytes32 internal constant TRIG_CUSTOM  = keccak256("custom");
+
+    address internal constant HOST_A = address(0xA0);
+    address internal constant HOST_B = address(0xB0);
+    address internal constant USDC   = address(0x05DC);
 
     // ─────────────────────────────────────────────────────────────────────
     // SoulboundHook
@@ -104,44 +102,65 @@ contract HookLibraryTest is Test {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // GenerationHook
+    // GenerationHook / TransferRecolorHook — counters per host collection
     // ─────────────────────────────────────────────────────────────────────
 
     function test_Generation_incrementsOnOwnerToOwner() public {
         GenerationHook h = new GenerationHook();
+        vm.startPrank(HOST_A);
         h.afterTransfer(1, address(0xA), address(0xB));
         h.afterTransfer(1, address(0xB), address(0xC));
-        assertEq(h.generation(1), 2);
+        vm.stopPrank();
+        assertEq(h.generation(HOST_A, 1), 2);
     }
 
     function test_Generation_doesNotIncrementOnMintOrBurn() public {
         GenerationHook h = new GenerationHook();
-        h.afterTransfer(1, address(0),  address(0xA)); // mint
-        h.afterTransfer(1, address(0xA), address(0));  // burn
-        assertEq(h.generation(1), 0);
+        vm.startPrank(HOST_A);
+        h.afterTransfer(1, address(0),  address(0xA));
+        h.afterTransfer(1, address(0xA), address(0));
+        vm.stopPrank();
+        assertEq(h.generation(HOST_A, 1), 0);
     }
 
-    function test_Generation_perAgentIsolation() public {
+    /// Anyone can call afterTransfer; it only moves the caller's own counters,
+    /// and the same token id in two collections never collides.
+    function test_Generation_isolatedPerHost() public {
         GenerationHook h = new GenerationHook();
+        vm.prank(HOST_A);
         h.afterTransfer(1, address(0xA), address(0xB));
-        h.afterTransfer(2, address(0xC), address(0xD));
-        h.afterTransfer(2, address(0xD), address(0xE));
-        assertEq(h.generation(1), 1);
-        assertEq(h.generation(2), 2);
-    }
-
-    function test_Generation_triggerRendersWithCount() public {
-        GenerationHook h = new GenerationHook();
-        h.afterTransfer(7, address(0xA), address(0xB));
-        EvolutionTypes.EvolutionResult memory r = h.onTrigger(7, TRIG_TRANSFER, "");
-        assertTrue(r.svgChanged);
-        assertGt(r.newSvgInline.length, 50);
+        for (uint256 i; i < 5; i++) {
+            vm.prank(address(0xBAD));
+            h.afterTransfer(1, address(0xA), address(0xB));
+        }
+        assertEq(h.generation(HOST_A, 1), 1);
+        assertEq(h.generation(HOST_B, 1), 0);
+        assertEq(h.generation(address(0xBAD), 1), 5);
+        vm.prank(HOST_A);
+        EvolutionTypes.EvolutionResult memory ra = h.onTrigger(1, TRIG_TRANSFER, "");
+        vm.prank(HOST_B);
+        EvolutionTypes.EvolutionResult memory rb = h.onTrigger(1, TRIG_TRANSFER, "");
+        assertTrue(ra.newStateHash != rb.newStateHash);
     }
 
     function test_Generation_unsupportedTriggerNoop() public {
         GenerationHook h = new GenerationHook();
         EvolutionTypes.EvolutionResult memory r = h.onTrigger(1, TRIG_CUSTOM, "");
         assertFalse(r.svgChanged);
+    }
+
+    function test_Recolor_countsOwnerMovesPerHost() public {
+        TransferRecolorHook h = new TransferRecolorHook();
+        vm.startPrank(HOST_A);
+        h.afterTransfer(1, address(0), address(0xA));  // mint: not counted
+        h.afterTransfer(1, address(0xA), address(0xB));
+        h.afterTransfer(1, address(0xB), address(0xC));
+        EvolutionTypes.EvolutionResult memory r = h.onTrigger(1, TRIG_TRANSFER, "");
+        vm.stopPrank();
+        assertEq(h.transferCount(HOST_A, 1), 2);
+        assertEq(h.transferCount(HOST_B, 1), 0);
+        assertTrue(r.svgChanged);
+        assertGt(r.newSvgInline.length, 50);
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -183,14 +202,12 @@ contract HookLibraryTest is Test {
         assertLt(uint256(s), 4);
     }
 
-    function test_Seasonal_emitsSeasonChangedOnTimeTick() public {
+    function test_Seasonal_rendersOnTimeTick() public {
         SeasonalHook h = new SeasonalHook();
         vm.warp(1721044000); // summer
-        vm.recordLogs();
         EvolutionTypes.EvolutionResult memory r = h.onTrigger(1, TRIG_TIME, "");
         assertTrue(r.svgChanged);
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        assertGt(logs.length, 0);
+        assertGt(r.newSvgInline.length, 80);
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -230,198 +247,248 @@ contract HookLibraryTest is Test {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // TipJarHook
+    // TipJarHook — tips reach the owner of that exact token
     // ─────────────────────────────────────────────────────────────────────
 
-    function test_TipJar_zeroResolverReverts() public {
-        vm.expectRevert(TipJarHook.ZeroBeneficiary.selector);
-        new TipJarHook(address(0));
-    }
-
-    function test_TipJar_zeroAmountReverts() public {
-        MockBeneficiary mb = new MockBeneficiary();
-        TipJarHook h = new TipJarHook(address(mb));
-        vm.expectRevert(TipJarHook.ZeroAmount.selector);
-        h.tip(1);
-    }
-
-    function test_TipJar_unsetBeneficiaryReverts() public {
-        MockBeneficiary mb = new MockBeneficiary();
-        TipJarHook h = new TipJarHook(address(mb));
+    function test_TipJar_forwardsToTokenOwner() public {
+        TipJarHook h = new TipJarHook();
+        MockCollection c = new MockCollection();
+        address owner = address(0xA11CE);
+        c.mint(owner, 7);
         vm.deal(address(this), 1 ether);
-        vm.expectRevert(TipJarHook.ZeroBeneficiary.selector);
-        h.tip{value: 1 ether}(1);
+        h.tip{value: 0.2 ether}(address(c), 7);
+        h.tip{value: 0.3 ether}(address(c), 7);
+        assertEq(owner.balance, 0.5 ether);
+        assertEq(address(h).balance, 0);
+        (uint256 total, uint256 last, uint32 count) = h.jars(address(c), 7);
+        assertEq(total, 0.5 ether);
+        assertEq(last, 0.3 ether);
+        assertEq(count, 2);
     }
 
-    function test_TipJar_forwardsToBeneficiary() public {
-        MockBeneficiary mb = new MockBeneficiary();
-        TipJarHook h = new TipJarHook(address(mb));
-        address payable sink = payable(address(uint160(uint256(keccak256("sink")))));
-        mb.setSink(1, sink);
-
-        vm.deal(address(this), 5 ether);
-        h.tip{value: 1 ether}(1);
-        h.tip{value: 0.5 ether}(1);
-
-        assertEq(sink.balance, 1.5 ether);
-        assertEq(h.tipped(1), 1.5 ether);
-        assertEq(h.lastTip(1), 0.5 ether);
-        assertEq(h.tipCount(1), 2);
-        assertEq(address(h).balance, 0); // hook holds nothing
+    /// The same token id in another collection belongs to someone else.
+    function test_TipJar_collectionsDontCollide() public {
+        TipJarHook h = new TipJarHook();
+        MockCollection a = new MockCollection();
+        MockCollection b = new MockCollection();
+        a.mint(address(0xA11CE), 1);
+        b.mint(address(0xB0B), 1);
+        vm.deal(address(this), 1 ether);
+        h.tip{value: 0.1 ether}(address(b), 1);
+        assertEq(address(0xA11CE).balance, 0);
+        assertEq(address(0xB0B).balance, 0.1 ether);
+        (uint256 totalA,,) = h.jars(address(a), 1);
+        assertEq(totalA, 0);
     }
 
-    function test_TipJar_revertingBeneficiaryRevertsOuter() public {
-        MockBeneficiary mb = new MockBeneficiary();
-        TipJarHook h = new TipJarHook(address(mb));
+    function test_TipJar_followsOwnershipAfterSale() public {
+        TipJarHook h = new TipJarHook();
+        MockCollection c = new MockCollection();
+        c.mint(address(0xA11CE), 1);
+        vm.prank(address(0xA11CE));
+        c.transferFrom(address(0xA11CE), address(0xB0B), 1);
+        vm.deal(address(this), 1 ether);
+        h.tip{value: 0.1 ether}(address(c), 1);
+        assertEq(address(0xB0B).balance, 0.1 ether);
+        assertEq(address(0xA11CE).balance, 0);
+    }
+
+    function test_TipJar_refusesUnknownTokensZeroAmountsAndEOAHosts() public {
+        TipJarHook h = new TipJarHook();
+        MockCollection c = new MockCollection();
+        vm.deal(address(this), 1 ether);
+        vm.expectRevert(TipJarHook.NoSuchToken.selector);
+        h.tip{value: 1}(address(c), 99);
+        vm.expectRevert(TipJarHook.NoSuchToken.selector);
+        h.tip{value: 1}(address(0xEEEE), 1);
+        c.mint(address(0xA11CE), 1);
+        vm.expectRevert(TipJarHook.ZeroAmount.selector);
+        h.tip(address(c), 1);
+    }
+
+    function test_TipJar_revertsWhenOwnerRefusesETH() public {
+        TipJarHook h = new TipJarHook();
+        MockCollection c = new MockCollection();
         RevertingReceiver rr = new RevertingReceiver();
-        mb.setSink(1, payable(address(rr)));
-
+        c.mint(address(rr), 1);
         vm.deal(address(this), 1 ether);
         vm.expectRevert(TipJarHook.TransferFailed.selector);
-        h.tip{value: 1 ether}(1);
+        h.tip{value: 1}(address(c), 1);
+        (uint256 total,,) = h.jars(address(c), 1);
+        assertEq(total, 0, "reverted tip leaves no trace");
     }
 
-    function test_TipJar_renderOnTipTrigger() public {
-        MockBeneficiary mb = new MockBeneficiary();
-        TipJarHook h = new TipJarHook(address(mb));
-        address payable sink = payable(address(0x1234));
-        mb.setSink(1, sink);
-        vm.deal(address(this), 5 ether);
-        h.tip{value: 2 ether}(1);
-
-        EvolutionTypes.EvolutionResult memory r = h.onTrigger(1, h.TRIG_TIP_JAR(), "");
+    function test_TipJar_rendersTotalsForTheCallingHost() public {
+        TipJarHook h = new TipJarHook();
+        MockCollection c = new MockCollection();
+        c.mint(address(0xA11CE), 1);
+        vm.deal(address(this), 1 ether);
+        h.tip{value: 0.25 ether}(address(c), 1);
+        bytes32 trig = h.TRIG_TIP_JAR();
+        vm.prank(address(c));
+        EvolutionTypes.EvolutionResult memory r = h.onTrigger(1, trig, "");
         assertTrue(r.svgChanged);
         assertGt(r.newSvgInline.length, 100);
+        vm.prank(HOST_B);
+        EvolutionTypes.EvolutionResult memory other = h.onTrigger(1, trig, "");
+        assertTrue(r.newStateHash != other.newStateHash);
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // ReputationLevelHook
+    // RevenueLevelHook — levels from what buyers paid (payment contract)
     // ─────────────────────────────────────────────────────────────────────
 
-    address internal constant ATTESTOR_A = address(0xAA1);
-    address internal constant ATTESTOR_B = address(0xAA2);
-
-    function _newRepHook() internal returns (ReputationLevelHook h, MockERC8004Reputation o) {
-        o = new MockERC8004Reputation(0);
-        int128[] memory th = new int128[](4);
-        th[0] = 25; th[1] = 50; th[2] = 75; th[3] = 90;
-        address[] memory att = new address[](2);
-        att[0] = ATTESTOR_A; att[1] = ATTESTOR_B;
-        h = new ReputationLevelHook(address(o), att, th, "", "");
+    function _revenueHook(MockNFTStats st) internal returns (RevenueLevelHook) {
+        uint256[] memory th = new uint256[](3);
+        th[0] = 1e6; th[1] = 10e6; th[2] = 100e6;
+        return new RevenueLevelHook(address(st), USDC, th);
     }
 
-    function test_ReputationLevel_zeroOracleReverts() public {
-        int128[] memory th = new int128[](1); th[0] = 1;
-        address[] memory att = new address[](1); att[0] = ATTESTOR_A;
-        vm.expectRevert(ReputationLevelHook.ZeroOracle.selector);
-        new ReputationLevelHook(address(0), att, th, "", "");
+    function test_RevenueLevel_levelsFromPaidVolume() public {
+        MockNFTStats st = new MockNFTStats(address(0));
+        RevenueLevelHook h = _revenueHook(st);
+        (uint8 lvl,) = h.levelOf(HOST_A, 1);
+        assertEq(lvl, 0);
+        st.set(HOST_A, 1, 3, USDC, 10e6);
+        (lvl,) = h.levelOf(HOST_A, 1);
+        assertEq(lvl, 2);
+        st.set(HOST_A, 1, 9, USDC, 500e6);
+        (lvl,) = h.levelOf(HOST_A, 1);
+        assertEq(lvl, 3, "capped at the last threshold");
+        (lvl,) = h.levelOf(HOST_B, 1);
+        assertEq(lvl, 0, "other collection");
+        // Volume in another token doesn't count.
+        st.set(HOST_B, 1, 1, address(0xDA1), 1000e6);
+        (lvl,) = h.levelOf(HOST_B, 1);
+        assertEq(lvl, 0);
     }
 
-    function test_ReputationLevel_nonIncreasingThresholdsRevert() public {
-        MockERC8004Reputation o = new MockERC8004Reputation(0);
-        int128[] memory th = new int128[](3); th[0] = 100; th[1] = 100; th[2] = 200;
-        address[] memory att = new address[](1); att[0] = ATTESTOR_A;
-        vm.expectRevert(ReputationLevelHook.ThresholdsNotIncreasing.selector);
-        new ReputationLevelHook(address(o), att, th, "", "");
+    function test_RevenueLevel_rendersForCallingHostOnX402Trigger() public {
+        MockNFTStats st = new MockNFTStats(address(0));
+        RevenueLevelHook h = _revenueHook(st);
+        st.set(HOST_A, 1, 1, USDC, 2e6);
+        vm.prank(HOST_A);
+        EvolutionTypes.EvolutionResult memory r = h.onTrigger(1, TRIG_X402, "");
+        assertTrue(r.svgChanged);
+        assertFalse(h.onTrigger(1, TRIG_CUSTOM, "").svgChanged);
     }
 
-    function test_ReputationLevel_zeroFeedbackIsTierZero() public {
-        (ReputationLevelHook h,) = _newRepHook();
-        (uint8 tier, int128 v, uint64 c) = h.tierOf(1);
-        assertEq(tier, 0); assertEq(v, int128(0)); assertEq(c, 0);
+    function test_RevenueLevel_constructorValidation() public {
+        uint256[] memory bad = new uint256[](2);
+        bad[0] = 10; bad[1] = 10;
+        vm.expectRevert(RevenueLevelHook.ThresholdsNotIncreasing.selector);
+        new RevenueLevelHook(address(1), USDC, bad);
+        uint256[] memory ok = new uint256[](1);
+        vm.expectRevert(RevenueLevelHook.ZeroAddress.selector);
+        new RevenueLevelHook(address(0), USDC, ok);
+        vm.expectRevert(RevenueLevelHook.ZeroAddress.selector);
+        new RevenueLevelHook(address(1), address(0), ok);
     }
 
-    function test_ReputationLevel_tierMapping() public {
-        (ReputationLevelHook h, MockERC8004Reputation o) = _newRepHook();
-        // Single attestor, score 30 → tier 1 (>=25, <50)
-        o.setScore(1, ATTESTOR_A, "", "", 30);
-        (uint8 t,,) = h.tierOf(1); assertEq(t, 1);
-        // Two attestors, average 75 → tier 3
-        o.setScore(1, ATTESTOR_B, "", "", 120); // avg = (30+120)/2 = 75
-        (t,,) = h.tierOf(1); assertEq(t, 3);
-        // Drop A's contribution by overwriting with -50, avg = (-50+120)/2 = 35 → tier 1
-        o.setScore(1, ATTESTOR_A, "", "", -50);
-        (t,,) = h.tierOf(1); assertEq(t, 1);
+    // ─────────────────────────────────────────────────────────────────────
+    // ReputationLevelHook — tiers from paid hires; identity agents per owner era
+    // ─────────────────────────────────────────────────────────────────────
+
+    address internal constant IDENTITY = address(0x1D);
+
+    function _repHook(MockNFTStats st, MockEras eras) internal returns (ReputationLevelHook) {
+        uint256[] memory th = new uint256[](3);
+        th[0] = 1; th[1] = 5; th[2] = 25;
+        return new ReputationLevelHook(address(st), address(eras), th);
     }
 
-    function test_ReputationLevel_unknownAttestorIgnored() public {
-        (ReputationLevelHook h, MockERC8004Reputation o) = _newRepHook();
-        // Score from a non-trusted address — must not affect tier.
-        o.setScore(1, address(0xBADBADBA), "", "", 99);
-        (uint8 t,, uint64 c) = h.tierOf(1);
-        assertEq(t, 0); assertEq(c, 0);
+    function test_ReputationLevel_collectionAgentsTierByPaidHires() public {
+        MockNFTStats st = new MockNFTStats(IDENTITY);
+        ReputationLevelHook h = _repHook(st, new MockEras());
+        st.set(HOST_A, 1, 5, USDC, 0);
+        (uint8 tier, uint64 hires,) = h.tierOf(HOST_A, 1);
+        assertEq(tier, 2);
+        assertEq(hires, 5);
+        (tier,,) = h.tierOf(HOST_B, 1);
+        assertEq(tier, 0);
     }
 
-    function testFuzz_ReputationLevel_tierMonotoneInValue(int64 lo, int64 hi) public {
-        if (lo > hi) (lo, hi) = (hi, lo);
-        (ReputationLevelHook h, MockERC8004Reputation o) = _newRepHook();
-        o.setScore(1, ATTESTOR_A, "", "", int128(lo));
-        (uint8 ta,,) = h.tierOf(1);
-        o.setScore(1, ATTESTOR_A, "", "", int128(hi));
-        (uint8 tb,,) = h.tierOf(1);
-        assertGe(tb, ta);
+    function test_ReputationLevel_identityAgentsUseCurrentOwnerEra() public {
+        MockNFTStats st = new MockNFTStats(IDENTITY);
+        MockEras eras = new MockEras();
+        ReputationLevelHook h = _repHook(st, eras);
+        // The payment contract's lifetime count is ignored for identity agents…
+        st.set(IDENTITY, 9, 100, USDC, 0);
+        // …the current owner's era is what counts: a new owner starts at 0.
+        eras.set(9, 0, 30, 5);
+        (uint8 tier,,) = h.tierOf(IDENTITY, 9);
+        assertEq(tier, 3);
+        eras.set(9, 1, 0, 0);
+        (tier,,) = h.tierOf(IDENTITY, 9);
+        assertEq(tier, 0, "sold: new era");
+        eras.set(9, 1, 6, 0);
+        (tier,,) = h.tierOf(IDENTITY, 9);
+        assertEq(tier, 2);
     }
 
-    function test_ReputationLevel_emitsTierObserved() public {
-        (ReputationLevelHook h, MockERC8004Reputation o) = _newRepHook();
-        o.setScore(1, ATTESTOR_A, "", "", 80);
-        vm.recordLogs();
+    function test_ReputationLevel_netNegativeRatingsDropToZero() public {
+        MockNFTStats st = new MockNFTStats(IDENTITY);
+        MockEras eras = new MockEras();
+        ReputationLevelHook h = _repHook(st, eras);
+        eras.set(9, 0, 30, -1);
+        (uint8 tier, uint64 hires, int128 sum) = h.tierOf(IDENTITY, 9);
+        assertEq(tier, 0);
+        assertEq(hires, 30);
+        assertEq(sum, -1);
+    }
+
+    function test_ReputationLevel_rendersOnReputationTrigger() public {
+        MockNFTStats st = new MockNFTStats(IDENTITY);
+        ReputationLevelHook h = _repHook(st, new MockEras());
+        st.set(HOST_A, 1, 1, USDC, 0);
+        vm.prank(HOST_A);
         EvolutionTypes.EvolutionResult memory r = h.onTrigger(1, TRIG_REP, "");
         assertTrue(r.svgChanged);
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        assertGt(logs.length, 0);
+        assertFalse(h.onTrigger(1, TRIG_CUSTOM, "").svgChanged);
+    }
+
+    function test_ReputationLevel_constructorValidation() public {
+        MockNFTStats st = new MockNFTStats(IDENTITY);
+        uint256[] memory bad = new uint256[](2);
+        bad[0] = 5; bad[1] = 1;
+        vm.expectRevert(ReputationLevelHook.ThresholdsNotIncreasing.selector);
+        new ReputationLevelHook(address(st), address(1), bad);
+        uint256[] memory ok = new uint256[](1);
+        vm.expectRevert(ReputationLevelHook.ZeroAddress.selector);
+        new ReputationLevelHook(address(st), address(0), ok);
+        ReputationLevelHook h = new ReputationLevelHook(address(st), address(1), ok);
+        assertEq(h.identityRegistry(), IDENTITY);
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // VoteGatedHook
+    // VoteGatedHook — governor names the collection
     // ─────────────────────────────────────────────────────────────────────
+
+    function test_VoteGated_onlyGovernorAdvancesPerHost() public {
+        address gov = address(0x60);
+        VoteGatedHook h = new VoteGatedHook(gov, 4);
+        vm.expectRevert(VoteGatedHook.NotGovernor.selector);
+        h.setStage(HOST_A, 1, 1);
+        vm.startPrank(gov);
+        h.setStage(HOST_A, 1, 2);
+        vm.expectRevert(VoteGatedHook.StageNotIncreasing.selector);
+        h.setStage(HOST_A, 1, 2);
+        vm.expectRevert(VoteGatedHook.StageNotIncreasing.selector);
+        h.setStage(HOST_A, 1, 5);
+        vm.stopPrank();
+        assertEq(h.stage(HOST_A, 1), 2);
+        assertEq(h.stage(HOST_B, 1), 0);
+        bytes32 trig = h.TRIG_VOTE_GATED();
+        vm.prank(HOST_A);
+        EvolutionTypes.EvolutionResult memory a = h.onTrigger(1, trig, "");
+        vm.prank(HOST_B);
+        EvolutionTypes.EvolutionResult memory b = h.onTrigger(1, trig, "");
+        assertTrue(a.svgChanged && b.svgChanged);
+        assertTrue(a.newStateHash != b.newStateHash);
+    }
 
     function test_VoteGated_zeroGovernorReverts() public {
         vm.expectRevert(VoteGatedHook.ZeroGovernor.selector);
-        new VoteGatedHook(address(0), 5);
-    }
-
-    function test_VoteGated_onlyGovernorAdvances() public {
-        address gov = address(0xC0DE);
-        VoteGatedHook h = new VoteGatedHook(gov, 5);
-
-        vm.expectRevert(VoteGatedHook.NotGovernor.selector);
-        h.setStage(1, 1);
-
-        vm.prank(gov);
-        h.setStage(1, 1);
-        assertEq(h.stage(1), 1);
-    }
-
-    function test_VoteGated_strictlyIncreasing() public {
-        address gov = address(0xC0DE);
-        VoteGatedHook h = new VoteGatedHook(gov, 5);
-
-        vm.startPrank(gov);
-        h.setStage(1, 2);
-        vm.expectRevert(VoteGatedHook.StageNotIncreasing.selector);
-        h.setStage(1, 2); // equal
-        vm.expectRevert(VoteGatedHook.StageNotIncreasing.selector);
-        h.setStage(1, 1); // older
-        vm.stopPrank();
-    }
-
-    function test_VoteGated_cannotExceedMaxStage() public {
-        address gov = address(0xC0DE);
-        VoteGatedHook h = new VoteGatedHook(gov, 3);
-
-        vm.prank(gov);
-        vm.expectRevert(VoteGatedHook.StageNotIncreasing.selector);
-        h.setStage(1, 4);
-    }
-
-    function test_VoteGated_renderOnCustomTrigger() public {
-        address gov = address(0xC0DE);
-        VoteGatedHook h = new VoteGatedHook(gov, 5);
-        vm.prank(gov);
-        h.setStage(1, 3);
-        EvolutionTypes.EvolutionResult memory r = h.onTrigger(1, h.TRIG_VOTE_GATED(), "");
-        assertTrue(r.svgChanged);
-        assertGt(r.newSvgInline.length, 50);
+        new VoteGatedHook(address(0), 4);
     }
 }

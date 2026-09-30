@@ -41,8 +41,6 @@ contract OracleHook is BaseEvolutionHook {
     int256 public immutable bullThreshold;
     uint256 public constant STALENESS_LIMIT = 1 hours;
 
-    event Bucketed(uint256 indexed agentId, int256 price, Band band);
-
     constructor(address _feed, int256 _bearThreshold, int256 _bullThreshold) {
         feed = IPriceFeed(_feed);
         bearThreshold = _bearThreshold;
@@ -70,6 +68,7 @@ contract OracleHook is BaseEvolutionHook {
 
     function onTrigger(uint256 agentId, bytes32 triggerKind, bytes calldata)
         external
+        view
         override
         returns (EvolutionTypes.EvolutionResult memory r)
     {
@@ -86,7 +85,6 @@ contract OracleHook is BaseEvolutionHook {
         r.svgChanged   = true;
         r.newSvgInline = svg;
         r.newStateHash = keccak256(abi.encode("oracle", agentId, band, price));
-        emit Bucketed(agentId, price, band);
         return r;
     }
 

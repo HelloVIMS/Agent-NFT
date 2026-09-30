@@ -6,7 +6,6 @@ import {EvolutionTypes}      from "../../src/hooks/EvolutionTypes.sol";
 import {EvolutionStagesHook} from "../../src/hooks/EvolutionStagesHook.sol";
 import {OracleHook}          from "../../src/hooks/OracleHook.sol";
 import {TimeOfDayHook}       from "../../src/hooks/TimeOfDayHook.sol";
-import {RevenueLevelHook}    from "../../src/hooks/RevenueLevelHook.sol";
 import {TransferRecolorHook} from "../../src/hooks/TransferRecolorHook.sol";
 
 /// @dev Mock Chainlink-style oracle for OracleHook.
@@ -23,7 +22,7 @@ contract OracleMock {
  * @title HookCoverageSweepTest
  * @notice Drives the trigger-mismatch and view-getter paths across the
  *         remaining hooks: EvolutionStagesHook, OracleHook, TimeOfDayHook,
- *         RevenueLevelHook, TransferRecolorHook.
+ *         TransferRecolorHook (RevenueLevelHook: HookLibrary.t.sol).
  */
 contract HookCoverageSweepTest is Test {
     bytes32 internal constant TRIG_TIME    = EvolutionTypes.TRIGGER_TIME_TICK;
@@ -39,7 +38,7 @@ contract HookCoverageSweepTest is Test {
         stages[0] = bytes('<svg id="0"/>');
         stages[1] = bytes('<svg id="1"/>');
         stages[2] = bytes('<svg id="2"/>');
-        h = new EvolutionStagesHook(stages);
+        h = new EvolutionStagesHook(stages, 1 hours);
     }
 
     function test_stages_totalStages() public {
@@ -139,33 +138,6 @@ contract HookCoverageSweepTest is Test {
         }
     }
 
-    // ─── RevenueLevelHook ─────────────────────────────────────────────────
-
-    function _makeRevenueHook() internal returns (RevenueLevelHook h, address recorder) {
-        recorder = address(this);
-        uint256[] memory thresholds = new uint256[](3);
-        thresholds[0] = 0.1 ether;
-        thresholds[1] = 0.5 ether;
-        thresholds[2] = 1 ether;
-        h = new RevenueLevelHook(recorder, thresholds);
-    }
-
-    function test_revenueLevel_otherTriggerNoOp() public {
-        (RevenueLevelHook h, ) = _makeRevenueHook();
-        EvolutionTypes.EvolutionResult memory r = h.onTrigger(1, TRIG_OTHER, "");
-        assertFalse(r.svgChanged);
-    }
-
-    function test_revenueLevel_serviceTriggerRendersBadge() public {
-        (RevenueLevelHook h, address recorder) = _makeRevenueHook();
-        // Bump cumulative revenue past first threshold via the recorder.
-        vm.prank(recorder);
-        h.recordRevenue(1, 0.6 ether);
-        EvolutionTypes.EvolutionResult memory r = h.onTrigger(1, TRIG_SERVICE, "");
-        assertTrue(r.svgChanged);
-        assertGt(r.newSvgInline.length, 50);
-    }
-
     // ─── TransferRecolorHook ──────────────────────────────────────────────
 
     function test_recolor_otherTriggerNoOp() public {
@@ -187,6 +159,6 @@ contract HookCoverageSweepTest is Test {
         TransferRecolorHook h = new TransferRecolorHook();
         bytes4 sel = h.afterTransfer(1, address(0xA), address(0xB));
         assertEq(sel, h.afterTransfer.selector);
-        assertEq(h.transferCount(1), 1);
+        assertEq(h.transferCount(address(this), 1), 1);
     }
 }
