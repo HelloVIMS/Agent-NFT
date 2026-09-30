@@ -133,7 +133,6 @@ contract AgentCollectionImpl is
         BaseURI,      // 1 — sequential composed from `collectionBaseURI`
         OnChainSVG    // 2 — rendered from `_svgImages[id]`
     }
-    mapping(uint256 => MetadataMode) public metadataMode;
 
     mapping(uint256 => AgentMetadata) public agents;
     mapping(address => uint256[]) public ownerAgents;
@@ -955,9 +954,14 @@ contract AgentCollectionImpl is
     /// @dev EIP-712 typed-data hashing and signer recovery for the keeper
     ///      `commitEvolution` flow are delegated to {AgentCollectionEIP712}.
 
+    /// @notice The hook that governs `agentId`: its own override while the
+    ///         owner who set it still holds the token, otherwise the
+    ///         collection's. A sale therefore drops the seller's override
+    ///         without deleting it (the hook keeps its data); the new owner
+    ///         turns it back on with setHook.
     function activeHookFor(uint256 agentId) public view returns (address hook, uint256 perms) {
         hook = hookOf[agentId];
-        if (hook == address(0)) hook = collectionHook;
+        if (hook == address(0) || hookSetter[agentId] != _ownerOf(agentId)) hook = collectionHook;
         if (hook != address(0)) perms = hookPermissions[hook];
     }
 
@@ -989,6 +993,7 @@ contract AgentCollectionImpl is
         address prev = hookOf[agentId];
         uint256 perms = _registerHookPerms(hook);
         hookOf[agentId] = hook;
+        hookSetter[agentId] = hook == address(0) ? address(0) : msg.sender;
         emit AgentHookSet(agentId, prev, hook, perms);
     }
 
@@ -1076,12 +1081,17 @@ contract AgentCollectionImpl is
         bool uriChanged = bytes(result.newSvgUri).length > 0;
         bool inlineChanged = result.newSvgInline.length > 0;
 
+        // A hook the creator or owner installed decides where the token's
+        // metadata now comes from: new art → on-chain SVG, a new URI → that
+        // URI. Otherwise evolved art would be stored and never served.
         if (uriChanged) {
             _setTokenURI(agentId, result.newSvgUri);
+            metadataMode[agentId] = MetadataMode.ExplicitURI;
         }
         if (inlineChanged) {
             if (result.newSvgInline.length > MAX_SVG_SIZE) revert TooLarge();
             _svgImages[agentId] = string(result.newSvgInline);
+            metadataMode[agentId] = MetadataMode.OnChainSVG;
             emit SVGImageSet(agentId, result.newSvgInline.length);
         }
         if (result.newStateHash != bytes32(0)) {
@@ -1108,16 +1118,14 @@ contract AgentCollectionImpl is
         if (sel != IAgentEvolutionHook.afterMint.selector) revert HookInvalidReturn();
     }
 
-    function _callBeforeTransfer(uint256 tokenId, address from, address to) internal {
-        (address hook, uint256 perms) = activeHookFor(tokenId);
+    function _callBeforeTransfer(address hook, uint256 perms, uint256 tokenId, address from, address to) internal {
         if (hook == address(0)) return;
         if (!EvolutionTypes.hasFlag(perms, EvolutionTypes.FLAG_BEFORE_TRANSFER)) return;
         bytes4 sel = IAgentEvolutionHook(hook).beforeTransfer(tokenId, from, to);
         if (sel != IAgentEvolutionHook.beforeTransfer.selector) revert HookInvalidReturn();
     }
 
-    function _callAfterTransfer(uint256 tokenId, address from, address to) internal {
-        (address hook, uint256 perms) = activeHookFor(tokenId);
+    function _callAfterTransfer(address hook, uint256 perms, uint256 tokenId, address from, address to) internal {
         if (hook == address(0)) return;
         if (!EvolutionTypes.hasFlag(perms, EvolutionTypes.FLAG_AFTER_TRANSFER)) return;
         bytes4 sel = IAgentEvolutionHook(hook).afterTransfer(tokenId, from, to);
@@ -1129,9 +1137,12 @@ contract AgentCollectionImpl is
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
         // Pre-transfer hook fires only on actual transfers, NOT on mints (from == 0)
         // or burns (to == 0). Mints/burns are governed by mint/burn-specific hooks.
+        // Resolve the hook once, before ownership moves: the same hook sees
+        // both sides of a transfer, even when the sale ends the override.
         address currentOwner = _ownerOf(tokenId);
+        (address hook, uint256 perms) = activeHookFor(tokenId);
         if (currentOwner != address(0) && to != address(0)) {
-            _callBeforeTransfer(tokenId, currentOwner, to);
+            _callBeforeTransfer(hook, perms, tokenId, currentOwner, to);
         }
 
         address from = super._update(to, tokenId, auth);
@@ -1152,7 +1163,7 @@ contract AgentCollectionImpl is
         }
 
         if (from != address(0) && to != address(0)) {
-            _callAfterTransfer(tokenId, from, to);
+            _callAfterTransfer(hook, perms, tokenId, from, to);
         }
 
         return from;
@@ -1252,4 +1263,16 @@ contract AgentCollectionImpl is
         agents[agentId].tbaAddress = tba;
         emit TBAAddressSet(agentId, tba);
     }
+
+    // ============ Storage appended after the live layout ============
+    //
+    // Collections are beacon proxies sharing this implementation: new state
+    // goes here, after everything the live implementation has, never in
+    // between (test/CollectionBeaconUpgradeFork.t.sol checks every live
+    // collection reads back identically across an upgrade).
+
+    /// @notice Per-token metadata source, fixed at mint (see MetadataMode).
+    mapping(uint256 => MetadataMode) public metadataMode;
+    /// @notice Who set each token's hook override (see activeHookFor).
+    mapping(uint256 => address) public hookSetter;
 }

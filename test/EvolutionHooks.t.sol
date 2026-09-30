@@ -50,6 +50,29 @@ contract OracleCommitHook is BaseEvolutionHook {
     }
 }
 
+/// @dev A seller's trap: once the token leaves its setter, every transfer
+///      reverts, and any redraw rewrites the art.
+contract SellerTrapHook is BaseEvolutionHook {
+    address public immutable setter;
+    constructor(address _setter) { setter = _setter; }
+    function getPermissions() public pure override returns (uint256) {
+        return EvolutionTypes.FLAG_BEFORE_TRANSFER | EvolutionTypes.FLAG_AFTER_TRANSFER | EvolutionTypes.FLAG_ON_TRIGGER;
+    }
+    uint256 public afterCalls;
+    function beforeTransfer(uint256, address from, address) external view override returns (bytes4) {
+        require(from == setter, "trapped");
+        return this.beforeTransfer.selector;
+    }
+    function afterTransfer(uint256, address, address) external override returns (bytes4) {
+        afterCalls++;
+        return this.afterTransfer.selector;
+    }
+    function onTrigger(uint256, bytes32, bytes calldata) external pure override returns (EvolutionTypes.EvolutionResult memory r) {
+        r.svgChanged = true;
+        r.newSvgInline = bytes("<svg>scam</svg>");
+    }
+}
+
 contract EvolutionHooksTest is Test {
     AgentCollectionFactory factory;
     AgentCollectionImpl    impl;
@@ -423,5 +446,80 @@ contract EvolutionHooksTest is Test {
             if (ok) return 1;
         }
         return 0;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // A token's own hook applies only while the owner who set it holds it
+    // ─────────────────────────────────────────────────────────────────────────
+
+    function _trappedSale() internal returns (uint256 id, SellerTrapHook trap) {
+        vm.prank(minter);
+        id = collection.registerAgent("A", "uri");
+        trap = new SellerTrapHook(minter);
+        vm.prank(minter);
+        collection.setHook(id, address(trap));
+        vm.prank(minter);
+        collection.transferFrom(minter, buyer, id);
+    }
+
+    function test_sellersHookCantBlockResale() public {
+        (uint256 id, SellerTrapHook trap) = _trappedSale();
+        // The sale itself ran through the seller's hook, both sides of it.
+        assertEq(trap.afterCalls(), 1);
+        // The buyer resells: the seller's hook no longer applies.
+        vm.prank(buyer);
+        collection.transferFrom(buyer, address(0xCAFE), id);
+        assertEq(collection.ownerOf(id), address(0xCAFE));
+        assertEq(trap.afterCalls(), 1);
+    }
+
+    function test_sellersHookCantRewriteArtAfterSale() public {
+        (uint256 id, ) = _trappedSale();
+        (address hook,) = collection.activeHookFor(id);
+        assertEq(hook, address(0), "no collection hook: none applies");
+        vm.expectRevert(AgentCollectionImpl.HookAddressInvalid.selector);
+        collection.triggerEvolve(id, EvolutionTypes.TRIGGER_CUSTOM, "");
+    }
+
+    function test_saleFallsBackToCollectionHookAndKeepsOverride() public {
+        vm.prank(creator);
+        collection.setCollectionHook(address(recolor));
+        (uint256 id, SellerTrapHook trap) = _trappedSale();
+        (address hook,) = collection.activeHookFor(id);
+        assertEq(hook, address(recolor));
+        assertEq(collection.hookOf(id), address(trap), "override kept, not deleted");
+        // The new owner can turn a hook back on for themselves.
+        vm.prank(buyer);
+        collection.setHook(id, address(trap));
+        (hook,) = collection.activeHookFor(id);
+        assertEq(hook, address(trap));
+        assertEq(collection.hookSetter(id), buyer);
+    }
+
+    function test_clearingAnOverrideClearsItsSetter() public {
+        vm.prank(minter);
+        uint256 id = collection.registerAgent("A", "uri");
+        vm.startPrank(minter);
+        collection.setHook(id, address(recolor));
+        assertEq(collection.hookSetter(id), minter);
+        collection.setHook(id, address(0));
+        vm.stopPrank();
+        assertEq(collection.hookSetter(id), address(0));
+    }
+
+    /// Evolved art is served: a hook writing inline SVG moves the token to
+    /// on-chain SVG metadata, whatever it was minted with.
+    function test_evolvedArtIsServedByTokenURI() public {
+        vm.prank(minter);
+        uint256 id = collection.registerAgent("A", "ipfs://static");
+        assertEq(collection.tokenURI(id), "ipfs://static");
+        vm.prank(creator);
+        collection.setCollectionHook(address(recolor));
+        vm.prank(minter);
+        collection.transferFrom(minter, buyer, id);
+        collection.triggerEvolve(id, EvolutionTypes.TRIGGER_TRANSFER, "");
+        assertEq(uint8(collection.metadataMode(id)), uint8(AgentCollectionImpl.MetadataMode.OnChainSVG));
+        string memory uri = collection.tokenURI(id);
+        assertTrue(bytes(uri).length > 100 && keccak256(bytes(uri)) != keccak256("ipfs://static"), "serves the evolved art");
     }
 }

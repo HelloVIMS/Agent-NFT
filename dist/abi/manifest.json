@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-30T03:11:57.125Z",
+  "generatedAt": "2026-09-30T04:15:37.363Z",
   "generator": "agent-nft/scripts/export-abi.mjs",
   "contracts": [
     {
@@ -142,9 +142,9 @@
       "namespace": null,
       "src": "src/AgentCollectionImpl.sol",
       "abi": "AgentCollectionImpl.json",
-      "sha256": "c798543bedf6f8872b3850ccfc3b4e7050375c1fc74dd5f648d6f188ed07bdad",
-      "bytes": 50515,
-      "entries": 182
+      "sha256": "447568f1bf7596ad4e9eed8f4af12d9ee61b875ec0cf86a19b50fb7a4cfa60f8",
+      "bytes": 50775,
+      "entries": 183
     },
     {
       "contract": "AgentAccount",

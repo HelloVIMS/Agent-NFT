@@ -32,7 +32,7 @@
     "AgentMemory": "0xEE3B214e08d54042Ae72991DF8D67D9Abb839F6A",
     "AgentX402Receiver": "0xf1126e12c7bea39383A0f13e0Adf7Af0Efd64799",
     "AgentMarketplace": "0xcc1E532C8148278c56DBBBcb02f23648C06C2950",
-    "AgentCollectionImpl": "0x9A0E93F14385e94F50284Ab4D973fbCBa3746f9d",
+    "AgentCollectionImpl": "0x5e8548c19bC8748A34aFAb30dC771a75aa26fb08",
     "AgentAvatarExtension": "0x5b20645870604D9CbB153dE9eb6012Ae42Dfea5b",
     "AgentIdentityKeyExtension": "0x06216a771Fe62A0043E173d185A6744b1C498348"
   },
@@ -57,7 +57,7 @@
         "notes": "second testnet deploy"
       }
     ],
-    "implementation": "0x9A0E93F14385e94F50284Ab4D973fbCBa3746f9d",
+    "implementation": "0x5e8548c19bC8748A34aFAb30dC771a75aa26fb08",
     "implementationLegacy": [
       {
         "address": "0xE5a34709CCb56acA387A43afb8D008aEA4bBba86",
@@ -66,6 +66,11 @@
       {
         "address": "0x6aE96a8A2584BD7dA2672157521698493fc271f8",
         "replacedAt": "2026-05-10T05:15:00Z"
+      },
+      {
+        "address": "0xEA68564d1c7F821167C834B6313fb644daB2e2f5",
+        "replacedAt": "2026-09-30",
+        "notes": "live beacon implementation with no deploy record here (this file listed 0x9A0E93F1\u2026); source not in this repository"
       }
     ],
     "beacon": "0xA28E020f8E6258B890e78630C0A5034642f97f2C",
@@ -82,7 +87,9 @@
     "deployedAt": "2026-05-08T03:30:00Z",
     "redeployedAt": "2026-05-08T19:35:00Z",
     "patternBUpgradedAt": "2026-05-10T05:15:00Z",
-    "notes": "v0.9.1 testnet beacon-proxy factory + impl. Adds collectionBaseURI + setBaseURI(), so creators can pre-upload shuffled metadata to IPFS and `tokenURI(id)` resolves to `${baseURI}${id}.json` for any token minted via mintAgent('','') / mintAgentAllowlist('','',proof). Bytecode kept under EIP-170 by linking AgentCollectionRenderer, AgentCollectionEIP712 (with verifyCommit consolidating the keeper signature flow), and AgentCollectionPaymentLib (primary-mint payment split). createCollectionWithSplits() keeps msg.sender as collectionCreator (governance: hooks, mint config, allowlist, baseURI, lock) and wires the splitter as royaltyReceiver via setRoyaltyReceiverOnce."
+    "notes": "v0.9.1 testnet beacon-proxy factory + impl. Adds collectionBaseURI + setBaseURI(), so creators can pre-upload shuffled metadata to IPFS and `tokenURI(id)` resolves to `${baseURI}${id}.json` for any token minted via mintAgent('','') / mintAgentAllowlist('','',proof). Bytecode kept under EIP-170 by linking AgentCollectionRenderer, AgentCollectionEIP712 (with verifyCommit consolidating the keeper signature flow), and AgentCollectionPaymentLib (primary-mint payment split). createCollectionWithSplits() keeps msg.sender as collectionCreator (governance: hooks, mint config, allowlist, baseURI, lock) and wires the splitter as royaltyReceiver via setRoyaltyReceiverOnce.",
+    "implementationUpgradedAt": "2026-09-30",
+    "implementationNotes": "script/UpgradeCollectionImpl.s.sol, rehearsed by test/CollectionBeaconUpgradeFork.t.sol against every live collection. A token hook override applies only while its setter owns the token; hook-written art moves a token to on-chain SVG metadata; per-token metadata mode fixed at mint (mintAgentWithSVG for on-chain art)."
   },
   "implementationHistory": {
     "_note": "Pre-mainnet testnet iterations. The current canonical version is v0.9.2; earlier entries are kept for forensic continuity only.",

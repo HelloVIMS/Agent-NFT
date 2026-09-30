@@ -2,30 +2,31 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
-import "../src/AgentCollectionImpl.sol";
-import "../src/AgentCollectionFactory.sol";
+import {AgentCollectionFactory} from "../src/AgentCollectionFactory.sol";
+import {AgentCollectionImpl}    from "../src/AgentCollectionImpl.sol";
 
 /**
- * @title UpgradeCollectionImpl
- * @notice Upgrades the Agent Collection Implementation via beacon
+ * @title  UpgradeCollectionImplScript
+ * @notice Points the factory's beacon — and so every collection — at the
+ *         current AgentCollectionImpl. New state only ever goes at the end of
+ *         the layout; test/CollectionBeaconUpgradeFork.t.sol rehearses this
+ *         against every live collection first.
+ *
+ * Env:
+ *   DEPLOYER_PRIVATE_KEY  — owner of the factory
+ *   COLLECTION_FACTORY    — factory (default: Base Sepolia)
  */
 contract UpgradeCollectionImplScript is Script {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address factoryAddress = 0x3A28C84fB5C06845d22Fccd0776341bF2e90A9EB;
-        
-        vm.startBroadcast(deployerPrivateKey);
-        
-        // 1. Deploy new implementation
-        AgentCollectionImpl newImpl = new AgentCollectionImpl();
-        console.log("New AgentCollectionImpl:", address(newImpl));
-        
-        // 2. Upgrade beacon via factory
-        AgentCollectionFactory factory = AgentCollectionFactory(factoryAddress);
-        factory.upgradeImplementation(address(newImpl));
-        console.log("Beacon upgraded to new implementation");
-        console.log("  -> New impl:", factory.implementation());
-        
+        uint256 pk = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        AgentCollectionFactory factory = AgentCollectionFactory(vm.envOr("COLLECTION_FACTORY", address(0x6B182188269208533Ed95B7C2b83240f21fA7f12)));
+        require(factory.owner() == vm.addr(pk), "signer does not own the factory");
+
+        vm.startBroadcast(pk);
+        AgentCollectionImpl impl = new AgentCollectionImpl();
+        factory.upgradeImplementation(address(impl));
         vm.stopBroadcast();
+
+        console.log("AgentCollectionImpl:", address(impl));
     }
 }
