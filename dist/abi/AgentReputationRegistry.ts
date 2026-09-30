@@ -1265,6 +1265,11 @@ const abi = [
   },
   {
     "type": "error",
+    "name": "InvalidNFT",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NoSuchEra",
     "inputs": []
   },

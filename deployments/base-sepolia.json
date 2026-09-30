@@ -27,14 +27,14 @@
   },
   "implementations": {
     "AgentIdentityRegistry": "0xCBBa112c05A97E1880e21504984acf40351D94b3",
-    "AgentReputationRegistry": "0x9473FBa41a5a0E6b2DFa62a28c4a2B71043f1243",
+    "AgentReputationRegistry": "0x85b87001c2baA33e7f15f785C6A29a17132E2Fca",
     "AgentContextRegistry": "0x5a31595F915dC8e2b67A1397BaDdA19D1d734ca3",
-    "AgentMemory": "0xEE3B214e08d54042Ae72991DF8D67D9Abb839F6A",
+    "AgentMemory": "0xedDb9b1bD7d065db5EAE4b0dE2DeeDddd57B9649",
     "AgentX402Receiver": "0xb880a889d60380F7F9D96472263eaDc521bD78DD",
     "AgentMarketplace": "0xcc1E532C8148278c56DBBBcb02f23648C06C2950",
     "AgentCollectionImpl": "0xDcBF7187E116577491B65C0E8b0c2aE30e4393c4",
-    "AgentAvatarExtension": "0x5b20645870604D9CbB153dE9eb6012Ae42Dfea5b",
-    "AgentIdentityKeyExtension": "0x7FcCA1B1AD289a5fF2DAa6C1E3038f35FD65eDFE"
+    "AgentAvatarExtension": "0xC6929383104a670FA5fDa0ABa95a874E489527B9",
+    "AgentIdentityKeyExtension": "0x2857F57816aEFcE9C6B73361f3b60A8c9e61cE1d"
   },
   "agentCollectionLibraries": {
     "AgentCollectionRenderer": "0x167655252e710533083C12e0Ea48c10d1F92f2FA",

@@ -29,13 +29,18 @@ import "./interfaces/IAgentIdentityRegistry.sol";
  * Spec: https://github.com/ArqonAi/Pixelog
  */
 import {VimsProvenance} from "./VimsProvenance.sol";
+import "./AgentNFTRefs.sol";
 
+/// @dev Agents of any ERC-721 (collection agents) keep memory too: every
+///      agentId-keyed function takes refOf(nft, tokenId) (AgentNFTRefs),
+///      and the `…For(nft, tokenId)` writes bind the reference.
 contract AgentMemory is
     Initializable,
     VimsProvenance,
     OwnableUpgradeable,
     UUPSUpgradeable,
-    PausableUpgradeable
+    PausableUpgradeable,
+    AgentNFTRefs
 {
     // ============ Errors ============
     error NotOwner();
@@ -160,8 +165,12 @@ contract AgentMemory is
     }
 
     modifier onlyAgentOwner(uint256 agentId) {
-        if (identityRegistry.ownerOf(agentId) != msg.sender) revert NotOwner();
+        if (_ownerOfRef(agentId) != msg.sender) revert NotOwner();
         _;
+    }
+
+    function _identityNFT() internal view override returns (address) {
+        return address(identityRegistry);
     }
 
     // ============ Write API ============
@@ -187,7 +196,35 @@ contract AgentMemory is
         uint8   tier,
         uint16  baseVersion,
         string calldata description
-    ) external onlyAgentOwner(agentId) whenNotPaused returns (uint256 version) {
+    ) external returns (uint256 version) {
+        return _addVersion(agentId, storageURI, contentHash, versionType, category, tier, baseVersion, description);
+    }
+
+    /// @notice {addVersion} for token `tokenId` of `nft`.
+    function addVersionFor(
+        address nft,
+        uint256 tokenId,
+        string calldata storageURI,
+        bytes32 contentHash,
+        uint8   versionType,
+        uint8   category,
+        uint8   tier,
+        uint16  baseVersion,
+        string calldata description
+    ) external returns (uint256 version) {
+        return _addVersion(_bindRef(nft, tokenId), storageURI, contentHash, versionType, category, tier, baseVersion, description);
+    }
+
+    function _addVersion(
+        uint256 agentId,
+        string calldata storageURI,
+        bytes32 contentHash,
+        uint8   versionType,
+        uint8   category,
+        uint8   tier,
+        uint16  baseVersion,
+        string calldata description
+    ) private onlyAgentOwner(agentId) whenNotPaused returns (uint256 version) {
         _validateInputs(storageURI, contentHash, versionType, category, tier, description);
         PixeVersion[] storage arr = _versions[agentId];
         if (arr.length >= MAX_PIXE_VERSIONS) revert MaxReached();
@@ -229,7 +266,37 @@ contract AgentMemory is
         uint8   category,
         uint8   tier,
         string  calldata description
-    ) external onlyAgentOwner(agentId) whenNotPaused returns (uint256 version) {
+    ) external returns (uint256 version) {
+        return _consolidate(agentId, storageURI, contentHash, merkleRoot, fromVersion, toVersion, category, tier, description);
+    }
+
+    /// @notice {consolidate} for token `tokenId` of `nft`.
+    function consolidateFor(
+        address nft,
+        uint256 tokenId,
+        string  calldata storageURI,
+        bytes32 contentHash,
+        bytes32 merkleRoot,
+        uint16  fromVersion,
+        uint16  toVersion,
+        uint8   category,
+        uint8   tier,
+        string  calldata description
+    ) external returns (uint256 version) {
+        return _consolidate(refOf(nft, tokenId), storageURI, contentHash, merkleRoot, fromVersion, toVersion, category, tier, description);
+    }
+
+    function _consolidate(
+        uint256 agentId,
+        string  calldata storageURI,
+        bytes32 contentHash,
+        bytes32 merkleRoot,
+        uint16  fromVersion,
+        uint16  toVersion,
+        uint8   category,
+        uint8   tier,
+        string  calldata description
+    ) private onlyAgentOwner(agentId) whenNotPaused returns (uint256 version) {
         _validateInputs(storageURI, contentHash, TYPE_CONSOLIDATED, category, tier, description);
         if (merkleRoot == bytes32(0)) revert EmptyInput();
         PixeVersion[] storage arr = _versions[agentId];

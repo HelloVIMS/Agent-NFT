@@ -397,6 +397,27 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "nftOf",
+    "inputs": [
+      {
+        "name": "ref",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "owner",
     "inputs": [],
     "outputs": [
@@ -458,6 +479,27 @@ const abi = [
       {
         "name": "",
         "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "refOf",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -661,27 +703,6 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "subjectOf",
-    "inputs": [
-      {
-        "name": "nft",
-        "type": "address"
-      },
-      {
-        "name": "tokenId",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "transferOwnership",
     "inputs": [
       {
@@ -751,6 +772,28 @@ const abi = [
     ],
     "outputs": [],
     "stateMutability": "payable"
+  },
+  {
+    "type": "event",
+    "name": "AgentRefBound",
+    "inputs": [
+      {
+        "name": "ref",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "nft",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": true
+      }
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -938,28 +981,6 @@ const abi = [
   },
   {
     "type": "event",
-    "name": "SubjectBound",
-    "inputs": [
-      {
-        "name": "subject",
-        "type": "uint256",
-        "indexed": true
-      },
-      {
-        "name": "nft",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "tokenId",
-        "type": "uint256",
-        "indexed": true
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "Upgraded",
     "inputs": [
       {
@@ -1018,6 +1039,11 @@ const abi = [
   {
     "type": "error",
     "name": "InvalidInitialization",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidNFT",
     "inputs": []
   },
   {

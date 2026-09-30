@@ -355,10 +355,112 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "addVersionFor",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "storageURI",
+        "type": "string"
+      },
+      {
+        "name": "contentHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "versionType",
+        "type": "uint8"
+      },
+      {
+        "name": "category",
+        "type": "uint8"
+      },
+      {
+        "name": "tier",
+        "type": "uint8"
+      },
+      {
+        "name": "baseVersion",
+        "type": "uint16"
+      },
+      {
+        "name": "description",
+        "type": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "version",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "consolidate",
     "inputs": [
       {
         "name": "agentId",
+        "type": "uint256"
+      },
+      {
+        "name": "storageURI",
+        "type": "string"
+      },
+      {
+        "name": "contentHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "merkleRoot",
+        "type": "bytes32"
+      },
+      {
+        "name": "fromVersion",
+        "type": "uint16"
+      },
+      {
+        "name": "toVersion",
+        "type": "uint16"
+      },
+      {
+        "name": "category",
+        "type": "uint8"
+      },
+      {
+        "name": "tier",
+        "type": "uint8"
+      },
+      {
+        "name": "description",
+        "type": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "version",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "consolidateFor",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
         "type": "uint256"
       },
       {
@@ -746,6 +848,27 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "nftOf",
+    "inputs": [
+      {
+        "name": "ref",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "owner",
     "inputs": [],
     "outputs": [
@@ -783,6 +906,27 @@ const abi = [
       {
         "name": "",
         "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "refOf",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -1004,6 +1148,28 @@ const abi = [
   },
   {
     "type": "event",
+    "name": "AgentRefBound",
+    "inputs": [
+      {
+        "name": "ref",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "nft",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": true
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "IdentityRegistryUpdated",
     "inputs": [
       {
@@ -1211,6 +1377,11 @@ const abi = [
   {
     "type": "error",
     "name": "InvalidInitialization",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidNFT",
     "inputs": []
   },
   {

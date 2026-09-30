@@ -5,7 +5,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "./interfaces/IAgentIdentityRegistry.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "./AgentNFTRefs.sol";
 
 /**
  * @title AgentIdentityKeyExtension
@@ -55,7 +55,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
  *    expected to rotate. Reading a stale key as authoritative would mean
  *    trusting an identity the previous owner can still sign for.
  */
-contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpgradeable {
+contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpgradeable, AgentNFTRefs {
     // ── Errors ────────────────────────────────────────────────────
 
     error NotOwner();
@@ -109,12 +109,6 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
     ///         contract-level note on why a secret cannot transfer.
     mapping(uint256 => address) private _boundOwner;
 
-    /// @notice Tagged subject => the agent NFT it names (unset for
-    ///         identity-registry agents, whose subject is the token id).
-    ///         Appended after the v1 layout.
-    struct NFTRef { address nft; uint256 tokenId; }
-    mapping(uint256 => NFTRef) private _subjectNFT;
-
     uint256 public constant MAX_KEYS_PER_AGENT = 32;
     uint256 public constant MAX_KEY_KIND_BYTES = 32;
     uint256 public constant MAX_LABEL_BYTES    = 64;
@@ -151,10 +145,6 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
 
     event KeyDeactivated(uint256 indexed agentId, bytes32 indexed pubkey, uint256 index);
 
-    /// @notice A non-identity agent NFT got its first key; `subject` is
-    ///         the agentId its key events carry.
-    event SubjectBound(uint256 indexed subject, address indexed nft, uint256 indexed tokenId);
-
     event KeyPermissionsUpdated(
         uint256 indexed agentId,
         bytes32 indexed pubkey,
@@ -182,46 +172,21 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         _;
     }
 
-    // ── Subjects: every agent NFT, not only the identity registry's ──
-    //
-    // Keys are stored per subject. An identity-registry agent's subject is
-    // its token id, as before; an agent of any other ERC-721 (an
-    // AgentCollectionFactory collection) gets `subjectOf(nft, tokenId)`,
-    // tagged with the top bit so it can never equal an identity token id.
-    // The `…For(nft, tokenId)` functions take either kind of agent.
+    // Keys are stored per agent reference (AgentNFTRefs): an identity
+    // agent's token id, or refOf(nft, tokenId) for any other ERC-721. The
+    // `…For(nft, tokenId)` functions take either kind of agent.
 
-    uint256 private constant NFT_SUBJECT_TAG = 1 << 255;
-
-    /// @notice The key subject of token `tokenId` of `nft`.
-    function subjectOf(address nft, uint256 tokenId) public view returns (uint256) {
-        if (nft == address(identityRegistry)) return tokenId;
-        return uint256(keccak256(abi.encode(nft, tokenId))) | NFT_SUBJECT_TAG;
+    function _identityNFT() internal view override returns (address) {
+        return address(identityRegistry);
     }
 
-    function _ownerOfSubject(uint256 subject) private view returns (address) {
-        NFTRef storage ref = _subjectNFT[subject];
-        if (ref.nft == address(0)) return identityRegistry.ownerOf(subject);
-        return IERC721(ref.nft).ownerOf(ref.tokenId);
-    }
-
-    function _requireOwner(uint256 subject) private view {
-        address tokenOwner = _ownerOfSubject(subject);
+    function _requireOwner(uint256 ref) private view {
+        address tokenOwner = _ownerOfRef(ref);
         // A nonexistent token has no owner to compare against, and
         // comparing only `!= msg.sender` would let address(0) write to
         // an unminted id — both sides being zero satisfies it.
         if (tokenOwner == address(0)) revert NotExists();
         if (tokenOwner != msg.sender) revert NotOwner();
-    }
-
-    /// @dev The subject for (nft, tokenId), recording which token a tagged
-    ///      subject names the first time it is written.
-    function _subject(address nft, uint256 tokenId) private returns (uint256 subject) {
-        subject = subjectOf(nft, tokenId);
-        if (subject != tokenId && _subjectNFT[subject].nft == address(0)) {
-            if (nft == address(0)) revert NotExists();
-            _subjectNFT[subject] = NFTRef(nft, tokenId);
-            emit SubjectBound(subject, nft, tokenId);
-        }
     }
 
     // ── Mutating ──────────────────────────────────────────────────
@@ -251,7 +216,7 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         string calldata label,
         uint96  permissions
     ) external {
-        _registerPrimaryKey(_subject(nft, tokenId), pubkey, keyKind, label, permissions);
+        _registerPrimaryKey(_bindRef(nft, tokenId), pubkey, keyKind, label, permissions);
     }
 
     function _registerPrimaryKey(
@@ -293,7 +258,7 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         string calldata label,
         uint96  permissions
     ) external returns (uint256 index) {
-        return _addKey(_subject(nft, tokenId), pubkey, keyKind, label, permissions);
+        return _addKey(_bindRef(nft, tokenId), pubkey, keyKind, label, permissions);
     }
 
     function _addKey(
@@ -338,7 +303,7 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         string calldata label,
         uint96  permissions
     ) external {
-        _rotatePrimaryKey(subjectOf(nft, tokenId), newPubkey, keyKind, label, permissions);
+        _rotatePrimaryKey(refOf(nft, tokenId), newPubkey, keyKind, label, permissions);
     }
 
     function _rotatePrimaryKey(
@@ -388,7 +353,7 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
 
     /// @notice {deactivateKey} for token `tokenId` of `nft`.
     function deactivateKeyFor(address nft, uint256 tokenId, bytes32 pubkey) external {
-        _deactivateKey(subjectOf(nft, tokenId), pubkey);
+        _deactivateKey(refOf(nft, tokenId), pubkey);
     }
 
     function _deactivateKey(uint256 agentId, bytes32 pubkey) private onlyAgentOwner(agentId) {
@@ -419,7 +384,7 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
 
     /// @notice {updateKeyPermissions} for token `tokenId` of `nft`.
     function updateKeyPermissionsFor(address nft, uint256 tokenId, bytes32 pubkey, uint96 newPermissions) external {
-        _updateKeyPermissions(subjectOf(nft, tokenId), pubkey, newPermissions);
+        _updateKeyPermissions(refOf(nft, tokenId), pubkey, newPermissions);
     }
 
     function _updateKeyPermissions(
@@ -491,7 +456,7 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
      */
     function keysStale(uint256 agentId) public view returns (bool) {
         if (_keys[agentId].length == 0) return false;
-        address current = _ownerOfSubject(agentId);
+        address current = _ownerOfRef(agentId);
         if (current == address(0)) return true;
         return current != _boundOwner[agentId];
     }
@@ -499,11 +464,11 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
     // ── Views for any agent NFT ───────────────────────────────────
 
     function getKeysFor(address nft, uint256 tokenId) external view returns (IdentityKey[] memory) {
-        return _keys[subjectOf(nft, tokenId)];
+        return _keys[refOf(nft, tokenId)];
     }
 
     function keysStaleFor(address nft, uint256 tokenId) external view returns (bool) {
-        return keysStale(subjectOf(nft, tokenId));
+        return keysStale(refOf(nft, tokenId));
     }
 
     /// @notice The agent NFT that claims `pubkey` (the identity registry
@@ -516,8 +481,7 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         uint256 plus = _pubkeyAgentIdPlusOne[pubkey];
         if (plus == 0) return (address(0), 0, 0, false, false, 0);
         uint256 subject = plus - 1;
-        NFTRef storage ref = _subjectNFT[subject];
-        (nft, tokenId) = ref.nft == address(0) ? (address(identityRegistry), subject) : (ref.nft, ref.tokenId);
+        (nft, tokenId) = nftOf(subject);
         index = _pubkeyIndexPlusOne[pubkey] - 1;
         IdentityKey storage k = _keys[subject][index];
         return (nft, tokenId, index, true, k.active, k.permissions);

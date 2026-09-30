@@ -5,7 +5,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./AgentIdentityRegistry.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "./AgentNFTRefs.sol";
 
 /**
  * @title AgentReputationRegistry
@@ -15,7 +15,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
  */
 import {VimsProvenance} from "./VimsProvenance.sol";
 
-contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgradeable, UUPSUpgradeable {
+contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgradeable, UUPSUpgradeable, AgentNFTRefs {
     function _vimsContractName() internal pure override returns (string memory) {
         return "AgentReputationRegistry";
     }
@@ -114,16 +114,6 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
     mapping(address => bool) public settlementRecorders;                    // payment contracts
     mapping(address => bool) public disputeRecorders;                       // escrow contracts
 
-    // ── agents of any ERC-721 (v3) ───────────────────────────────────
-    //
-    // Every agentId-keyed function also takes the reference of an agent
-    // that isn't an identity-registry token: `refOf(nft, tokenId)`, the
-    // same top-bit-tagged subject AgentIdentityKeyExtension uses, so it
-    // never equals an identity token id. Eras, paid-only attestations and
-    // system stats work identically; the owner is the NFT contract's.
-    struct NFTRef { address nft; uint256 tokenId; }
-    mapping(uint256 => NFTRef) internal _refNFT;                            // tagged ref => agent NFT
-
     event EraStarted(uint256 indexed agentId, uint256 indexed era, address indexed owner, bytes32 subject);
     event SettlementRecorded(uint256 indexed agentId, uint256 indexed era, address indexed client, bytes32 serviceId, uint256 amount, bool counted);
     event DisputeRecorded(uint256 indexed agentId, uint256 indexed era, address indexed client, bytes32 ref);
@@ -158,26 +148,13 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
         emit DisputeRecorderSet(recorder, allowed);
     }
 
-    uint256 private constant _NFT_REF_TAG = 1 << 255;
+    // Every agentId-keyed function also takes the reference of an agent
+    // that isn't an identity-registry token — refOf(nft, tokenId), see
+    // AgentNFTRefs. Eras, paid-only attestations and system stats work
+    // identically; the owner is that NFT contract's.
 
-    event AgentRefBound(uint256 indexed ref, address indexed nft, uint256 indexed tokenId);
-
-    /// @notice The agentId every function takes for token `tokenId` of `nft`.
-    function refOf(address nft, uint256 tokenId) public view returns (uint256) {
-        if (nft == address(identityRegistry)) return tokenId;
-        return uint256(keccak256(abi.encode(nft, tokenId))) | _NFT_REF_TAG;
-    }
-
-    /// @notice The agent NFT a reference names.
-    function nftOf(uint256 ref) external view returns (address nft, uint256 tokenId) {
-        NFTRef storage r = _refNFT[ref];
-        return r.nft == address(0) ? (address(identityRegistry), ref) : (r.nft, r.tokenId);
-    }
-
-    function _ownerOfRef(uint256 ref) internal view returns (address) {
-        NFTRef storage r = _refNFT[ref];
-        if (r.nft == address(0)) return identityRegistry.ownerOf(ref);
-        return IERC721(r.nft).ownerOf(r.tokenId);
+    function _identityNFT() internal view override returns (address) {
+        return address(identityRegistry);
     }
 
     /**
@@ -189,12 +166,7 @@ contract AgentReputationRegistry is Initializable, VimsProvenance, OwnableUpgrad
         external
         onlySettlementRecorder
     {
-        uint256 ref = refOf(nft, tokenId);
-        if (ref != tokenId && _refNFT[ref].nft == address(0)) {
-            _refNFT[ref] = NFTRef(nft, tokenId);
-            emit AgentRefBound(ref, nft, tokenId);
-        }
-        _recordSettlement(ref, payer, serviceId, amount);
+        _recordSettlement(_bindRef(nft, tokenId), payer, serviceId, amount);
     }
 
     // ── eras ─────────────────────────────────────────────────────────

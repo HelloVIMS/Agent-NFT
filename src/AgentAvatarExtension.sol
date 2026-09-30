@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "./interfaces/IAgentIdentityRegistry.sol";
+import "./AgentNFTRefs.sol";
 
 /**
  * @title AgentAvatarExtension
@@ -62,7 +63,10 @@ import "./interfaces/IAgentIdentityRegistry.sol";
  * inherits the previous owner's avatar until they update it, which is
  * the same UX every marketplace user expects.
  */
-contract AgentAvatarExtension is Initializable, OwnableUpgradeable, UUPSUpgradeable {
+/// @dev Agents of any ERC-721 (collection agents) get avatar manifests too:
+///      every tokenId-keyed function takes refOf(nft, tokenId)
+///      (AgentNFTRefs), and the `…For(nft, tokenId)` writes bind it.
+contract AgentAvatarExtension is Initializable, OwnableUpgradeable, UUPSUpgradeable, AgentNFTRefs {
 
     // ── Errors ────────────────────────────────────────────────────
     error NotOwner();
@@ -139,8 +143,12 @@ contract AgentAvatarExtension is Initializable, OwnableUpgradeable, UUPSUpgradea
 
     // ── Modifiers ─────────────────────────────────────────────────
 
+    function _identityNFT() internal view override returns (address) {
+        return address(identityRegistry);
+    }
+
     modifier onlyAgentOwner(uint256 tokenId) {
-        address tokenOwner = identityRegistry.ownerOf(tokenId);
+        address tokenOwner = _ownerOfRef(tokenId);
         // A token that does not exist has no owner to compare against.
         // Checking only `!= msg.sender` made an unowned token writable by
         // address(0), because both sides were zero and the guard passed.
@@ -172,7 +180,27 @@ contract AgentAvatarExtension is Initializable, OwnableUpgradeable, UUPSUpgradea
         string calldata manifestURI,
         bytes32 contentHash,
         uint16  fileCount
-    ) external onlyAgentOwner(tokenId) {
+    ) external {
+        _setAvatarManifest(tokenId, manifestURI, contentHash, fileCount);
+    }
+
+    /// @notice {setAvatarManifest} for token `tokenId` of `nft`.
+    function setAvatarManifestFor(
+        address nft,
+        uint256 tokenId,
+        string calldata manifestURI,
+        bytes32 contentHash,
+        uint16  fileCount
+    ) external {
+        _setAvatarManifest(_bindRef(nft, tokenId), manifestURI, contentHash, fileCount);
+    }
+
+    function _setAvatarManifest(
+        uint256 tokenId,
+        string calldata manifestURI,
+        bytes32 contentHash,
+        uint16  fileCount
+    ) private onlyAgentOwner(tokenId) {
         if (bytes(manifestURI).length == 0)          revert EmptyInput();
         if (bytes(manifestURI).length > MAX_URI_LENGTH) revert URITooLong();
         if (contentHash == bytes32(0))                revert EmptyInput();
@@ -205,7 +233,16 @@ contract AgentAvatarExtension is Initializable, OwnableUpgradeable, UUPSUpgradea
      *         `hasAvatarManifest(tokenId)` is false. Emits
      *         {AvatarManifestCleared} for indexers.
      */
-    function clearAvatarManifest(uint256 tokenId) external onlyAgentOwner(tokenId) {
+    function clearAvatarManifest(uint256 tokenId) external {
+        _clearAvatarManifest(tokenId);
+    }
+
+    /// @notice {clearAvatarManifest} for token `tokenId` of `nft`.
+    function clearAvatarManifestFor(address nft, uint256 tokenId) external {
+        _clearAvatarManifest(refOf(nft, tokenId));
+    }
+
+    function _clearAvatarManifest(uint256 tokenId) private onlyAgentOwner(tokenId) {
         AvatarManifest memory prev = _manifests[tokenId];
         if (bytes(prev.manifestURI).length == 0) revert NotExists();
 

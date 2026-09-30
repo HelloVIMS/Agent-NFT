@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-30T15:11:35.728Z",
+  "generatedAt": "2026-09-30T15:24:58.073Z",
   "generator": "agent-nft/scripts/export-abi.mjs",
   "contracts": [
     {
@@ -43,9 +43,9 @@
       "namespace": null,
       "src": "src/AgentReputationRegistry.sol",
       "abi": "AgentReputationRegistry.json",
-      "sha256": "75d79df9180288d24c1d72239fea2b6cf8415111803df57c075698ae721ce789",
-      "bytes": 22409,
-      "entries": 71
+      "sha256": "81a6df0b90d2f67947b2300a3c532c6e3d943a72fbd9fe5441f8de53408b8695",
+      "bytes": 22482,
+      "entries": 72
     },
     {
       "contract": "AgentContextRegistry",
@@ -61,9 +61,9 @@
       "namespace": null,
       "src": "src/AgentMemory.sol",
       "abi": "AgentMemory.json",
-      "sha256": "13f5c7d0cf9d8f006b81a0d4a2f539c87d7a1d50e5dd3554e95fadc74c5216f5",
-      "bytes": 22272,
-      "entries": 84
+      "sha256": "068ce3615a4609c872be28232353d9dbf68a9f1084e53d4f27f17a2894fcb9d2",
+      "bytes": 25152,
+      "entries": 90
     },
     {
       "contract": "AgentPaymentRouter",
@@ -178,18 +178,18 @@
       "namespace": null,
       "src": "src/AgentAvatarExtension.sol",
       "abi": "AgentAvatarExtension.json",
-      "sha256": "714e1236a109f3ad5937e0bf9f1f5486393e1ea688a43c379337e378ae5a0a38",
-      "bytes": 7414,
-      "entries": 35
+      "sha256": "4aec276910620106375b749598e3cd47f7164b472b20de89d6a1c779509e6735",
+      "bytes": 9311,
+      "entries": 41
     },
     {
       "contract": "AgentIdentityKeyExtension",
       "namespace": null,
       "src": "src/AgentIdentityKeyExtension.sol",
       "abi": "AgentIdentityKeyExtension.json",
-      "sha256": "436e140c3128567aacf8e24b95bffe5d1bd0fd4b325f335a1671c66628b7838b",
-      "bytes": 19051,
-      "entries": 64
+      "sha256": "0e6ce311ab65768696a2891c946751cd3aceee4e9a1b940ce456a8a3762edd92",
+      "bytes": 19448,
+      "entries": 66
     },
     {
       "contract": "AgentBridge",

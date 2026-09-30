@@ -65,7 +65,7 @@ contract AgentIdentityKeyExtensionNFTTest is Test {
         (address nft, uint256 tokenId,,,,) = ext.resolveKeyFor(K1);
         assertEq(nft, address(identity));
         assertEq(tokenId, 1);
-        assertTrue(ext.subjectOf(address(collection), 1) > type(uint128).max, "tagged subject");
+        assertTrue(ext.refOf(address(collection), 1) > type(uint128).max, "tagged subject");
     }
 
     function test_onePubkeyOneAgentAcrossContracts() public {
