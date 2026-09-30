@@ -91,6 +91,43 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "addKeyFor",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "pubkey",
+        "type": "bytes32"
+      },
+      {
+        "name": "keyKind",
+        "type": "string"
+      },
+      {
+        "name": "label",
+        "type": "string"
+      },
+      {
+        "name": "permissions",
+        "type": "uint96"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "index",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "boundOwner",
     "inputs": [
       {
@@ -112,6 +149,26 @@ const abi = [
     "inputs": [
       {
         "name": "agentId",
+        "type": "uint256"
+      },
+      {
+        "name": "pubkey",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "deactivateKeyFor",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
         "type": "uint256"
       },
       {
@@ -214,6 +271,53 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "getKeysFor",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "pubkey",
+            "type": "bytes32"
+          },
+          {
+            "name": "permissions",
+            "type": "uint96"
+          },
+          {
+            "name": "createdAt",
+            "type": "uint48"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "keyKind",
+            "type": "string"
+          },
+          {
+            "name": "label",
+            "type": "string"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "identityRegistry",
     "inputs": [],
     "outputs": [
@@ -259,6 +363,27 @@ const abi = [
     "inputs": [
       {
         "name": "agentId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "keysStaleFor",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
         "type": "uint256"
       }
     ],
@@ -367,6 +492,38 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "registerPrimaryKeyFor",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "pubkey",
+        "type": "bytes32"
+      },
+      {
+        "name": "keyKind",
+        "type": "string"
+      },
+      {
+        "name": "label",
+        "type": "string"
+      },
+      {
+        "name": "permissions",
+        "type": "uint96"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "renounceOwnership",
     "inputs": [],
     "outputs": [],
@@ -384,6 +541,43 @@ const abi = [
     "outputs": [
       {
         "name": "agentId",
+        "type": "uint256"
+      },
+      {
+        "name": "index",
+        "type": "uint256"
+      },
+      {
+        "name": "bound",
+        "type": "bool"
+      },
+      {
+        "name": "active",
+        "type": "bool"
+      },
+      {
+        "name": "permissions",
+        "type": "uint96"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "resolveKeyFor",
+    "inputs": [
+      {
+        "name": "pubkey",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
         "type": "uint256"
       },
       {
@@ -435,6 +629,59 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "rotatePrimaryKeyFor",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "newPubkey",
+        "type": "bytes32"
+      },
+      {
+        "name": "keyKind",
+        "type": "string"
+      },
+      {
+        "name": "label",
+        "type": "string"
+      },
+      {
+        "name": "permissions",
+        "type": "uint96"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "subjectOf",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "transferOwnership",
     "inputs": [
       {
@@ -451,6 +698,30 @@ const abi = [
     "inputs": [
       {
         "name": "agentId",
+        "type": "uint256"
+      },
+      {
+        "name": "pubkey",
+        "type": "bytes32"
+      },
+      {
+        "name": "newPermissions",
+        "type": "uint96"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "updateKeyPermissionsFor",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
         "type": "uint256"
       },
       {
@@ -661,6 +932,28 @@ const abi = [
         "name": "owner",
         "type": "address",
         "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SubjectBound",
+    "inputs": [
+      {
+        "name": "subject",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "nft",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": true
       }
     ],
     "anonymous": false

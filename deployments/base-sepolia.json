@@ -34,7 +34,7 @@
     "AgentMarketplace": "0xcc1E532C8148278c56DBBBcb02f23648C06C2950",
     "AgentCollectionImpl": "0xDcBF7187E116577491B65C0E8b0c2aE30e4393c4",
     "AgentAvatarExtension": "0x5b20645870604D9CbB153dE9eb6012Ae42Dfea5b",
-    "AgentIdentityKeyExtension": "0x06216a771Fe62A0043E173d185A6744b1C498348"
+    "AgentIdentityKeyExtension": "0x7FcCA1B1AD289a5fF2DAa6C1E3038f35FD65eDFE"
   },
   "agentCollectionLibraries": {
     "AgentCollectionRenderer": "0x167655252e710533083C12e0Ea48c10d1F92f2FA",

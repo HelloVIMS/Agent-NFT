@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-30T12:10:28.214Z",
+  "generatedAt": "2026-09-30T14:54:14.230Z",
   "generator": "agent-nft/scripts/export-abi.mjs",
   "contracts": [
     {
@@ -187,9 +187,9 @@
       "namespace": null,
       "src": "src/AgentIdentityKeyExtension.sol",
       "abi": "AgentIdentityKeyExtension.json",
-      "sha256": "cd0aa0ca4ea6c7703e9cb3f93db7a4bfddf4862a2dcb2326f96799ef4009ed16",
-      "bytes": 13990,
-      "entries": 54
+      "sha256": "436e140c3128567aacf8e24b95bffe5d1bd0fd4b325f335a1671c66628b7838b",
+      "bytes": 19051,
+      "entries": 64
     },
     {
       "contract": "AgentBridge",

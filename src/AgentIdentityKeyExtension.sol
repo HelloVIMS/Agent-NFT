@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "./interfaces/IAgentIdentityRegistry.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 /**
  * @title AgentIdentityKeyExtension
@@ -108,6 +109,12 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
     ///         contract-level note on why a secret cannot transfer.
     mapping(uint256 => address) private _boundOwner;
 
+    /// @notice Tagged subject => the agent NFT it names (unset for
+    ///         identity-registry agents, whose subject is the token id).
+    ///         Appended after the v1 layout.
+    struct NFTRef { address nft; uint256 tokenId; }
+    mapping(uint256 => NFTRef) private _subjectNFT;
+
     uint256 public constant MAX_KEYS_PER_AGENT = 32;
     uint256 public constant MAX_KEY_KIND_BYTES = 32;
     uint256 public constant MAX_LABEL_BYTES    = 64;
@@ -144,6 +151,10 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
 
     event KeyDeactivated(uint256 indexed agentId, bytes32 indexed pubkey, uint256 index);
 
+    /// @notice A non-identity agent NFT got its first key; `subject` is
+    ///         the agentId its key events carry.
+    event SubjectBound(uint256 indexed subject, address indexed nft, uint256 indexed tokenId);
+
     event KeyPermissionsUpdated(
         uint256 indexed agentId,
         bytes32 indexed pubkey,
@@ -167,13 +178,50 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
     // ── Modifiers ─────────────────────────────────────────────────
 
     modifier onlyAgentOwner(uint256 agentId) {
-        address tokenOwner = identityRegistry.ownerOf(agentId);
+        _requireOwner(agentId);
+        _;
+    }
+
+    // ── Subjects: every agent NFT, not only the identity registry's ──
+    //
+    // Keys are stored per subject. An identity-registry agent's subject is
+    // its token id, as before; an agent of any other ERC-721 (an
+    // AgentCollectionFactory collection) gets `subjectOf(nft, tokenId)`,
+    // tagged with the top bit so it can never equal an identity token id.
+    // The `…For(nft, tokenId)` functions take either kind of agent.
+
+    uint256 private constant NFT_SUBJECT_TAG = 1 << 255;
+
+    /// @notice The key subject of token `tokenId` of `nft`.
+    function subjectOf(address nft, uint256 tokenId) public view returns (uint256) {
+        if (nft == address(identityRegistry)) return tokenId;
+        return uint256(keccak256(abi.encode(nft, tokenId))) | NFT_SUBJECT_TAG;
+    }
+
+    function _ownerOfSubject(uint256 subject) private view returns (address) {
+        NFTRef storage ref = _subjectNFT[subject];
+        if (ref.nft == address(0)) return identityRegistry.ownerOf(subject);
+        return IERC721(ref.nft).ownerOf(ref.tokenId);
+    }
+
+    function _requireOwner(uint256 subject) private view {
+        address tokenOwner = _ownerOfSubject(subject);
         // A nonexistent token has no owner to compare against, and
         // comparing only `!= msg.sender` would let address(0) write to
         // an unminted id — both sides being zero satisfies it.
         if (tokenOwner == address(0)) revert NotExists();
         if (tokenOwner != msg.sender) revert NotOwner();
-        _;
+    }
+
+    /// @dev The subject for (nft, tokenId), recording which token a tagged
+    ///      subject names the first time it is written.
+    function _subject(address nft, uint256 tokenId) private returns (uint256 subject) {
+        subject = subjectOf(nft, tokenId);
+        if (subject != tokenId && _subjectNFT[subject].nft == address(0)) {
+            if (nft == address(0)) revert NotExists();
+            _subjectNFT[subject] = NFTRef(nft, tokenId);
+            emit SubjectBound(subject, nft, tokenId);
+        }
     }
 
     // ── Mutating ──────────────────────────────────────────────────
@@ -190,7 +238,29 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         string calldata keyKind,
         string calldata label,
         uint96  permissions
-    ) external onlyAgentOwner(agentId) {
+    ) external {
+        _registerPrimaryKey(agentId, pubkey, keyKind, label, permissions);
+    }
+
+    /// @notice {registerPrimaryKey} for token `tokenId` of `nft`.
+    function registerPrimaryKeyFor(
+        address nft,
+        uint256 tokenId,
+        bytes32 pubkey,
+        string calldata keyKind,
+        string calldata label,
+        uint96  permissions
+    ) external {
+        _registerPrimaryKey(_subject(nft, tokenId), pubkey, keyKind, label, permissions);
+    }
+
+    function _registerPrimaryKey(
+        uint256 agentId,
+        bytes32 pubkey,
+        string calldata keyKind,
+        string calldata label,
+        uint96  permissions
+    ) private onlyAgentOwner(agentId) {
         if (_keys[agentId].length != 0) revert PrimaryAlreadySet();
         _validate(pubkey, keyKind, label);
         _bind(agentId, pubkey, keyKind, label, permissions, 0);
@@ -210,7 +280,29 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         string calldata keyKind,
         string calldata label,
         uint96  permissions
-    ) external onlyAgentOwner(agentId) returns (uint256 index) {
+    ) external returns (uint256 index) {
+        return _addKey(agentId, pubkey, keyKind, label, permissions);
+    }
+
+    /// @notice {addKey} for token `tokenId` of `nft`.
+    function addKeyFor(
+        address nft,
+        uint256 tokenId,
+        bytes32 pubkey,
+        string calldata keyKind,
+        string calldata label,
+        uint96  permissions
+    ) external returns (uint256 index) {
+        return _addKey(_subject(nft, tokenId), pubkey, keyKind, label, permissions);
+    }
+
+    function _addKey(
+        uint256 agentId,
+        bytes32 pubkey,
+        string calldata keyKind,
+        string calldata label,
+        uint96  permissions
+    ) private onlyAgentOwner(agentId) returns (uint256 index) {
         if (_keys[agentId].length == 0) revert PrimaryNotSet();
         if (_keys[agentId].length >= MAX_KEYS_PER_AGENT) revert MaxKeys();
         _validate(pubkey, keyKind, label);
@@ -233,7 +325,29 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         string calldata keyKind,
         string calldata label,
         uint96  permissions
-    ) external onlyAgentOwner(agentId) {
+    ) external {
+        _rotatePrimaryKey(agentId, newPubkey, keyKind, label, permissions);
+    }
+
+    /// @notice {rotatePrimaryKey} for token `tokenId` of `nft`.
+    function rotatePrimaryKeyFor(
+        address nft,
+        uint256 tokenId,
+        bytes32 newPubkey,
+        string calldata keyKind,
+        string calldata label,
+        uint96  permissions
+    ) external {
+        _rotatePrimaryKey(subjectOf(nft, tokenId), newPubkey, keyKind, label, permissions);
+    }
+
+    function _rotatePrimaryKey(
+        uint256 agentId,
+        bytes32 newPubkey,
+        string calldata keyKind,
+        string calldata label,
+        uint96  permissions
+    ) private onlyAgentOwner(agentId) {
         if (_keys[agentId].length == 0) revert PrimaryNotSet();
         _validate(newPubkey, keyKind, label);
 
@@ -268,7 +382,16 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
      *         identity at index 0 is indistinguishable from one that
      *         never registered. Rotate it instead.
      */
-    function deactivateKey(uint256 agentId, bytes32 pubkey) external onlyAgentOwner(agentId) {
+    function deactivateKey(uint256 agentId, bytes32 pubkey) external {
+        _deactivateKey(agentId, pubkey);
+    }
+
+    /// @notice {deactivateKey} for token `tokenId` of `nft`.
+    function deactivateKeyFor(address nft, uint256 tokenId, bytes32 pubkey) external {
+        _deactivateKey(subjectOf(nft, tokenId), pubkey);
+    }
+
+    function _deactivateKey(uint256 agentId, bytes32 pubkey) private onlyAgentOwner(agentId) {
         uint256 idxPlus = _pubkeyIndexPlusOne[pubkey];
         if (idxPlus == 0 || _pubkeyAgentIdPlusOne[pubkey] != agentId + 1) revert NotBound();
         if (idxPlus == 1) revert CannotDeactivatePrimary();
@@ -290,7 +413,20 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
         uint256 agentId,
         bytes32 pubkey,
         uint96  newPermissions
-    ) external onlyAgentOwner(agentId) {
+    ) external {
+        _updateKeyPermissions(agentId, pubkey, newPermissions);
+    }
+
+    /// @notice {updateKeyPermissions} for token `tokenId` of `nft`.
+    function updateKeyPermissionsFor(address nft, uint256 tokenId, bytes32 pubkey, uint96 newPermissions) external {
+        _updateKeyPermissions(subjectOf(nft, tokenId), pubkey, newPermissions);
+    }
+
+    function _updateKeyPermissions(
+        uint256 agentId,
+        bytes32 pubkey,
+        uint96  newPermissions
+    ) private onlyAgentOwner(agentId) {
         uint256 idxPlus = _pubkeyIndexPlusOne[pubkey];
         if (idxPlus == 0 || _pubkeyAgentIdPlusOne[pubkey] != agentId + 1) revert NotBound();
 
@@ -353,11 +489,38 @@ contract AgentIdentityKeyExtension is Initializable, OwnableUpgradeable, UUPSUpg
      *         agent's identity. It is the whole reason a key cannot be
      *         inherited the way a TBA is.
      */
-    function keysStale(uint256 agentId) external view returns (bool) {
+    function keysStale(uint256 agentId) public view returns (bool) {
         if (_keys[agentId].length == 0) return false;
-        address current = identityRegistry.ownerOf(agentId);
+        address current = _ownerOfSubject(agentId);
         if (current == address(0)) return true;
         return current != _boundOwner[agentId];
+    }
+
+    // ── Views for any agent NFT ───────────────────────────────────
+
+    function getKeysFor(address nft, uint256 tokenId) external view returns (IdentityKey[] memory) {
+        return _keys[subjectOf(nft, tokenId)];
+    }
+
+    function keysStaleFor(address nft, uint256 tokenId) external view returns (bool) {
+        return keysStale(subjectOf(nft, tokenId));
+    }
+
+    /// @notice The agent NFT that claims `pubkey` (the identity registry
+    ///         for identity agents), with the key's position and state.
+    function resolveKeyFor(bytes32 pubkey)
+        external
+        view
+        returns (address nft, uint256 tokenId, uint256 index, bool bound, bool active, uint96 permissions)
+    {
+        uint256 plus = _pubkeyAgentIdPlusOne[pubkey];
+        if (plus == 0) return (address(0), 0, 0, false, false, 0);
+        uint256 subject = plus - 1;
+        NFTRef storage ref = _subjectNFT[subject];
+        (nft, tokenId) = ref.nft == address(0) ? (address(identityRegistry), subject) : (ref.nft, ref.tokenId);
+        index = _pubkeyIndexPlusOne[pubkey] - 1;
+        IdentityKey storage k = _keys[subject][index];
+        return (nft, tokenId, index, true, k.active, k.permissions);
     }
 
     /// @notice The owner that last wrote a key for this agent.
