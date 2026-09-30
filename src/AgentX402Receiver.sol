@@ -22,6 +22,11 @@ interface ICollectionCreatorReadable {
     function collectionCreator() external view returns (address);
 }
 
+/// @dev AgentReputationRegistry's settlement hook (v2).
+interface IReputationSettlements {
+    function recordSettlement(uint256 agentId, address payer, bytes32 serviceId, uint256 amount) external;
+}
+
 /**
  * @title AgentX402Receiver
  * @notice Atomic on-chain settler for Agent NFT services paid via the
@@ -315,6 +320,7 @@ contract AgentX402Receiver is
             agentId, serviceId, from, svc.token, gross,
             systemCut, creatorCut, agentCut, agentRecipient
         );
+        _recordSettlement(agentId, from, serviceId, gross);
     }
 
     // ============ View helpers ============
@@ -645,5 +651,44 @@ contract AgentX402Receiver is
             nft, tokenId, serviceId, from, svc.token, gross,
             systemCut, creatorCut, agentCut, agentRecipient
         );
+        // Reputation is keyed by identity agent ids; other collections have none.
+        if (nft == address(identityRegistry)) _recordSettlement(tokenId, from, serviceId, gross);
+    }
+
+    // ============ Reputation (v2) ============
+
+    /// @notice AgentReputationRegistry that records each settled hire (who
+    ///         paid, for what, how much) as the agent's system reputation and
+    ///         as the payer's right to attest. Zero disables recording.
+    IReputationSettlements public reputationRegistry;
+
+    event ReputationRegistryUpdated(address indexed oldRegistry, address indexed newRegistry);
+    /// @notice A settlement the reputation registry refused to record. The
+    ///         payment itself stands — reputation never blocks a payment.
+    event ReputationRecordFailed(uint256 indexed agentId, address indexed payer, bytes32 indexed serviceId, bytes reason);
+
+    function setReputationRegistry(address registry) external onlyOwner {
+        emit ReputationRegistryUpdated(address(reputationRegistry), registry);
+        reputationRegistry = IReputationSettlements(registry);
+    }
+
+    /// @notice Gas the reputation call always gets. The seller's side
+    ///         broadcasts settlements, so without a floor it could send just
+    ///         enough gas for the payment and starve the recording — keeping
+    ///         a buyer from ever being able to attest. Payments revert
+    ///         unless the full stipend is available.
+    uint256 public constant REPUTATION_GAS = 200_000;
+
+    error InsufficientGasForReputation();
+
+    function _recordSettlement(uint256 agentId, address payer, bytes32 serviceId, uint256 gross) internal {
+        IReputationSettlements rep = reputationRegistry;
+        if (address(rep) == address(0)) return;
+        // EIP-150: a call receives at most 63/64 of the remaining gas.
+        if (gasleft() < (REPUTATION_GAS * 64) / 63 + 5_000) revert InsufficientGasForReputation();
+        try rep.recordSettlement{gas: REPUTATION_GAS}(agentId, payer, serviceId, gross) {
+        } catch (bytes memory reason) {
+            emit ReputationRecordFailed(agentId, payer, serviceId, reason);
+        }
     }
 }

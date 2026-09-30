@@ -118,6 +118,10 @@ contract BuyerSellerAgentEconomyTest is Test {
             abi.encodeCall(AgentReputationRegistry.initialize, (address(identity)))
         );
         reputation = AgentReputationRegistry(address(repProxy));
+        // v2: the receiver records every settlement as system reputation
+        // and as the payer's right to attest.
+        reputation.setSettlementRecorder(address(x402), true);
+        x402.setReputationRegistry(address(reputation));
 
         // ─── Deploy TBA registry ────────────────────────────────────────
         tbaRegistry = new AgentTBARegistry(address(identity), ENTRY_POINT);
@@ -338,20 +342,81 @@ contract BuyerSellerAgentEconomyTest is Test {
     // Reputation: buyer attests delivery
     // ─────────────────────────────────────────────────────────────────────
 
+    /// @dev Pays SERVICE_PRICE for SERVICE_ID from the deterministic payer.
+    function _paySeller(uint256 sellerId, uint256 nonceSeed) internal returns (address payerAddr) {
+        payerAddr = vm.addr(uint256(keccak256("buyer-payer-pk")));
+        usdc.mint(payerAddr, SERVICE_PRICE);
+        bytes32 nonce = bytes32(nonceSeed);
+        uint256 deadline = block.timestamp + 1 hours;
+        (uint8 cv, bytes32 cr, bytes32 cs) = _signCommit(sellerId, nonce, deadline);
+        x402.payForService(sellerId, SERVICE_ID, payerAddr, 0, deadline, nonce, 0, bytes32(0), bytes32(0), cv, cr, cs);
+    }
+
     function test_BuyerAttestsDelivery() public {
         (uint256 sellerId, ) = _mintSellerAgent();
-        // mint a buyer agent so the buyer EOA has a peer identity (not
-        // strictly required for giveFeedback, but mirrors the production
-        // flow where the buyer is themselves an agent operator).
-        _mintBuyerAgent();
+        address payerAddr = _paySeller(sellerId, 1);
 
-        vm.prank(buyer);
-        reputation.giveFeedback(sellerId, int128(5), uint8(0), "quality", "speed", "ipfs://r/1");
+        // The settlement is the seller's system reputation.
+        AgentReputationRegistry.EraStats memory st = reputation.eraStats(sellerId, 0);
+        assertEq(st.settlements, 1, "settlement recorded");
+        assertEq(st.volume, SERVICE_PRICE, "volume recorded");
+
+        vm.prank(payerAddr);
+        reputation.giveFeedback(sellerId, int128(1), uint8(0), "x402", "svc", "eip155:84532:0xsettlement");
 
         (uint256 total, int256 avg, uint256 ts) = reputation.getReputationSummary(sellerId);
         assertEq(total, 1, "feedback count");
-        assertEq(avg,   5, "average score");
+        assertEq(avg,   1, "average score");
         assertEq(ts,    block.timestamp, "feedback timestamp");
+    }
+
+    function test_NonBuyerCannotAttest() public {
+        (uint256 sellerId, ) = _mintSellerAgent();
+        vm.prank(buyer);
+        vm.expectRevert(AgentReputationRegistry.NotAPayingClient.selector);
+        reputation.giveFeedback(sellerId, 1, 0, "", "", "");
+    }
+
+    function test_SettlementNeedsTheReputationGasStipend() public {
+        (uint256 sellerId, ) = _mintSellerAgent();
+        address payerAddr = vm.addr(uint256(keccak256("buyer-payer-pk")));
+        usdc.mint(payerAddr, SERVICE_PRICE * 2);
+        uint256 deadline = block.timestamp + 1 hours;
+
+        // Enough gas to reach the recording step but not to give it its
+        // stipend: the settlement reverts with the specific error rather
+        // than paying without recording the buyer's right to attest.
+        (uint8 cv, bytes32 cr, bytes32 cs) = _signCommit(sellerId, bytes32(uint256(7)), deadline);
+        vm.expectRevert(AgentX402Receiver.InsufficientGasForReputation.selector);
+        x402.payForService{gas: 180_000}(sellerId, SERVICE_ID, payerAddr, 0, deadline, bytes32(uint256(7)), 0, bytes32(0), bytes32(0), cv, cr, cs);
+        assertEq(reputation.eraStats(sellerId, 0).settlements, 0);
+
+        // With the stipend available it settles and records.
+        (cv, cr, cs) = _signCommit(sellerId, bytes32(uint256(8)), deadline);
+        x402.payForService{gas: 600_000}(sellerId, SERVICE_ID, payerAddr, 0, deadline, bytes32(uint256(8)), 0, bytes32(0), bytes32(0), cv, cr, cs);
+        assertEq(reputation.eraStats(sellerId, 0).settlements, 1);
+    }
+
+    function test_ReputationFailureNeverBlocksPayment() public {
+        (uint256 sellerId, ) = _mintSellerAgent();
+        vm.prank(owner);
+        reputation.setSettlementRecorder(address(x402), false); // registry now refuses the receiver
+        address payerAddr = _paySeller(sellerId, 3);
+        assertEq(usdc.balanceOf(payerAddr), 0, "payment went through");
+        assertEq(reputation.eraStats(sellerId, 0).settlements, 0, "not recorded");
+    }
+
+    function test_TransferResetsSellerReputation() public {
+        (uint256 sellerId, ) = _mintSellerAgent();
+        address payerAddr = _paySeller(sellerId, 4);
+        vm.prank(payerAddr);
+        reputation.giveFeedback(sellerId, 1, 0, "x402", "", "");
+        vm.prank(seller);
+        identity.transferFrom(seller, newOwner, sellerId);
+        (uint256 total,,) = reputation.getReputationSummary(sellerId);
+        assertEq(total, 0, "the new owner starts a fresh history");
+        assertEq(reputation.eraStats(sellerId, 0).feedbackCount, 1, "the previous era is kept");
+        assertEq(reputation.eraCount(sellerId), 2);
     }
 
     function test_BuyerCannotReviewOwnAgent() public {
@@ -359,6 +424,6 @@ contract BuyerSellerAgentEconomyTest is Test {
         (uint256 buyerId, ) = _mintBuyerAgent();
         vm.prank(buyer);
         vm.expectRevert(bytes("Cannot review own agent"));
-        reputation.giveFeedback(buyerId, 5, 0, "", "", "");
+        reputation.giveFeedback(buyerId, 1, 0, "", "", "");
     }
 }

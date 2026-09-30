@@ -41,6 +41,8 @@ contract ReputationAnchorTest is Test {
             abi.encodeCall(AgentReputationRegistry.initialize, (address(identityRegistry)))
         );
         reputationRegistry = AgentReputationRegistry(address(reputationProxy));
+        // v2: this contract stands in for the payment contract.
+        reputationRegistry.setSettlementRecorder(address(this), true);
 
         vm.stopPrank();
 
@@ -114,230 +116,131 @@ contract ReputationAnchorTest is Test {
         identityRegistry.reputationAnchorOf(999);
     }
 
-    // ============ Soulbound (default, non-anchored) Reputation Tests ============
-    //
-    // Reviews on a transferable agent NFT bind to the wallet that owns
-    // it AT THE MOMENT OF ATTESTATION. Transferring the NFT does NOT
-    // carry reviews to the new owner — the new owner starts with a
-    // clean record, and the previous owner's track record stays
-    // queryable as a per-tenure record. This pins the v2 semantic that
-    // replaced the pre-v2 "reputation follows agentId" behaviour.
+    // ============ Transferable Reputation Tests ============
 
-    function test_SoulboundReputation_DoesNotTransferWithNFT() public {
-        // Creator earns feedback while owning the agent.
+    // Reputation v2: reputation belongs to an (agent, owner) era. A sale
+    // starts the buyer's era with an empty history — whether or not the
+    // agent was minted with a reputation anchor — and the seller's era stays
+    // readable. Anchors remain an identity-registry fact (who minted, the
+    // reverse index); they no longer pool or carry reputation.
+
+    function _paid(uint256 agentId, address client) internal {
+        reputationRegistry.recordSettlement(agentId, client, bytes32("svc"), 1);
+    }
+
+    function test_Sale_StartsNewEra_ForTransferableAgent() public {
+        _paid(transferableAgentId, client1);
         vm.prank(client1);
-        reputationRegistry.giveFeedback(transferableAgentId, 80, 0, "quality", "", "");
+        reputationRegistry.giveFeedback(transferableAgentId, 1, 0, "quality", "", "");
 
-        (uint256 count1, int256 avg1,) =
-            reputationRegistry.getReputationSummary(transferableAgentId);
-        assertEq(count1, 1);
-        assertEq(avg1, 80);
-
-        // Creator sells the NFT to buyer.
         vm.prank(creator);
         identityRegistry.transferFrom(creator, buyer, transferableAgentId);
 
-        // Buyer does NOT inherit the reputation — the public summary
-        // for this agent now reflects buyer's (empty) tenure.
-        (uint256 count2, int256 avg2,) =
-            reputationRegistry.getReputationSummary(transferableAgentId);
-        assertEq(count2, 0, "buyer must not inherit reviews");
-        assertEq(avg2, 0);
-
-        // Creator's tenure track record is preserved and queryable.
-        (uint256 creatorCount, int256 creatorAvg,) =
-            reputationRegistry.getReputationByOwnerAgent(creator, transferableAgentId);
-        assertEq(creatorCount, 1, "previous owner's tenure persists");
-        assertEq(creatorAvg, 80);
+        (uint256 count,,) = reputationRegistry.getReputationSummary(transferableAgentId);
+        assertEq(count, 0, "the buyer does not inherit the seller's reputation");
+        assertEq(reputationRegistry.eraStats(transferableAgentId, 0).feedbackCount, 1, "seller's era kept");
     }
 
-    function test_SoulboundReputation_BuyerEarnsFreshTrackRecord() public {
-        // Creator earns a review.
+    function test_Sale_BuyersClientsBuildTheNewEra() public {
+        _paid(transferableAgentId, client1);
         vm.prank(client1);
-        reputationRegistry.giveFeedback(transferableAgentId, 80, 0, "quality", "", "");
+        reputationRegistry.giveFeedback(transferableAgentId, -1, 0, "quality", "", "");
 
-        // Transfer to buyer.
         vm.prank(creator);
         identityRegistry.transferFrom(creator, buyer, transferableAgentId);
 
-        // Public summary on the same NFT is now empty (buyer's tenure).
-        (uint256 count,,) =
-            reputationRegistry.getReputationSummary(transferableAgentId);
-        assertEq(count, 0);
-
-        // A fresh client reviews buyer's tenure.
+        _paid(transferableAgentId, client2);
         vm.prank(client2);
-        reputationRegistry.giveFeedback(transferableAgentId, 90, 0, "quality", "", "");
+        reputationRegistry.giveFeedback(transferableAgentId, 1, 0, "quality", "", "");
 
-        // Buyer's tenure summary reflects ONLY their own record (not
-        // 85 = (80+90)/2 — the creator's 80 is soulbound to creator).
-        (uint256 countAfter, int256 avgAfter,) =
-            reputationRegistry.getReputationSummary(transferableAgentId);
-        assertEq(countAfter, 1);
-        assertEq(avgAfter, 90);
-
-        // Creator's tenure remains intact.
-        (uint256 creatorCount, int256 creatorAvg,) =
-            reputationRegistry.getReputationByOwnerAgent(creator, transferableAgentId);
-        assertEq(creatorCount, 1);
-        assertEq(creatorAvg, 80);
+        (uint256 count, int256 avg,) = reputationRegistry.getReputationSummary(transferableAgentId);
+        assertEq(count, 1);
+        assertEq(avg, 1, "only the new era's attestation counts");
     }
 
-    // ============ Anchored Reputation Tests ============
-
-    function test_AnchoredReputation_SurvivesSale() public {
-        // Client gives feedback to anchored agent
+    function test_AnchoredAgent_SaleStillStartsNewEra() public {
+        _paid(anchoredAgentId, client1);
         vm.prank(client1);
-        reputationRegistry.giveFeedback(anchoredAgentId, 80, 0, "quality", "", "");
+        reputationRegistry.giveFeedback(anchoredAgentId, 1, 0, "quality", "", "");
 
-        (uint256 count1, int256 avg1,) = reputationRegistry.getReputationSummary(anchoredAgentId);
-        assertEq(count1, 1);
-        assertEq(avg1, 80);
-
-        // Creator sells the NFT to buyer
         vm.prank(creator);
         identityRegistry.transferFrom(creator, buyer, anchoredAgentId);
 
-        // Reputation is still attached to creator's anchor, NOT the new owner
-        // Querying by agentId still resolves through the anchor
-        (uint256 count2, int256 avg2,) = reputationRegistry.getReputationSummary(anchoredAgentId);
-        assertEq(count2, 1);
-        assertEq(avg2, 80);
+        (uint256 count,,) = reputationRegistry.getReputationSummary(anchoredAgentId);
+        assertEq(count, 0, "an anchor does not carry reputation to a new owner");
+        (address eraOwner,,,) = reputationRegistry.eraInfo(anchoredAgentId, 0);
+        assertEq(eraOwner, creator);
     }
 
-    function test_AnchoredReputation_NewBuyerStartsFresh() public {
-        // Give feedback to anchored agent
-        vm.prank(client1);
-        reputationRegistry.giveFeedback(anchoredAgentId, 80, 0, "quality", "", "");
+    function test_AgentsWithTheSameAnchor_HaveSeparateHistories() public {
+        vm.prank(creator);
+        uint256 agent2Id = identityRegistry.registerAgent("AnchoredBot2", "ipfs://anchored2", 1000, creator);
 
-        // Transfer to buyer
+        _paid(anchoredAgentId, client1);
+        _paid(agent2Id, client2);
+        vm.prank(client1);
+        reputationRegistry.giveFeedback(anchoredAgentId, 1, 0, "quality", "", "");
+        vm.prank(client2);
+        reputationRegistry.giveFeedback(agent2Id, -1, 0, "quality", "", "");
+
+        (uint256 c1, int256 a1,) = reputationRegistry.getReputationSummary(anchoredAgentId);
+        (uint256 c2, int256 a2,) = reputationRegistry.getReputationSummary(agent2Id);
+        assertEq(c1, 1);
+        assertEq(a1, 1);
+        assertEq(c2, 1);
+        assertEq(a2, -1);
+    }
+
+    function test_TagScores_ArePerEra() public {
+        _paid(anchoredAgentId, client1);
+        vm.prank(client1);
+        reputationRegistry.giveFeedback(anchoredAgentId, 1, 0, "quality", "speed", "");
+        (int256 q, uint256 qn) = reputationRegistry.getTagScore(anchoredAgentId, "quality");
+        assertEq(q, 1);
+        assertEq(qn, 1);
+
+        vm.prank(creator);
+        identityRegistry.transferFrom(creator, buyer, anchoredAgentId);
+        (, uint256 qnAfter) = reputationRegistry.getTagScore(anchoredAgentId, "quality");
+        assertEq(qnAfter, 0);
+    }
+
+    function test_ClosedEra_RevocationsAndAttestationsAreFrozen() public {
+        _paid(anchoredAgentId, client1);
+        vm.prank(client1);
+        reputationRegistry.giveFeedback(anchoredAgentId, 1, 0, "quality", "", "");
+
         vm.prank(creator);
         identityRegistry.transferFrom(creator, buyer, anchoredAgentId);
 
-        // New client tries to review the agent post-sale
-        // The reputation is anchored to creator, so querying by agentId still
-        // resolves to the anchored subject (creator's address as uint256)
-        vm.prank(client2);
-        reputationRegistry.giveFeedback(anchoredAgentId, 90, 0, "quality", "", "");
-
-        // Both reviews are on the SAME anchored subject
-        (uint256 count, int256 avg,) = reputationRegistry.getReputationSummary(anchoredAgentId);
-        assertEq(count, 2);
-        assertEq(avg, 85);
-    }
-
-    function test_AnchoredReputation_TwoAgentsSameAnchor() public {
-        // Creator mints a second agent with the SAME anchor
-        vm.prank(creator);
-        uint256 agent2Id = identityRegistry.registerAgent(
-            "AnchoredBot2",
-            "ipfs://anchored2",
-            1000,
-            creator // same anchor as agent 1
-        );
-
-        // Different clients review different agents
         vm.prank(client1);
-        reputationRegistry.giveFeedback(anchoredAgentId, 100, 0, "quality", "", "");
-
-        vm.prank(client2);
-        reputationRegistry.giveFeedback(agent2Id, 50, 0, "quality", "", "");
-
-        // Both agents share the same anchor BUCKET, but each public
-        // summary is filtered to that agentId's attestations only —
-        // anchor sharing decides which bucket reviews drop into, not
-        // whether reviews of unrelated agents bleed across the public
-        // per-agent card. The combined view is read explicitly via
-        // getReputationByOwnerAgent(anchor, agentId) when needed.
-        (uint256 count1, int256 avg1,) = reputationRegistry.getReputationSummary(anchoredAgentId);
-        (uint256 count2, int256 avg2,) = reputationRegistry.getReputationSummary(agent2Id);
-        assertEq(count1, 1);
-        assertEq(avg1, 100);
-        assertEq(count2, 1);
-        assertEq(avg2, 50);
-    }
-
-    // ============ Tag Scores ============
-
-    function test_Anchored_TagScoreResolvesThroughAnchor() public {
-        vm.prank(client1);
-        reputationRegistry.giveFeedback(anchoredAgentId, 80, 0, "quality", "speed", "");
-
-        (int256 qualityScore, uint256 qualityCount) = reputationRegistry.getTagScore(anchoredAgentId, "quality");
-        (int256 speedScore, uint256 speedCount) = reputationRegistry.getTagScore(anchoredAgentId, "speed");
-
-        assertEq(qualityScore, 80);
-        assertEq(qualityCount, 1);
-        assertEq(speedScore, 80);
-        assertEq(speedCount, 1);
-    }
-
-    // ============ Revoke & Re-submit ============
-
-    function test_Anchored_RevokePersistsAcrossTransfer() public {
-        // Give and revoke feedback on anchored agent
-        vm.prank(client1);
-        reputationRegistry.giveFeedback(anchoredAgentId, 80, 0, "quality", "", "");
-
-        vm.prank(client1);
+        vm.expectRevert("No feedback to revoke");
         reputationRegistry.revokeFeedback(anchoredAgentId);
-
-        (uint256 countBefore,,) = reputationRegistry.getReputationSummary(anchoredAgentId);
-        assertEq(countBefore, 0);
-
-        // Transfer to buyer
-        vm.prank(creator);
-        identityRegistry.transferFrom(creator, buyer, anchoredAgentId);
-
-        // Revoke state is still attached to the anchor
-        (uint256 countAfter,,) = reputationRegistry.getReputationSummary(anchoredAgentId);
-        assertEq(countAfter, 0);
-
-        // Client can re-submit
         vm.prank(client1);
-        reputationRegistry.giveFeedback(anchoredAgentId, 90, 0, "quality", "", "");
-
-        (uint256 countFinal,,) = reputationRegistry.getReputationSummary(anchoredAgentId);
-        assertEq(countFinal, 1);
+        vm.expectRevert(AgentReputationRegistry.NotAPayingClient.selector);
+        reputationRegistry.giveFeedback(anchoredAgentId, -1, 0, "quality", "", "");
     }
 
     // ============ Audit regression tests ============
 
-    /**
-     * @dev CRITICAL-1 regression: subject namespace must be domain-separated.
-     *      An anchor address whose uint160 representation collides with an
-     *      existing agentId MUST NOT cause reputation pools to merge.
-     *
-     *      Setup:
-     *        - transferableAgentId is some integer N
-     *        - We force-mint a third agent whose anchor is address(uint160(N))
-     *        - Reviews on the anchored agent must NOT show up on agent N.
-     */
+    /// CRITICAL-1 (v2 form): subjects are domain-separated keccak(ERA, agentId,
+    /// era) — an anchor whose uint160 equals an agentId can't merge pools, and
+    /// the legacy anchor/agent subjects stay separate too.
     function test_AUDIT_NoSubjectCollisionBetweenAnchorAndAgentId() public {
-        // Pick the address whose uint160 representation == transferableAgentId.
         address collidingAnchor = address(uint160(transferableAgentId));
-
-        // The colliding anchor must mint as msg.sender (HIGH-3 enforcement).
         vm.prank(collidingAnchor);
-        uint256 collidingAgent = identityRegistry.registerAgent(
-            "Collider",
-            "ipfs://collide",
-            0,
-            collidingAnchor
-        );
+        uint256 collidingAgent = identityRegistry.registerAgent("Collider", "ipfs://collide", 0, collidingAnchor);
 
-        // Review the colliding (anchored) agent.
+        _paid(collidingAgent, client1);
         vm.prank(client1);
-        reputationRegistry.giveFeedback(collidingAgent, -100, 0, "evil", "", "");
+        reputationRegistry.giveFeedback(collidingAgent, -1, 0, "evil", "", "");
 
-        // Transferable agent N must remain untouched.
         (uint256 nCount,,) = reputationRegistry.getReputationSummary(transferableAgentId);
-        assertEq(nCount, 0, "transferable agent leaked from anchor namespace");
-
-        // And the anchored agent has its own review.
+        assertEq(nCount, 0, "transferable agent leaked from another subject");
         (uint256 aCount, int256 aAvg,) = reputationRegistry.getReputationSummary(collidingAgent);
         assertEq(aCount, 1);
-        assertEq(aAvg, -100);
+        assertEq(aAvg, -1);
+        assertTrue(reputationRegistry.reputationSubjectOf(collidingAgent) != reputationRegistry.reputationSubjectOf(transferableAgentId));
     }
 
     /**
@@ -352,96 +255,27 @@ contract ReputationAnchorTest is Test {
         identityRegistry.registerAgent("Evil", "ipfs://evil", 0, victim);
     }
 
-    /**
-     * @dev CRITICAL-2 regression: getFeedbackCount must resolve through the
-     *      reputation anchor. Previously it indexed feedbacks[agentId] directly.
-     */
-    function test_AUDIT_GetFeedbackCount_ResolvesAnchor() public {
+    function test_AUDIT_GetFeedbackCount_ResolvesCurrentEra() public {
+        _paid(anchoredAgentId, client1);
         vm.prank(client1);
-        reputationRegistry.giveFeedback(anchoredAgentId, 80, 0, "quality", "", "");
-
-        assertEq(
-            reputationRegistry.getFeedbackCount(anchoredAgentId),
-            1,
-            "getFeedbackCount must resolve through anchor"
-        );
+        reputationRegistry.giveFeedback(anchoredAgentId, 1, 0, "quality", "", "");
+        assertEq(reputationRegistry.getFeedbackCount(anchoredAgentId), 1);
     }
 
-    /**
-     * @dev MEDIUM-4 sanity (v2): subject is exposed via
-     *      reputationSubjectOf and is domain-separated. After the
-     *      soulbound upgrade the transferable branch resolves to
-     *      keccak256("OWNER", currentOwner) instead of the legacy
-     *      keccak256("AGENT", agentId) — pinning that derivation here
-     *      so a future change can't silently break domain separation
-     *      and merge the OWNER and ANCHOR pools.
-     */
+    /// MEDIUM-4 (v2 form): the current subject is keccak(ERA, agentId, era).
     function test_AUDIT_ReputationSubjectIsDomainSeparated() public view {
-        bytes32 anchored = reputationRegistry.reputationSubjectOf(anchoredAgentId);
-        bytes32 transferable = reputationRegistry.reputationSubjectOf(transferableAgentId);
-
-        bytes32 expectedAnchor = keccak256(abi.encode(keccak256("ANCHOR"), creator));
-        bytes32 expectedOwner  = keccak256(abi.encode(
-            keccak256("OWNER"),
-            identityRegistry.ownerOf(transferableAgentId)
-        ));
-
-        assertEq(anchored, expectedAnchor);
-        assertEq(transferable, expectedOwner);
-        assertTrue(anchored != transferable);
+        assertEq(reputationRegistry.reputationSubjectOf(transferableAgentId), keccak256(abi.encode(keccak256("ERA"), transferableAgentId, uint256(0))));
+        assertTrue(reputationRegistry.reputationSubjectOf(anchoredAgentId) != reputationRegistry.reputationSubjectOf(transferableAgentId));
     }
 
-    /**
-     * @dev getFeedbackAt is the canonical anchor-aware indexed accessor used
-     *      by the ERC-8004 adapter. Verify it returns the same data the array
-     *      view would, and resolves through the anchor.
-     */
-    /**
-     * @dev Audit gap fix: identity registry must expose a reverse index so
-     *      UIs can surface "this anchor controls N agents" — critical for
-     *      marketplaces selling anchored NFTs (buyer must understand the
-     *      shared-pool semantic).
-     */
-    function test_AUDIT_AnchorReverseIndex_EnumeratesSharedAgents() public {
-        // anchoredAgentId already exists in setUp() with anchor=creator.
-        // Mint two more anchored agents under the same anchor.
-        vm.startPrank(creator);
-        uint256 a2 = identityRegistry.registerAgent("A2", "ipfs://a2", 0, creator);
-        uint256 a3 = identityRegistry.registerAgent("A3", "ipfs://a3", 0, creator);
-        vm.stopPrank();
-
-        uint256[] memory ids = identityRegistry.agentsByAnchor(creator);
-        assertEq(ids.length, 3);
-        assertEq(ids[0], anchoredAgentId);
-        assertEq(ids[1], a2);
-        assertEq(ids[2], a3);
-
-        // Transferable agents do not populate the anchor index.
-        assertEq(identityRegistry.agentsByAnchor(address(0)).length, 0);
-    }
-
-    function test_AUDIT_AnchorReverseIndex_EmptyForUnusedAnchor() public view {
-        uint256[] memory ids = identityRegistry.agentsByAnchor(address(0xCAFE));
-        assertEq(ids.length, 0);
-    }
-
-    function test_AUDIT_GetFeedbackAt_ResolvesAnchor() public {
+    function test_AUDIT_GetFeedbackAt_ResolvesCurrentEra() public {
+        _paid(anchoredAgentId, client1);
         vm.prank(client1);
-        reputationRegistry.giveFeedback(anchoredAgentId, 80, 0, "quality", "speed", "ipfs://x");
+        reputationRegistry.giveFeedback(anchoredAgentId, 1, 0, "quality", "speed", "ipfs://x");
 
-        (
-            address fbClient,
-            int128 fbValue,
-            ,
-            string memory fbTag1,
-            ,
-            ,
-            ,
-            bool fbRevoked
-        ) = reputationRegistry.getFeedbackAt(anchoredAgentId, 0);
-
+        (address fbClient, int128 fbValue,, string memory fbTag1,,,, bool fbRevoked) = reputationRegistry.getFeedbackAt(anchoredAgentId, 0);
         assertEq(fbClient, client1);
-        assertEq(fbValue, 80);
+        assertEq(fbValue, 1);
         assertEq(keccak256(bytes(fbTag1)), keccak256(bytes("quality")));
         assertFalse(fbRevoked);
     }

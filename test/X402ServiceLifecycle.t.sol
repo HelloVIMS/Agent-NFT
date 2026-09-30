@@ -140,6 +140,9 @@ contract X402ServiceLifecycleTest is Test {
 
         usdc = new LifecycleUSDC();
         x402.setTokenAllowed(address(usdc), true);
+        // Reputation v2: settlements are recorded by the receiver.
+        reputation.setSettlementRecorder(address(x402), true);
+        x402.setReputationRegistry(address(reputation));
 
         vm.stopPrank();
 
@@ -232,13 +235,13 @@ contract X402ServiceLifecycleTest is Test {
         // 3. Buyer attests delivery on-chain.
         vm.prank(buyer1);
         reputation.giveFeedback(
-            agentId, int128(5), uint8(0), "quality", "speed", "ipfs://review/job-1.json"
+            agentId, int128(1), uint8(0), "quality", "speed", "ipfs://review/job-1.json"
         );
 
         // 4. Reputation summary reflects the new entry.
         (uint256 total, int256 avg, uint256 last) = reputation.getReputationSummary(agentId);
         assertEq(total, 1, "1 feedback recorded");
-        assertEq(avg, int256(5), "average is 5");
+        assertEq(avg, int256(1), "average is 1");
         assertEq(last, block.timestamp, "timestamp anchored to block");
     }
 
@@ -273,15 +276,16 @@ contract X402ServiceLifecycleTest is Test {
         // Two distinct buyers each pay + attest.
         _pay(buyer1, buyer1Pk, keccak256("multi-1"));
         vm.prank(buyer1);
-        reputation.giveFeedback(agentId, int128(5), 0, "great", "", "ipfs://r/1");
+        reputation.giveFeedback(agentId, int128(1), 0, "great", "", "ipfs://r/1");
 
         _pay(buyer2, buyer2Pk, keccak256("multi-2"));
         vm.prank(buyer2);
-        reputation.giveFeedback(agentId, int128(3), 0, "okay", "", "ipfs://r/2");
+        reputation.giveFeedback(agentId, int128(1), 0, "okay", "", "ipfs://r/2");
 
         (uint256 total, int256 avg,) = reputation.getReputationSummary(agentId);
         assertEq(total, 2, "two attestations");
-        assertEq(avg, int256(4), "average is (5+3)/2 = 4");
+        assertEq(avg, int256(1), "average of two positives is 1");
+        assertEq(reputation.eraStats(agentId, 0).settlements, 2, "two settlements recorded");
     }
 
     /// @notice Buyer revokes prior attestation; summary reflects the revocation.
@@ -290,7 +294,7 @@ contract X402ServiceLifecycleTest is Test {
         _pay(buyer1, buyer1Pk, keccak256("revoke-1"));
 
         vm.prank(buyer1);
-        reputation.giveFeedback(agentId, int128(5), 0, "", "", "");
+        reputation.giveFeedback(agentId, int128(1), 0, "", "", "");
 
         // Revoke.
         vm.prank(buyer1);
@@ -302,11 +306,11 @@ contract X402ServiceLifecycleTest is Test {
 
         // Re-attest after revocation. Must succeed (no "already gave feedback").
         vm.prank(buyer1);
-        reputation.giveFeedback(agentId, int128(2), 0, "second-thought", "", "");
+        reputation.giveFeedback(agentId, int128(-1), 0, "second-thought", "", "");
 
         (uint256 totalAfter, int256 avgAfter,) = reputation.getReputationSummary(agentId);
         assertEq(totalAfter, 1, "re-attestation registered");
-        assertEq(avgAfter, int256(2), "new value is canonical");
+        assertEq(avgAfter, int256(-1), "new value is canonical");
     }
 
     /// @notice Replay protection — submitting the *same* EIP-3009 nonce twice
@@ -358,7 +362,7 @@ contract X402ServiceLifecycleTest is Test {
         // First payment + attestation succeed.
         _pay(buyer1, buyer1Pk, keccak256("deact-1"));
         vm.prank(buyer1);
-        reputation.giveFeedback(agentId, 5, 0, "", "", "");
+        reputation.giveFeedback(agentId, 1, 0, "", "", "");
 
         // Creator deactivates the service.
         vm.prank(creator);
@@ -410,7 +414,7 @@ contract X402ServiceLifecycleTest is Test {
     function test_Lifecycle_OnlyAuthorMayRevoke() public {
         _pay(buyer1, buyer1Pk, keccak256("auth-1"));
         vm.prank(buyer1);
-        reputation.giveFeedback(agentId, 5, 0, "", "", "");
+        reputation.giveFeedback(agentId, 1, 0, "", "", "");
 
         // buyer2 (who never attested) tries to revoke buyer1's feedback.
         vm.prank(buyer2);
@@ -420,7 +424,7 @@ contract X402ServiceLifecycleTest is Test {
         // Original attestation untouched.
         (uint256 total, int256 avg,) = reputation.getReputationSummary(agentId);
         assertEq(total, 1, "feedback survives third-party revoke attempt");
-        assertEq(avg, int256(5), "value untouched");
+        assertEq(avg, int256(1), "value untouched");
     }
 
     /// @notice `quoteSplit` must mirror `payForService`'s on-chain math.

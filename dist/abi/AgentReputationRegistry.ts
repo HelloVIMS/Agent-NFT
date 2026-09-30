@@ -78,8 +78,38 @@ const abi = [
       },
       {
         "name": "",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "currentEra",
+    "inputs": [
+      {
+        "name": "agentId",
         "type": "uint256"
-      },
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "disputeRecorders",
+    "inputs": [
       {
         "name": "",
         "type": "address"
@@ -95,14 +125,10 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "feedbackAgentId",
+    "name": "eraCount",
     "inputs": [
       {
-        "name": "",
-        "type": "bytes32"
-      },
-      {
-        "name": "",
+        "name": "agentId",
         "type": "uint256"
       }
     ],
@@ -110,6 +136,164 @@ const abi = [
       {
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "eraFeedbackAt",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256"
+      },
+      {
+        "name": "era",
+        "type": "uint256"
+      },
+      {
+        "name": "index",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "client",
+        "type": "address"
+      },
+      {
+        "name": "value",
+        "type": "int128"
+      },
+      {
+        "name": "decimals",
+        "type": "uint8"
+      },
+      {
+        "name": "tag1",
+        "type": "string"
+      },
+      {
+        "name": "tag2",
+        "type": "string"
+      },
+      {
+        "name": "feedbackURI",
+        "type": "string"
+      },
+      {
+        "name": "timestamp",
+        "type": "uint256"
+      },
+      {
+        "name": "revoked",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "eraFeedbackCount",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256"
+      },
+      {
+        "name": "era",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "eraInfo",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256"
+      },
+      {
+        "name": "era",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "name": "startedAt",
+        "type": "uint64"
+      },
+      {
+        "name": "endedAt",
+        "type": "uint64"
+      },
+      {
+        "name": "current",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "eraStats",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256"
+      },
+      {
+        "name": "era",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "settlements",
+            "type": "uint64"
+          },
+          {
+            "name": "disputes",
+            "type": "uint64"
+          },
+          {
+            "name": "volume",
+            "type": "uint128"
+          },
+          {
+            "name": "lastSettlementAt",
+            "type": "uint64"
+          },
+          {
+            "name": "feedbackCount",
+            "type": "uint64"
+          },
+          {
+            "name": "feedbackSum",
+            "type": "int128"
+          },
+          {
+            "name": "lastFeedbackAt",
+            "type": "uint64"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -264,35 +448,6 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "getReputationByOwnerAgent",
-    "inputs": [
-      {
-        "name": "owner",
-        "type": "address"
-      },
-      {
-        "name": "agentId",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "totalFeedbacks",
-        "type": "uint256"
-      },
-      {
-        "name": "averageScore",
-        "type": "int256"
-      },
-      {
-        "name": "lastFeedbackTime",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getReputationSummary",
     "inputs": [
       {
@@ -399,12 +554,99 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "legacyFeedbackAt",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256"
+      },
+      {
+        "name": "index",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "client",
+        "type": "address"
+      },
+      {
+        "name": "value",
+        "type": "int128"
+      },
+      {
+        "name": "decimals",
+        "type": "uint8"
+      },
+      {
+        "name": "tag1",
+        "type": "string"
+      },
+      {
+        "name": "tag2",
+        "type": "string"
+      },
+      {
+        "name": "feedbackURI",
+        "type": "string"
+      },
+      {
+        "name": "timestamp",
+        "type": "uint256"
+      },
+      {
+        "name": "revoked",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "legacyFeedbackCount",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "owner",
     "inputs": [],
     "outputs": [
       {
         "name": "",
         "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "paidSettlements",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      },
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -420,6 +662,50 @@ const abi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "recordDispute",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256"
+      },
+      {
+        "name": "client",
+        "type": "address"
+      },
+      {
+        "name": "ref",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "recordSettlement",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256"
+      },
+      {
+        "name": "payer",
+        "type": "address"
+      },
+      {
+        "name": "serviceId",
+        "type": "bytes32"
+      },
+      {
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -456,6 +742,55 @@ const abi = [
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setDisputeRecorder",
+    "inputs": [
+      {
+        "name": "recorder",
+        "type": "address"
+      },
+      {
+        "name": "allowed",
+        "type": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setSettlementRecorder",
+    "inputs": [
+      {
+        "name": "recorder",
+        "type": "address"
+      },
+      {
+        "name": "allowed",
+        "type": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "settlementRecorders",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -573,6 +908,77 @@ const abi = [
   },
   {
     "type": "event",
+    "name": "DisputeRecorded",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "era",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "client",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "ref",
+        "type": "bytes32",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DisputeRecorderSet",
+    "inputs": [
+      {
+        "name": "recorder",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "allowed",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EraStarted",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "era",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "owner",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "subject",
+        "type": "bytes32",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "FeedbackGiven",
     "inputs": [
       {
@@ -666,6 +1072,60 @@ const abi = [
   },
   {
     "type": "event",
+    "name": "SettlementRecorded",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "era",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "client",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "serviceId",
+        "type": "bytes32",
+        "indexed": false
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "counted",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SettlementRecorderSet",
+    "inputs": [
+      {
+        "name": "recorder",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "allowed",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Upgraded",
     "inputs": [
       {
@@ -713,7 +1173,27 @@ const abi = [
   },
   {
     "type": "error",
+    "name": "NoSuchEra",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotAPayingClient",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotDisputeRecorder",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NotInitializing",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotSettlementRecorder",
     "inputs": []
   },
   {
@@ -735,6 +1215,11 @@ const abi = [
         "type": "address"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "ScoreOutOfRange",
+    "inputs": []
   },
   {
     "type": "error",

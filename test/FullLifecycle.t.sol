@@ -16,6 +16,12 @@ contract LifecycleUSDC is ERC20 {
     constructor() ERC20("Mock USDC", "mUSDC") {}
     function decimals() public pure override returns (uint8) { return 6; }
     function mint(address to, uint256 amount) external { _mint(to, amount); }
+    /// EIP-3009 stand-in: the receiver pulls from `from` (signature checks
+    /// belong to real USDC; the receiver's own commitment check is real).
+    function receiveWithAuthorization(address from, address to, uint256 value, uint256, uint256, bytes32, uint8, bytes32, bytes32) external {
+        require(msg.sender == to, "caller must be the payee");
+        _transfer(from, to, value);
+    }
 }
 
 /// @notice End-to-end test that walks the *exact* sequence the marketplace
@@ -39,7 +45,8 @@ contract FullLifecycleTest is Test {
 
     address public owner   = address(0xA11CE);
     address public creator = address(0xC1EA7);  // owns the agent NFT + TBA
-    address public hirer   = address(0xB055);   // pays the agent for a service
+    uint256 public constant HIRER_PK = uint256(keccak256("full-lifecycle-hirer"));
+    address public hirer;                        // pays the agent for a service
     address public treasury = address(0x7E2A);
 
     bytes32 public constant SERVICE_ID = keccak256("api/chat/v1");
@@ -52,6 +59,7 @@ contract FullLifecycleTest is Test {
     address constant ERC6551_REGISTRY = 0x000000006551c19487814612e58FE06813775758;
 
     function setUp() public {
+        hirer = vm.addr(HIRER_PK);
         // ─── Identity ────────────────────────────────────────────────────
         vm.startPrank(owner);
         AgentIdentityRegistry idImpl = new AgentIdentityRegistry();
@@ -89,6 +97,9 @@ contract FullLifecycleTest is Test {
         // ─── USDC + allowlist ────────────────────────────────────────────
         usdc = new LifecycleUSDC();
         x402.setTokenAllowed(address(usdc), true);
+        // Reputation v2: the receiver records settlements; only payers attest.
+        reputation.setSettlementRecorder(address(x402), true);
+        x402.setReputationRegistry(address(reputation));
 
         vm.stopPrank();
 
@@ -125,20 +136,18 @@ contract FullLifecycleTest is Test {
         assertEq(svc.price, SERVICE_PRICE,  "service price");
         assertTrue(svc.active,              "service active");
 
-        // ─── 4. Hire (agent_vims_hire_agent_tx) ──────────────────────────
-        // MCP returns USDC.transfer(splitter, amount). For the lifecycle
-        // test the "splitter" is the agent's TBA, which is the simplest
-        // valid payout target. PaymentSplitter testing is a separate suite.
+        // ─── 4. Hire: a settlement through AgentX402Receiver ─────────────
         uint256 tbaBefore = usdc.balanceOf(tba);
-        vm.prank(hirer);
-        usdc.transfer(tba, HIRE_PAYMENT);
-        assertEq(usdc.balanceOf(tba) - tbaBefore, HIRE_PAYMENT, "TBA received payment");
+        _hire(agentId, keccak256("hire-1"));
+        (, , , uint256 agentCut) = x402.quoteSplit(agentId, SERVICE_ID);
+        assertEq(usdc.balanceOf(tba) - tbaBefore, agentCut, "TBA received its share");
+        assertEq(reputation.eraStats(agentId, 0).settlements, 1, "settlement is system reputation");
 
         // ─── 5. Attest delivery (agent_vims_attest_delivery_tx) ──────────
         vm.prank(hirer);
         reputation.giveFeedback(
             agentId,
-            int128(5),       // 5-star
+            int128(1),       // positive (ERC-8004 tri-state)
             uint8(0),        // decimals = 0
             "quality",
             "speed",
@@ -149,7 +158,7 @@ contract FullLifecycleTest is Test {
         (uint256 totalFeedbacks, int256 averageScore, uint256 lastFeedbackTime) =
             reputation.getReputationSummary(agentId);
         assertEq(totalFeedbacks, 1, "feedback recorded");
-        assertEq(averageScore, int256(5), "average is 5");
+        assertEq(averageScore, int256(1), "average is positive");
         assertEq(lastFeedbackTime, block.timestamp, "timestamp set");
     }
 
@@ -165,7 +174,22 @@ contract FullLifecycleTest is Test {
 
         vm.prank(creator);
         vm.expectRevert(bytes("Cannot review own agent"));
-        reputation.giveFeedback(agentId, int128(5), 0, "", "", "");
+        reputation.giveFeedback(agentId, int128(1), 0, "", "", "");
+    }
+
+    /// @notice Sending USDC to the agent outside the receiver isn't a hire:
+    ///         no settlement is recorded, so there's nothing to attest to.
+    function test_FullLifecycle_DirectTransferIsNotAHire() public {
+        vm.prank(creator);
+        (uint256 agentId, address tba) = identity.mintWithFullStack(
+            "Pixel", "ipfs://pixel", 500, address(0),
+            TBA_SALT, SERVICE_ID, address(usdc), SERVICE_PRICE
+        );
+        vm.prank(hirer);
+        usdc.transfer(tba, HIRE_PAYMENT);
+        vm.prank(hirer);
+        vm.expectRevert(AgentReputationRegistry.NotAPayingClient.selector);
+        reputation.giveFeedback(agentId, int128(1), 0, "", "", "");
     }
 
     /// @notice Duplicate feedback from the same client must be rejected. The
@@ -177,8 +201,9 @@ contract FullLifecycleTest is Test {
             TBA_SALT, SERVICE_ID, address(usdc), SERVICE_PRICE
         );
 
+        _hire(agentId, keccak256("dup-1"));
         vm.prank(hirer);
-        reputation.giveFeedback(agentId, 5, 0, "", "", "");
+        reputation.giveFeedback(agentId, 1, 0, "", "", "");
 
         vm.prank(hirer);
         vm.expectRevert(bytes("Already gave feedback"));
@@ -196,10 +221,11 @@ contract FullLifecycleTest is Test {
             TBA_SALT, SERVICE_ID, address(usdc), SERVICE_PRICE
         );
 
+        _hire(agentId, keccak256("raw-1"));
         bytes memory data = abi.encodeWithSignature(
             "giveFeedback(uint256,int128,uint8,string,string,string)",
             agentId,
-            int128(5),
+            int128(1),
             uint8(0),
             "quality",
             "speed",
@@ -212,5 +238,15 @@ contract FullLifecycleTest is Test {
 
         (uint256 total,,) = reputation.getReputationSummary(agentId);
         assertEq(total, 1, "feedback recorded via raw calldata");
+    }
+
+    /// @dev A real settlement: the hirer signs the receiver's payment
+    ///      commitment; the receiver pulls USDC and records the hire.
+    function _hire(uint256 agentId, bytes32 nonce) internal {
+        uint256 deadline = block.timestamp + 1 hours;
+        (uint8 cv, bytes32 cr, bytes32 cs) = vm.sign(
+            HIRER_PK, x402.hashPaymentCommitment(agentId, SERVICE_ID, address(usdc), SERVICE_PRICE, nonce, deadline)
+        );
+        x402.payForService(agentId, SERVICE_ID, hirer, 0, deadline, nonce, 27, bytes32(0), bytes32(0), cv, cr, cs);
     }
 }

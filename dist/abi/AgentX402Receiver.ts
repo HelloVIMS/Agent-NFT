@@ -58,6 +58,18 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "REPUTATION_GAS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "UPGRADE_INTERFACE_VERSION",
     "inputs": [],
     "outputs": [
@@ -710,6 +722,18 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "reputationRegistry",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "selfRegisterCollection",
     "inputs": [
       {
@@ -808,6 +832,18 @@ const abi = [
     "inputs": [
       {
         "name": "_registry",
+        "type": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setReputationRegistry",
+    "inputs": [
+      {
+        "name": "registry",
         "type": "address"
       }
     ],
@@ -1149,6 +1185,50 @@ const abi = [
         "name": "account",
         "type": "address",
         "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ReputationRecordFailed",
+    "inputs": [
+      {
+        "name": "agentId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "payer",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "serviceId",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "reason",
+        "type": "bytes",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ReputationRegistryUpdated",
+    "inputs": [
+      {
+        "name": "oldRegistry",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "newRegistry",
+        "type": "address",
+        "indexed": true
       }
     ],
     "anonymous": false
@@ -1587,6 +1667,11 @@ const abi = [
   {
     "type": "error",
     "name": "FailedInnerCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InsufficientGasForReputation",
     "inputs": []
   },
   {

@@ -52,6 +52,9 @@ contract AgentSubaccountWiringTest is Test {
 
         usdc = new WiringMockUSDC();
         router = new AgentPaymentRouter(address(identity), address(usdc), treasury);
+        // This test contract stands in for AgentX402Receiver (v2: only
+        // paying clients may attest).
+        reputation.setSettlementRecorder(address(this), true);
 
         vm.stopPrank();
 
@@ -66,9 +69,14 @@ contract AgentSubaccountWiringTest is Test {
 
     // ============ ReputationRegistry · PERM_REPUTATION ============
 
+    function _paid(address who) internal {
+        reputation.recordSettlement(targetAgentId, who, bytes32("svc"), 1);
+    }
+
     function test_Reputation_NonBoundCaller_UnchangedBehavior() public {
+        _paid(payer);
         vm.prank(payer);
-        reputation.giveFeedback(targetAgentId, 90, 0, "quality", "speed", "ipfs://r1");
+        reputation.giveFeedback(targetAgentId, 1, 0, "quality", "speed", "ipfs://r1");
         assertEq(reputation.getFeedbackCount(targetAgentId), 1);
     }
 
@@ -78,9 +86,10 @@ contract AgentSubaccountWiringTest is Test {
         vm.prank(clientEoa);
         identity.registerSubaccount(clientAgentId, clientSubacct, bytes32(0), permPay);
 
+        _paid(clientSubacct);
         vm.prank(clientSubacct);
         vm.expectRevert(bytes("Subaccount lacks PERM_REPUTATION"));
-        reputation.giveFeedback(targetAgentId, 90, 0, "q", "s", "ipfs://x");
+        reputation.giveFeedback(targetAgentId, 1, 0, "q", "s", "ipfs://x");
     }
 
     function test_Reputation_SubaccountWithPerm_CanonicalisesAndDedups() public {
@@ -89,14 +98,14 @@ contract AgentSubaccountWiringTest is Test {
         vm.prank(clientEoa);
         identity.registerSubaccount(clientAgentId, clientSubacct, bytes32(0), permRep);
 
+        // The subaccount paid; the canonical paying client is clientEoa.
+        _paid(clientSubacct);
+        assertEq(reputation.paidSettlements(reputation.reputationSubjectOf(targetAgentId), clientEoa), 1);
         // Subaccount writes feedback. Canonical client should be clientEoa.
-        // targetAgentId is transferable (no anchor) so the v2 OWNER
-        // branch fires and dedup is recorded in clientHasFeedbackForAgent.
-        bytes32 subj = reputation.reputationSubjectOf(targetAgentId);
         vm.prank(clientSubacct);
-        reputation.giveFeedback(targetAgentId, 88, 0, "quality", "", "ipfs://r1");
-        assertTrue(reputation.clientHasFeedback(subj, targetAgentId, clientEoa));
-        assertFalse(reputation.clientHasFeedback(subj, targetAgentId, clientSubacct));
+        reputation.giveFeedback(targetAgentId, 1, 0, "quality", "", "ipfs://r1");
+        assertTrue(reputation.clientHasFeedback(reputation.reputationSubjectOf(targetAgentId), clientEoa));
+        assertFalse(reputation.clientHasFeedback(reputation.reputationSubjectOf(targetAgentId), clientSubacct));
 
         // A second subaccount also bound with PERM_REPUTATION must NOT be
         // able to bypass dedup — same canonical client.
@@ -106,23 +115,23 @@ contract AgentSubaccountWiringTest is Test {
 
         vm.prank(sub2);
         vm.expectRevert(bytes("Already gave feedback"));
-        reputation.giveFeedback(targetAgentId, 50, 0, "q", "", "ipfs://r2");
+        reputation.giveFeedback(targetAgentId, 0, 0, "q", "", "ipfs://r2");
 
         // The original subaccount can revoke even though the canonical
         // client (clientEoa) was who recorded the feedback.
         vm.prank(clientSubacct);
         reputation.revokeFeedback(targetAgentId);
-        assertFalse(reputation.clientHasFeedback(subj, targetAgentId, clientEoa));
+        assertFalse(reputation.clientHasFeedback(reputation.reputationSubjectOf(targetAgentId), clientEoa));
     }
 
     function test_Reputation_PrimaryTBA_AlsoCanonicalises() public {
         vm.prank(clientEoa);
         identity.setTBAAddress(clientAgentId, clientPrimaryTba);
 
+        _paid(clientPrimaryTba);
         vm.prank(clientPrimaryTba);
-        reputation.giveFeedback(targetAgentId, 70, 0, "quality", "", "ipfs://r3");
-        bytes32 subj = reputation.reputationSubjectOf(targetAgentId);
-        assertTrue(reputation.clientHasFeedback(subj, targetAgentId, clientEoa));
+        reputation.giveFeedback(targetAgentId, 1, 0, "quality", "", "ipfs://r3");
+        assertTrue(reputation.clientHasFeedback(reputation.reputationSubjectOf(targetAgentId), clientEoa));
     }
 
     function test_Reputation_CannotReviewOwnAgent_ViaSubaccount() public {
@@ -131,9 +140,10 @@ contract AgentSubaccountWiringTest is Test {
         vm.prank(creator);
         identity.registerSubaccount(targetAgentId, agentSubacct, bytes32(0), permRep);
 
+        _paid(agentSubacct); // the owner's own payment: not a sale
         vm.prank(agentSubacct);
         vm.expectRevert(bytes("Cannot review own agent"));
-        reputation.giveFeedback(targetAgentId, 100, 0, "q", "", "ipfs://self");
+        reputation.giveFeedback(targetAgentId, 1, 0, "q", "", "ipfs://self");
     }
 
     // ============ PaymentRouter · PERM_PAY ============

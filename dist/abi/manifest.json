@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-29T13:35:12.401Z",
+  "generatedAt": "2026-09-30T00:04:47.342Z",
   "generator": "agent-nft/scripts/export-abi.mjs",
   "contracts": [
     {
@@ -43,9 +43,9 @@
       "namespace": null,
       "src": "src/AgentReputationRegistry.sol",
       "abi": "AgentReputationRegistry.json",
-      "sha256": "178ab8c72ad5e7f530cc6f7088d592c17261a0892b8e03c10ae191946bef9690",
-      "bytes": 12578,
-      "entries": 44
+      "sha256": "5c74815313ace33df76fb263215237f0c9a9ae8eb34de1ab3802588f108afba9",
+      "bytes": 20876,
+      "entries": 67
     },
     {
       "contract": "AgentContextRegistry",
@@ -79,9 +79,9 @@
       "namespace": null,
       "src": "src/AgentX402Receiver.sol",
       "abi": "AgentX402Receiver.json",
-      "sha256": "d0e322a2df4096b9660b47bf656d939d56576185a28ba093d0186bc6487696f6",
-      "bytes": 29147,
-      "entries": 102
+      "sha256": "8a5bb652e6211910e69e1d8b410c6f91e1f5f4220865de3fcd4f1fb5f2ea963d",
+      "bytes": 30659,
+      "entries": 108
     },
     {
       "contract": "AgentMarketplace",
