@@ -28,6 +28,10 @@ interface IReputationSettlements {
     function recordSettlementForNFT(address nft, uint256 tokenId, address payer, bytes32 serviceId, uint256 amount) external;
 }
 
+interface IAgentServiceEscrow {
+    function open(bytes32 escrowId, address buyer, address nft, uint256 tokenId, bytes32 serviceId, address token, uint256 amount) external;
+}
+
 /**
  * @title AgentX402Receiver
  * @notice Atomic on-chain settler for Agent NFT services paid via the
@@ -295,27 +299,9 @@ contract AgentX402Receiver is
             from, address(this), gross, validAfter, validBefore, nonce, v, r, s
         );
 
-        // 3. Compute splits (audit L-4: zero-out before emit so the event
-        //    accurately reflects on-chain disbursement).
-        uint256 systemCut  = (gross * systemFeeBps) / BPS_DENOM;
-        (address creator, uint256 creatorBps) = identityRegistry.getCreatorRoyalty(agentId);
-        uint256 creatorCut = (gross * creatorBps) / BPS_DENOM;
-        uint256 agentCut   = gross - systemCut - creatorCut;
-
-        if (creatorCut > 0 && creator == address(0)) {
-            agentCut  += creatorCut;
-            creatorCut = 0;
-        }
-
-        // 4. Resolve agent recipient: prefer TBA, fall back to NFT owner.
-        (,address tba,,,) = identityRegistry.agents(agentId);
-        address agentRecipient = tba != address(0) ? tba : identityRegistry.ownerOf(agentId);
-
-        // 5. Disburse.
-        IERC20 token = IERC20(svc.token);
-        if (systemCut  > 0) token.safeTransfer(treasury,        systemCut);
-        if (creatorCut > 0) token.safeTransfer(creator,         creatorCut);
-        if (agentCut   > 0) token.safeTransfer(agentRecipient,  agentCut);
+        // 3-5. Split and disburse (audit L-4: the event reflects what moved).
+        (uint256 systemCut, uint256 creatorCut, uint256 agentCut, address agentRecipient) =
+            _disburse(address(identityRegistry), agentId, svc.token, gross);
 
         emit ServicePaid(
             agentId, serviceId, from, svc.token, gross,
@@ -628,26 +614,9 @@ contract AgentX402Receiver is
             from, address(this), gross, validAfter, validBefore, nonce, v, r, s
         );
 
-        // 3. Compute splits via the per-collection adapter.
-        uint256 systemCut = (gross * systemFeeBps) / BPS_DENOM;
-        (address creator, uint256 creatorBps) = ad.serviceRoyaltyOf(tokenId);
-        uint256 creatorCut = (gross * creatorBps) / BPS_DENOM;
-        uint256 agentCut   = gross - systemCut - creatorCut;
-
-        if (creatorCut > 0 && creator == address(0)) {
-            agentCut  += creatorCut;
-            creatorCut = 0;
-        }
-
-        // 4. Resolve agent recipient: prefer TBA, fall back to NFT owner.
-        address tba = ad.tbaOf(tokenId);
-        address agentRecipient = tba != address(0) ? tba : ad.ownerOf(tokenId);
-
-        // 5. Disburse.
-        IERC20 tk = IERC20(svc.token);
-        if (systemCut  > 0) tk.safeTransfer(treasury,        systemCut);
-        if (creatorCut > 0) tk.safeTransfer(creator,         creatorCut);
-        if (agentCut   > 0) tk.safeTransfer(agentRecipient,  agentCut);
+        // 3-5. Split via the per-collection adapter and disburse.
+        (uint256 systemCut, uint256 creatorCut, uint256 agentCut, address agentRecipient) =
+            _disburse(nft, tokenId, svc.token, gross);
 
         emit ServicePaidForNFT(
             nft, tokenId, serviceId, from, svc.token, gross,
@@ -724,5 +693,122 @@ contract AgentX402Receiver is
         if (payer == owner) return;
         unchecked { nftSettlements[nft][tokenId] += 1; }
         nftVolume[nft][tokenId][token] += gross;
+    }
+
+    // ============ Split (every payout path) ============
+
+    /// @dev The agent's creator royalty and payee: its TBA, else its owner.
+    ///      Identity agents read the identity registry; others their
+    ///      collection's adapter.
+    function _payees(address nft, uint256 tokenId) internal view returns (address creator, uint256 creatorBps, address agentRecipient, address owner) {
+        if (nft == address(identityRegistry)) {
+            (creator, creatorBps) = identityRegistry.getCreatorRoyalty(tokenId);
+            (,address tba,,,) = identityRegistry.agents(tokenId);
+            owner = identityRegistry.ownerOf(tokenId);
+            agentRecipient = tba != address(0) ? tba : owner;
+        } else {
+            IAgentNFTAdapter ad = nftAdapters[nft];
+            if (address(ad) == address(0)) revert AdapterNotSet();
+            (creator, creatorBps) = ad.serviceRoyaltyOf(tokenId);
+            address tba = ad.tbaOf(tokenId);
+            owner = ad.ownerOf(tokenId);
+            agentRecipient = tba != address(0) ? tba : owner;
+        }
+    }
+
+    /// @dev System fee to the treasury, creator royalty to the creator (to
+    ///      the agent when there is none), the rest to the agent.
+    function _disburse(address nft, uint256 tokenId, address token, uint256 gross)
+        internal returns (uint256 systemCut, uint256 creatorCut, uint256 agentCut, address agentRecipient)
+    {
+        address creator;
+        uint256 creatorBps;
+        (creator, creatorBps, agentRecipient,) = _payees(nft, tokenId);
+        systemCut  = (gross * systemFeeBps) / BPS_DENOM;
+        creatorCut = (gross * creatorBps) / BPS_DENOM;
+        agentCut   = gross - systemCut - creatorCut;
+        if (creatorCut > 0 && creator == address(0)) {
+            agentCut  += creatorCut;
+            creatorCut = 0;
+        }
+        IERC20 tk = IERC20(token);
+        if (systemCut  > 0) tk.safeTransfer(treasury,       systemCut);
+        if (creatorCut > 0) tk.safeTransfer(creator,        creatorCut);
+        if (agentCut   > 0) tk.safeTransfer(agentRecipient, agentCut);
+    }
+
+    // ============ Escrowed services (v4) ============
+
+    /// @notice AgentServiceEscrow holding payments for services delivered
+    ///         over time. Zero: escrowed payments are off.
+    IAgentServiceEscrow public serviceEscrow;
+
+    event ServiceEscrowUpdated(address indexed oldEscrow, address indexed newEscrow);
+    event ServiceEscrowed(address indexed nft, uint256 indexed tokenId, bytes32 indexed serviceId, address payer, address token, uint256 gross, bytes32 escrowId);
+    event EscrowReleased(address indexed nft, uint256 indexed tokenId, bytes32 indexed serviceId, address token, uint256 gross,
+        uint256 systemCut, uint256 creatorCut, uint256 agentCut, address agentRecipient);
+
+    error NotEscrow();
+    error EscrowNotSet();
+
+    function setServiceEscrow(address escrow) external onlyOwner {
+        emit ServiceEscrowUpdated(address(serviceEscrow), escrow);
+        serviceEscrow = IAgentServiceEscrow(escrow);
+    }
+
+    /// @notice The owner of agent `tokenId` of `nft` (identity registry or
+    ///         a registered collection) — whom the escrow lets set terms.
+    function agentOwnerOf(address nft, uint256 tokenId) external view returns (address owner) {
+        (,,, owner) = _payees(nft, tokenId);
+    }
+
+    /// @notice Settle a hire of an escrowed service. The buyer signs exactly
+    ///         what they sign for an immediate payment — the service's
+    ///         terms are fixed on-chain when the seller sets them — and the
+    ///         funds go to the escrow, which releases them as service is
+    ///         delivered and refunds the rest. The escrow id is the nonce.
+    ///         `nft` is the identity registry for identity agents.
+    function payForServiceEscrowed(
+        address nft,
+        uint256 tokenId,
+        bytes32 serviceId,
+        address from,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
+        uint8   v,  bytes32 r,  bytes32 s,
+        uint8   cv, bytes32 cr, bytes32 cs
+    ) external nonReentrant whenNotPaused returns (uint256 gross) {
+        IAgentServiceEscrow escrow = serviceEscrow;
+        if (address(escrow) == address(0)) revert EscrowNotSet();
+        bool identity = nft == address(identityRegistry);
+        Service memory svc = identity ? services[tokenId][serviceId] : servicesForNFT[nft][tokenId][serviceId];
+        if (!svc.active || svc.price == 0) revert ServiceInactive();
+        gross = svc.price;
+
+        bytes32 digest = identity
+            ? hashPaymentCommitment(tokenId, serviceId, svc.token, gross, nonce, validBefore)
+            : hashPaymentCommitmentForNFT(nft, tokenId, serviceId, svc.token, gross, nonce, validBefore);
+        if (ECDSA.recover(digest, cv, cr, cs) != from) revert InvalidCommitment();
+
+        IERC3009(svc.token).receiveWithAuthorization(
+            from, address(this), gross, validAfter, validBefore, nonce, v, r, s
+        );
+        IERC20(svc.token).safeTransfer(address(escrow), gross);
+        escrow.open(nonce, from, nft, tokenId, serviceId, svc.token, gross);
+
+        emit ServiceEscrowed(nft, tokenId, serviceId, from, svc.token, gross, nonce);
+        (,,, address owner) = _payees(nft, tokenId);
+        if (identity) _recordSettlement(tokenId, from, serviceId, gross);
+        else _recordSettlementForNFT(nft, tokenId, from, serviceId, gross);
+        _recordNFTStats(nft, tokenId, from, owner, svc.token, gross);
+    }
+
+    /// @notice Pay out what the escrow released, by the same split as an
+    ///         immediate payment. The escrow sends the tokens first.
+    function distributeFromEscrow(address token, uint256 amount, address nft, uint256 tokenId, bytes32 serviceId) external nonReentrant {
+        if (msg.sender != address(serviceEscrow) || msg.sender == address(0)) revert NotEscrow();
+        (uint256 systemCut, uint256 creatorCut, uint256 agentCut, address agentRecipient) = _disburse(nft, tokenId, token, amount);
+        emit EscrowReleased(nft, tokenId, serviceId, token, amount, systemCut, creatorCut, agentCut, agentRecipient);
     }
 }
