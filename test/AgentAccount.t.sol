@@ -101,8 +101,7 @@ contract AgentAccountTest is Test {
             0.1 ether,  // maxValuePerTx
             1 ether,    // maxTotalValue
             validAfter,
-            validUntil
-        );
+            validUntil, new AgentAccount.TokenLimit[](0));
         
         assertNotEq(keyHash, bytes32(0));
         
@@ -127,7 +126,8 @@ contract AgentAccountTest is Test {
     }
     
     function test_CreateSessionKey_RevertNotOwner() public {
-        address[] memory targets = new address[](0);
+        address[] memory targets = new address[](1);
+        targets[0] = address(0x123);
         bytes4[] memory selectors = new bytes4[](0);
         
         vm.prank(attacker);
@@ -139,12 +139,12 @@ contract AgentAccountTest is Test {
             0.1 ether,
             1 ether,
             uint48(block.timestamp),
-            uint48(block.timestamp + 1 hours)
-        );
+            uint48(block.timestamp + 1 hours), new AgentAccount.TokenLimit[](0));
     }
     
     function test_CreateSessionKey_RevertInvalidPeriod() public {
-        address[] memory targets = new address[](0);
+        address[] memory targets = new address[](1);
+        targets[0] = address(0x123);
         bytes4[] memory selectors = new bytes4[](0);
         
         vm.prank(user1);
@@ -156,12 +156,12 @@ contract AgentAccountTest is Test {
             0.1 ether,
             1 ether,
             uint48(block.timestamp + 1 hours), // validAfter > validUntil
-            uint48(block.timestamp)
-        );
+            uint48(block.timestamp), new AgentAccount.TokenLimit[](0));
     }
     
     function test_RevokeSessionKey() public {
-        address[] memory targets = new address[](0);
+        address[] memory targets = new address[](1);
+        targets[0] = address(0x123);
         bytes4[] memory selectors = new bytes4[](0);
         
         vm.prank(user1);
@@ -172,8 +172,7 @@ contract AgentAccountTest is Test {
             0.1 ether,
             1 ether,
             uint48(block.timestamp),
-            uint48(block.timestamp + 1 hours)
-        );
+            uint48(block.timestamp + 1 hours), new AgentAccount.TokenLimit[](0));
         
         vm.prank(user1);
         account.revokeSessionKey(keyHash);
@@ -183,7 +182,8 @@ contract AgentAccountTest is Test {
     }
     
     function test_RevokeSessionKey_RevertNotOwner() public {
-        address[] memory targets = new address[](0);
+        address[] memory targets = new address[](1);
+        targets[0] = address(0x123);
         bytes4[] memory selectors = new bytes4[](0);
         
         vm.prank(user1);
@@ -194,8 +194,7 @@ contract AgentAccountTest is Test {
             0.1 ether,
             1 ether,
             uint48(block.timestamp),
-            uint48(block.timestamp + 1 hours)
-        );
+            uint48(block.timestamp + 1 hours), new AgentAccount.TokenLimit[](0));
         
         vm.prank(attacker);
         vm.expectRevert("Only owner can revoke session keys");
@@ -203,7 +202,8 @@ contract AgentAccountTest is Test {
     }
     
     function test_GetSessionKeyHashes() public {
-        address[] memory targets = new address[](0);
+        address[] memory targets = new address[](1);
+        targets[0] = address(0x123);
         bytes4[] memory selectors = new bytes4[](0);
         
         vm.startPrank(user1);
@@ -214,8 +214,7 @@ contract AgentAccountTest is Test {
             0.1 ether,
             1 ether,
             uint48(block.timestamp),
-            uint48(block.timestamp + 1 hours)
-        );
+            uint48(block.timestamp + 1 hours), new AgentAccount.TokenLimit[](0));
         
         bytes32 key2 = account.createSessionKey(
             address(0x222),
@@ -224,8 +223,7 @@ contract AgentAccountTest is Test {
             0.1 ether,
             1 ether,
             uint48(block.timestamp),
-            uint48(block.timestamp + 1 hours)
-        );
+            uint48(block.timestamp + 1 hours), new AgentAccount.TokenLimit[](0));
         vm.stopPrank();
         
         bytes32[] memory hashes = account.getSessionKeyHashes();

@@ -70,26 +70,23 @@ contract AgentAccountSessionKeyTest is Test {
         vm.prank(agentOwner);
         keyHash = account.createSessionKey(
             sessionSigner, allowedTargets, allowedSelectors,
-            maxValuePerTx, maxTotalValue, validAfter, validUntil
+            maxValuePerTx, maxTotalValue, validAfter, validUntil, new AgentAccount.TokenLimit[](0)
         );
     }
 
-    /// @dev Mirror the F-2 message construction inside the contract.
-    function _signMsg(address to, uint256 value, bytes memory data) internal view returns (bytes memory) {
-        uint256 state = account.state();
-        bytes32 messageHash = keccak256(abi.encode(
-            address(account),
-            block.chainid,
-            to,
-            value,
-            keccak256(data),
-            state
+    /// @dev The V4 session-call digest: EIP-712 over this account's domain,
+    ///      binding the key and its own nonce.
+    function _signMsg(bytes32 keyHash, address to, uint256 value, bytes memory data) internal view returns (bytes memory) {
+        return _signWith(SIGNER_PK, account, keyHash, to, value, data);
+    }
+
+    function _signWith(uint256 pk, AgentAccount acct, bytes32 keyHash, address to, uint256 value, bytes memory data) internal view returns (bytes memory) {
+        bytes32 digest = keccak256(abi.encodePacked(
+            "\x19\x01",
+            acct.domainSeparator(),
+            keccak256(abi.encode(acct.SESSION_CALL_TYPEHASH(), keyHash, to, value, keccak256(data), acct.sessionKeyNonce(keyHash)))
         ));
-        bytes32 ethSignedHash = keccak256(abi.encodePacked(
-            "\x19Ethereum Signed Message:\n32",
-            messageHash
-        ));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PK, ethSignedHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);
         return abi.encodePacked(r, s, v);
     }
 
@@ -100,7 +97,7 @@ contract AgentAccountSessionKeyTest is Test {
         bytes4[]  memory selectors;
         vm.prank(agentOwner);
         vm.expectRevert("Invalid signer");
-        account.createSessionKey(address(0), targets, selectors, 1 ether, 5 ether, 0, uint48(block.timestamp + 1 days));
+        account.createSessionKey(address(0), targets, selectors, 1 ether, 5 ether, 0, uint48(block.timestamp + 1 days), new AgentAccount.TokenLimit[](0));
     }
 
     function test_createSessionKey_revertsOnInvertedValidity() public {
@@ -108,7 +105,7 @@ contract AgentAccountSessionKeyTest is Test {
         bytes4[]  memory selectors;
         vm.prank(agentOwner);
         vm.expectRevert("Invalid validity period");
-        account.createSessionKey(sessionSigner, targets, selectors, 1 ether, 5 ether, uint48(block.timestamp + 1 days), uint48(block.timestamp));
+        account.createSessionKey(sessionSigner, targets, selectors, 1 ether, 5 ether, uint48(block.timestamp + 1 days), uint48(block.timestamp), new AgentAccount.TokenLimit[](0));
     }
 
     function test_createSessionKey_revertsForNonOwner() public {
@@ -116,7 +113,7 @@ contract AgentAccountSessionKeyTest is Test {
         bytes4[]  memory selectors;
         vm.prank(stranger);
         vm.expectRevert("Only owner can create session keys");
-        account.createSessionKey(sessionSigner, targets, selectors, 1 ether, 5 ether, 0, uint48(block.timestamp + 1 days));
+        account.createSessionKey(sessionSigner, targets, selectors, 1 ether, 5 ether, 0, uint48(block.timestamp + 1 days), new AgentAccount.TokenLimit[](0));
     }
 
     function test_createSessionKey_emitsAndStoresKey() public {
@@ -125,7 +122,7 @@ contract AgentAccountSessionKeyTest is Test {
         bytes4[] memory selectors;
 
         vm.prank(agentOwner);
-        bytes32 keyHash = account.createSessionKey(sessionSigner, targets, selectors, 1 ether, 5 ether, 0, uint48(block.timestamp + 1 days));
+        bytes32 keyHash = account.createSessionKey(sessionSigner, targets, selectors, 1 ether, 5 ether, 0, uint48(block.timestamp + 1 days), new AgentAccount.TokenLimit[](0));
 
         (address signer,uint256 maxValuePerTx,uint256 maxTotalValue,uint256 usedValue,uint48 validAfter,uint48 validUntil,bool revoked) =
             account.getSessionKey(keyHash);
@@ -148,7 +145,7 @@ contract AgentAccountSessionKeyTest is Test {
         bytes32 keyHash = _createKey(targets, selectors, 1 ether, 5 ether, 0, uint48(block.timestamp + 1 days));
 
         bytes memory data = "";
-        bytes memory sig  = _signMsg(receiver, 0.5 ether, data);
+        bytes memory sig  = _signMsg(keyHash, receiver, 0.5 ether, data);
 
         uint256 receiverBefore = receiver.balance;
         uint256 stateBefore    = account.state();
@@ -173,7 +170,7 @@ contract AgentAccountSessionKeyTest is Test {
 
         for (uint256 i = 0; i < 4; i++) {
             bytes memory data = abi.encodePacked("call-", i);
-            bytes memory sig = _signMsg(receiver, 0.1 ether, data);
+            bytes memory sig = _signMsg(keyHash, receiver, 0.1 ether, data);
             vm.prank(stranger);
             account.executeWithSessionKey(keyHash, sig, receiver, 0.1 ether, data);
         }
@@ -194,7 +191,7 @@ contract AgentAccountSessionKeyTest is Test {
         vm.prank(agentOwner);
         account.revokeSessionKey(keyHash);
 
-        bytes memory sig = _signMsg(receiver, 0.1 ether, "");
+        bytes memory sig = _signMsg(keyHash, receiver, 0.1 ether, "");
         vm.prank(stranger);
         vm.expectRevert("Session key revoked");
         account.executeWithSessionKey(keyHash, sig, receiver, 0.1 ether, "");
@@ -210,7 +207,7 @@ contract AgentAccountSessionKeyTest is Test {
         vm.prank(agentOwner);
         account.revokeAllSessionKeys();
 
-        bytes memory sig = _signMsg(receiver, 0.1 ether, "");
+        bytes memory sig = _signMsg(keyHash, receiver, 0.1 ether, "");
         vm.prank(stranger);
         vm.expectRevert("Session key epoch invalidated");
         account.executeWithSessionKey(keyHash, sig, receiver, 0.1 ether, "");
@@ -224,7 +221,7 @@ contract AgentAccountSessionKeyTest is Test {
         // Key not valid until +1 hour.
         bytes32 keyHash = _createKey(targets, selectors, 1 ether, 5 ether, uint48(block.timestamp + 1 hours), uint48(block.timestamp + 1 days));
 
-        bytes memory sig = _signMsg(receiver, 0.1 ether, "");
+        bytes memory sig = _signMsg(keyHash, receiver, 0.1 ether, "");
         vm.prank(stranger);
         vm.expectRevert("Session key not yet valid");
         account.executeWithSessionKey(keyHash, sig, receiver, 0.1 ether, "");
@@ -239,7 +236,7 @@ contract AgentAccountSessionKeyTest is Test {
 
         // Move past the expiry.
         vm.warp(block.timestamp + 2 hours);
-        bytes memory sig = _signMsg(receiver, 0.1 ether, "");
+        bytes memory sig = _signMsg(keyHash, receiver, 0.1 ether, "");
         vm.prank(stranger);
         vm.expectRevert("Session key expired");
         account.executeWithSessionKey(keyHash, sig, receiver, 0.1 ether, "");
@@ -252,7 +249,7 @@ contract AgentAccountSessionKeyTest is Test {
         bytes4[]  memory selectors;
         bytes32 keyHash = _createKey(targets, selectors, 0.1 ether, 5 ether, 0, uint48(block.timestamp + 1 days));
 
-        bytes memory sig = _signMsg(receiver, 0.5 ether, "");
+        bytes memory sig = _signMsg(keyHash, receiver, 0.5 ether, "");
         vm.prank(stranger);
         vm.expectRevert("Exceeds per-tx value limit");
         account.executeWithSessionKey(keyHash, sig, receiver, 0.5 ether, "");
@@ -266,11 +263,11 @@ contract AgentAccountSessionKeyTest is Test {
         // Per-tx 1 ETH OK, total cap 0.5 ETH so first 0.4 succeeds, second 0.2 must fail.
         bytes32 keyHash = _createKey(targets, selectors, 1 ether, 0.5 ether, 0, uint48(block.timestamp + 1 days));
 
-        bytes memory sig = _signMsg(receiver, 0.4 ether, "");
+        bytes memory sig = _signMsg(keyHash, receiver, 0.4 ether, "");
         vm.prank(stranger);
         account.executeWithSessionKey(keyHash, sig, receiver, 0.4 ether, "");
 
-        bytes memory sig2 = _signMsg(receiver, 0.2 ether, "");
+        bytes memory sig2 = _signMsg(keyHash, receiver, 0.2 ether, "");
         vm.prank(stranger);
         vm.expectRevert("Exceeds total value limit");
         account.executeWithSessionKey(keyHash, sig2, receiver, 0.2 ether, "");
@@ -284,7 +281,7 @@ contract AgentAccountSessionKeyTest is Test {
         bytes4[] memory selectors;
         bytes32 keyHash = _createKey(targets, selectors, 1 ether, 5 ether, 0, uint48(block.timestamp + 1 days));
 
-        bytes memory sig = _signMsg(disallowed, 0.1 ether, "");
+        bytes memory sig = _signMsg(keyHash, disallowed, 0.1 ether, "");
         vm.prank(stranger);
         vm.expectRevert("Target not allowed");
         account.executeWithSessionKey(keyHash, sig, disallowed, 0.1 ether, "");
@@ -299,7 +296,7 @@ contract AgentAccountSessionKeyTest is Test {
         bytes32 keyHash = _createKey(targets, selectors, 1 ether, 5 ether, 0, uint48(block.timestamp + 1 days));
 
         bytes memory data = abi.encodeWithSelector(bytes4(0xcafebabe), uint256(1));
-        bytes memory sig  = _signMsg(receiver, 0, data);
+        bytes memory sig  = _signMsg(keyHash, receiver, 0, data);
         vm.prank(stranger);
         vm.expectRevert("Selector not allowed");
         account.executeWithSessionKey(keyHash, sig, receiver, 0, data);
@@ -314,7 +311,7 @@ contract AgentAccountSessionKeyTest is Test {
 
         // Sign for a DIFFERENT value than the call uses → recovery returns the
         // wrong address, the strict equality check reverts.
-        bytes memory sig = _signMsg(receiver, 0.5 ether, "");
+        bytes memory sig = _signMsg(keyHash, receiver, 0.5 ether, "");
         vm.prank(stranger);
         vm.expectRevert("Invalid session key signature");
         account.executeWithSessionKey(keyHash, sig, receiver, 0.6 ether, "");
@@ -330,7 +327,7 @@ contract AgentAccountSessionKeyTest is Test {
         bytes32 keyHash = _createKey(targets, selectors, 1 ether, 5 ether, 0, uint48(block.timestamp + 1 days));
 
         bytes memory data = "first";
-        bytes memory sig  = _signMsg(receiver, 0.1 ether, data);
+        bytes memory sig  = _signMsg(keyHash, receiver, 0.1 ether, data);
         vm.prank(stranger);
         account.executeWithSessionKey(keyHash, sig, receiver, 0.1 ether, data);
 
@@ -343,7 +340,8 @@ contract AgentAccountSessionKeyTest is Test {
     // ─── revoke paths ──────────────────────────────────────────────────────
 
     function test_revokeSessionKey_revertsForNonOwner() public {
-        address[] memory t; bytes4[] memory s;
+        address[] memory t = new address[](1); bytes4[] memory s;
+        t[0] = address(0x123);
         bytes32 keyHash = _createKey(t, s, 1 ether, 5 ether, 0, uint48(block.timestamp + 1 days));
         vm.prank(stranger);
         vm.expectRevert();

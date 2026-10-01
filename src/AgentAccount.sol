@@ -14,7 +14,12 @@ import "@openzeppelin/contracts/interfaces/IERC1271.sol";
 /**
  * @title AgentAccount
  * @notice ERC-6551 Token Bound Account for Agent agents with ERC-4337 support
- * @dev V3: Added ERC-4337, EIP-712, hook safety, epoch revocation, ERC-1271
+ * @dev V4: hook gas is accounted per outermost call (V3 summed it in storage
+ *      forever, so an account stopped executing for good after ~13M
+ *      lifetime gas); ERC-4337 calls execute through the EntryPoint;
+ *      session keys sign EIP-712 over this account and their own keyHash,
+ *      name explicit targets, can't approve or pull, and spend ERC20s only
+ *      within per-token caps.
  */
 import {VimsProvenance} from "./VimsProvenance.sol";
 
@@ -32,20 +37,26 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
     uint8 public constant MAX_HOOK_DEPTH = 8;
     uint256 public constant MAX_HOOK_GAS = 13_000_000;
     
-    // Current execution context for hook safety
-    uint8 private _currentDepth;
-    uint256 private _usedHookGas;
+    // Hook-call depth lives in transient storage (EIP-1153): it never
+    // outlives the transaction. Gas is bounded per outermost call.
+    bytes32 private constant _DEPTH_SLOT = keccak256("vims.agentaccount.hook.depth");
     
     // Epoch for bulk session key revocation
     uint256 public sessionKeyEpoch;
     
-    // EIP-712 domain separator
-    bytes32 public immutable DOMAIN_SEPARATOR;
-    
-    // EIP-712 type hashes
-    bytes32 public constant EXECUTE_TYPEHASH = keccak256(
-        "Execute(address to,uint256 value,bytes data,uint256 nonce)"
+    /// @notice What a session key signs: one call, from this account (the
+    ///         domain's verifyingContract), charged to exactly this key.
+    bytes32 public constant SESSION_CALL_TYPEHASH = keccak256(
+        "SessionCall(bytes32 keyHash,address to,uint256 value,bytes data,uint256 nonce)"
     );
+
+    /// @notice An ERC20 a session key may spend, measured as the account's
+    ///         balance drop across each call.
+    struct TokenLimit {
+        address token;
+        uint256 maxPerTx;
+        uint256 maxTotal;
+    }
     
     // Session key storage
     struct SessionKey {
@@ -63,6 +74,11 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
     
     mapping(bytes32 => SessionKey) public sessionKeys;
     bytes32[] public sessionKeyHashes;
+    /// @notice Per-key nonce: each key's signatures are ordered on their own,
+    ///         so the owner's executes don't invalidate them.
+    mapping(bytes32 => uint256) public sessionKeyNonce;
+    mapping(bytes32 => TokenLimit[]) internal _tokenLimits;
+    mapping(bytes32 => mapping(address => uint256)) public tokenSpent;
     
     // ERC-4337 UserOperation struct (packed)
     struct PackedUserOperation {
@@ -97,14 +113,24 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
     error HookGasExceeded();
     error InvalidEntryPoint();
     error InvalidSignature();
+    error SessionTargetsRequired();
+    error SessionTargetForbidden(address target);
+    error SessionSelectorForbidden(bytes4 selector);
+    error TokenLimitExceeded(address token, uint256 spent);
     
     constructor(address _entryPoint) {
         entryPoint = _entryPoint;
-        
-        DOMAIN_SEPARATOR = keccak256(abi.encode(
+    }
+
+    /// @notice EIP-712 domain of this account. Computed at call time: each
+    ///         account is a clone of one implementation, and an immutable
+    ///         would carry the implementation's address, letting a
+    ///         signature for one account replay on every other.
+    function domainSeparator() public view returns (bytes32) {
+        return keccak256(abi.encode(
             keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
             keccak256("AgentAccount"),
-            keccak256("3"),
+            keccak256("4"),
             block.chainid,
             address(this)
         ));
@@ -120,14 +146,22 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
     }
     
     modifier hookSafe() {
-        if (_currentDepth >= MAX_HOOK_DEPTH) revert HookDepthExceeded();
+        uint256 depth = _tload(_DEPTH_SLOT);
+        if (depth >= MAX_HOOK_DEPTH) revert HookDepthExceeded();
         uint256 gasStart = gasleft();
-        _currentDepth++;
+        _tstore(_DEPTH_SLOT, depth + 1);
         _;
-        _currentDepth--;
-        uint256 gasUsed = gasStart - gasleft();
-        _usedHookGas += gasUsed;
-        if (_usedHookGas > MAX_HOOK_GAS) revert HookGasExceeded();
+        _tstore(_DEPTH_SLOT, depth);
+        // The outermost call's gas includes every nested (hook) call.
+        if (depth == 0 && gasStart - gasleft() > MAX_HOOK_GAS) revert HookGasExceeded();
+    }
+
+    function _tload(bytes32 slot) private view returns (uint256 v) {
+        assembly { v := tload(slot) }
+    }
+
+    function _tstore(bytes32 slot, uint256 v) private {
+        assembly { tstore(slot, v) }
     }
     
     // ============ ERC-4337 IAccount ============
@@ -219,7 +253,9 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
         bytes calldata data,
         uint8 operation
     ) external payable nonReentrant hookSafe returns (bytes memory result) {
-        require(_isValidSigner(msg.sender), "Invalid signer");
+        // The EntryPoint calls in after validateUserOp checked the owner's
+        // signature on the UserOperation.
+        require(msg.sender == entryPoint || _isValidSigner(msg.sender), "Invalid signer");
         require(operation == 0, "Only call operations supported");
         
         ++state;
@@ -253,6 +289,7 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
     ) external payable nonReentrant hookSafe returns (bytes memory result) {
         SessionKey storage key = sessionKeys[keyHash];
         
+        require(key.signer != address(0), "Unknown session key");
         require(!key.revoked, "Session key revoked");
         require(key.epoch == sessionKeyEpoch, "Session key epoch invalidated");
         require(block.timestamp >= key.validAfter, "Session key not yet valid");
@@ -260,51 +297,32 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
         require(value <= key.maxValuePerTx, "Exceeds per-tx value limit");
         require(key.usedValue + value <= key.maxTotalValue, "Exceeds total value limit");
         
-        // Verify signature.
-        //
-        // We use abi.encode (NOT abi.encodePacked) because two of the inputs
-        // are dynamic — `data` (bytes) is followed by `state` (uint256) under
-        // the hash. With encodePacked the dynamic field has no length prefix,
-        // so a crafted (data', state') tuple where data' = data || extraBytes
-        // can produce the same packed pre-image as (data, state) for some
-        // data', extraBytes. abi.encode prefixes dynamic fields with their
-        // length and disambiguates each argument by ABI position, eliminating
-        // collision-via-padding.
-        //
-        // Chain ID is included in the message to prevent cross-chain replay.
-        // `state` is the per-account nonce — incremented after the call —
-        // and prevents same-chain replay of a successful execution.
-        bytes32 messageHash = keccak256(abi.encode(
-            address(this),
-            block.chainid,
-            to,
-            value,
-            keccak256(data),
-            state
+        // EIP-712 over this account's domain, binding the key itself (a
+        // signature can't be charged to another key of the same signer) and
+        // the key's own nonce (no replay). abi.encode + keccak256(data)
+        // keep dynamic fields unambiguous.
+        uint256 nonce = sessionKeyNonce[keyHash];
+        bytes32 digest = keccak256(abi.encodePacked(
+            "\x19\x01",
+            domainSeparator(),
+            keccak256(abi.encode(SESSION_CALL_TYPEHASH, keyHash, to, value, keccak256(data), nonce))
         ));
-        bytes32 ethSignedHash = keccak256(abi.encodePacked(
-            "\x19Ethereum Signed Message:\n32",
-            messageHash
-        ));
-        
         require(
-            SignatureChecker.isValidSignatureNow(key.signer, ethSignedHash, signature),
+            SignatureChecker.isValidSignatureNow(key.signer, digest, signature),
             "Invalid session key signature"
         );
         
-        // Verify target is allowed
-        require(_isAllowedTarget(key, to), "Target not allowed");
+        _checkSessionCall(key, to, data);
         
-        // Verify selector is allowed (if calldata present)
-        if (data.length >= 4) {
-            bytes4 selector = bytes4(data[:4]);
-            require(_isAllowedSelector(key, selector), "Selector not allowed");
-        }
-        
-        // Update used value
         key.usedValue += value;
-        
+        sessionKeyNonce[keyHash] = nonce + 1;
         ++state;
+
+        TokenLimit[] storage limits = _tokenLimits[keyHash];
+        uint256[] memory before = new uint256[](limits.length);
+        for (uint256 i = 0; i < limits.length; i++) {
+            before[i] = _balanceOf(limits[i].token);
+        }
         
         bool success;
         (success, result) = to.call{value: value}(data);
@@ -314,8 +332,45 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
                 revert(add(result, 32), mload(result))
             }
         }
+
+        for (uint256 i = 0; i < limits.length; i++) {
+            uint256 afterBal = _balanceOf(limits[i].token);
+            if (afterBal >= before[i]) continue;
+            uint256 spent = before[i] - afterBal;
+            uint256 total = tokenSpent[keyHash][limits[i].token] + spent;
+            if (spent > limits[i].maxPerTx || total > limits[i].maxTotal) revert TokenLimitExceeded(limits[i].token, spent);
+            tokenSpent[keyHash][limits[i].token] = total;
+        }
         
         emit Executed(to, value, data, state);
+    }
+
+    /// @dev A session key reaches only the targets it names, never this
+    ///      account, and never a selector that hands out or pulls assets:
+    ///      approvals outlive the key, and pulls move value the caps can't see.
+    function _checkSessionCall(SessionKey storage key, address to, bytes calldata data) internal view {
+        if (to == address(this)) revert SessionTargetForbidden(to);
+        require(_isAllowedTarget(key, to), "Target not allowed");
+        if (data.length >= 4) {
+            bytes4 selector = bytes4(data[:4]);
+            if (
+                selector == 0x095ea7b3 || // approve(address,uint256)
+                selector == 0x39509351 || // increaseAllowance(address,uint256)
+                selector == 0xa22cb465 || // setApprovalForAll(address,bool)
+                selector == 0x23b872dd || // transferFrom(address,address,uint256)
+                selector == 0x42842e0e || // safeTransferFrom(address,address,uint256)
+                selector == 0xb88d4fde || // safeTransferFrom(address,address,uint256,bytes)
+                selector == 0xf242432a || // safeTransferFrom(address,address,uint256,uint256,bytes)
+                selector == 0x2eb2c2d6 || // safeBatchTransferFrom(...)
+                selector == 0xd505accf    // permit(...)
+            ) revert SessionSelectorForbidden(selector);
+            require(_isAllowedSelector(key, selector), "Selector not allowed");
+        }
+    }
+
+    function _balanceOf(address erc20) internal view returns (uint256 bal) {
+        (bool ok, bytes memory ret) = erc20.staticcall(abi.encodeWithSelector(0x70a08231, address(this)));
+        if (ok && ret.length >= 32) bal = abi.decode(ret, (uint256));
     }
     
     /**
@@ -328,11 +383,17 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
         uint256 maxValuePerTx,
         uint256 maxTotalValue,
         uint48 validAfter,
-        uint48 validUntil
+        uint48 validUntil,
+        TokenLimit[] calldata tokenLimits
     ) external returns (bytes32 keyHash) {
         require(_isValidSigner(msg.sender), "Only owner can create session keys");
         require(validUntil > validAfter, "Invalid validity period");
         require(signer != address(0), "Invalid signer");
+        // "Everything" is never a session key's scope.
+        if (allowedTargets.length == 0) revert SessionTargetsRequired();
+        for (uint256 i = 0; i < allowedTargets.length; i++) {
+            if (allowedTargets[i] == address(this) || allowedTargets[i] == address(0)) revert SessionTargetForbidden(allowedTargets[i]);
+        }
         
         keyHash = keccak256(abi.encodePacked(
             address(this),
@@ -354,6 +415,10 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
             revoked: false
         });
         
+        for (uint256 i = 0; i < tokenLimits.length; i++) {
+            require(tokenLimits[i].token != address(0) && tokenLimits[i].maxPerTx <= tokenLimits[i].maxTotal, "Invalid token limit");
+            _tokenLimits[keyHash].push(tokenLimits[i]);
+        }
         sessionKeyHashes.push(keyHash);
         
         emit SessionKeyCreated(keyHash, signer, validUntil);
@@ -413,6 +478,11 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
         );
     }
     
+    /// @notice The ERC20 caps of a session key.
+    function getSessionKeyTokenLimits(bytes32 keyHash) external view returns (TokenLimit[] memory) {
+        return _tokenLimits[keyHash];
+    }
+
     /**
      * @notice Returns the owner of the NFT that owns this account
      */
@@ -446,8 +516,6 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
     }
     
     function _isAllowedTarget(SessionKey storage key, address target) internal view returns (bool) {
-        if (key.allowedTargets.length == 0) return true; // Empty = all allowed
-        
         for (uint256 i = 0; i < key.allowedTargets.length; i++) {
             if (key.allowedTargets[i] == target) return true;
         }
