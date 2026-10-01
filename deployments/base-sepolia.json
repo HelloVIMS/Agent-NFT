@@ -12,8 +12,8 @@
   "explorer": "https://sepolia.basescan.org",
   "proxies": {
     "AgentIdentityRegistry": "0xfE1ef66Ba95891d3cDf6FB83FE1444Bc3bB9FEeF",
-    "AgentTBARegistry": "0x1383FA459907ce08f7A6c4619C40f672C0cA7D5e",
-    "AgentTBAImplementation": "0x50183A126Ad080e88eDE5166bEaDAa0DdaAaa24C",
+    "AgentTBARegistry": "0xdB349E2cD059E733A0c71D515f2F3bb4FFF0F600",
+    "AgentTBAImplementation": "0xe786333C9811a2Da73E42a41b643d33272e2479f",
     "AgentReputationRegistry": "0x5563EE2939F6839CE82B3cA6E50AA285e8d1C316",
     "AgentPaymentRouter": "0x1d4320d0cdcbA7d60dc1A76cE63AA13a2Cd43b97",
     "AgentContextRegistry": "0x816D8AA61c283d874ae6C9A9c380A43fd325f9D5",
@@ -229,5 +229,12 @@
       },
       "why": "state keyed by token id only (anyone could inflate counters or fast-forward stages; collections collided); ReputationLevelHook reverted on every call; RevenueLevelHook's recorder never called; TipJar paid identity-agent owners for collection tokens."
     }
-  ]
+  ],
+  "history": {
+    "AgentTBARegistryV3": {
+      "registry": "0x1383FA459907ce08f7A6c4619C40f672C0cA7D5e",
+      "implementation": "0x50183A126Ad080e88eDE5166bEaDAa0DdaAaa24C",
+      "note": "Accounts of agents minted before 2026-10-01 run V3: execute stops after ~13M lifetime gas; move funds out. Session keys there cap only ETH."
+    }
+  }
 }
