@@ -13,6 +13,26 @@ contract MockToken is ERC20 {
     function mint(address to, uint256 amt) external { _mint(to, amt); }
 }
 
+/// @dev Treasury that refuses ETH (e.g. governance set a contract without receive).
+contract RejectingPayee {
+    receive() external payable { revert("no"); }
+    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+        return this.onERC721Received.selector; // can hold the agent NFT, can't take ETH
+    }
+}
+
+/// @dev USDC-like token with a blocklist: transfers to a listed address revert.
+contract BlocklistToken is ERC20 {
+    mapping(address => bool) public blocked;
+    constructor() ERC20("Block", "BLK") {}
+    function mint(address to, uint256 amt) external { _mint(to, amt); }
+    function setBlocked(address a, bool b) external { blocked[a] = b; }
+    function _update(address from, address to, uint256 value) internal override {
+        require(!blocked[to], "blocked");
+        super._update(from, to, value);
+    }
+}
+
 contract AgentRoyaltyVaultTest is Test {
     AgentIdentityRegistry internal registry;
     address internal owner    = makeAddr("owner");
@@ -301,6 +321,85 @@ contract AgentRoyaltyVaultTest is Test {
     }
 
     // ============ Helpers ============
+
+    // ============ M-03: one bad receiver never blocks the other ============
+
+    function test_RejectingTreasuryDefersItsShareCreatorStillPaid() public {
+        uint256 agentId = _mint(creator, DEFAULT_CREATOR_BPS);
+        AgentRoyaltyVault vault = AgentRoyaltyVault(payable(registry.deployRoyaltyVault(agentId)));
+        RejectingPayee bad = new RejectingPayee();
+        vm.prank(owner);
+        registry.setSecondaryTreasury(address(bad));
+
+        vm.deal(address(vault), 1_050 ether);
+        vault.release();
+        assertEq(creator.balance, 1_000 ether, "creator paid despite the treasury");
+        assertEq(vault.owed(address(0), address(bad)), 50 ether);
+        assertEq(vault.totalOwed(address(0)), 50 ether);
+
+        // New royalty splits only the new money, not the deferred share.
+        vm.deal(address(vault), address(vault).balance + 105 ether);
+        vault.release();
+        assertEq(creator.balance, 1_100 ether);
+        assertEq(vault.owed(address(0), address(bad)), 55 ether);
+
+        // The stuck payee pulls its share to an address that can take it.
+        vm.prank(address(bad));
+        vault.withdrawOwed(address(0), treasury);
+        assertEq(treasury.balance, 55 ether);
+        assertEq(vault.totalOwed(address(0)), 0);
+        assertEq(address(vault).balance, 0);
+        vm.expectRevert(AgentRoyaltyVault.NothingToRelease.selector);
+        vault.release();
+    }
+
+    function test_RejectingCreatorDefersOnlyItsShare() public {
+        RejectingPayee badCreator = new RejectingPayee();
+        uint256 agentId = _mint(address(badCreator), DEFAULT_CREATOR_BPS);
+        AgentRoyaltyVault vault = AgentRoyaltyVault(payable(registry.deployRoyaltyVault(agentId)));
+        vm.deal(address(vault), 1_050 ether);
+        vault.release();
+        assertEq(treasury.balance, 50 ether);
+        assertEq(vault.owed(address(0), address(badCreator)), 1_000 ether);
+    }
+
+    function test_BlocklistedTokenPayeeDefersERC20Share() public {
+        uint256 agentId = _mint(creator, DEFAULT_CREATOR_BPS);
+        AgentRoyaltyVault vault = AgentRoyaltyVault(payable(registry.deployRoyaltyVault(agentId)));
+        BlocklistToken tok = new BlocklistToken();
+        tok.mint(address(vault), 1_050e6);
+        tok.setBlocked(treasury, true);
+        vault.releaseToken(IERC20(address(tok)));
+        assertEq(tok.balanceOf(creator), 1_000e6);
+        assertEq(vault.owed(address(tok), treasury), 50e6);
+        // Unblocked, the treasury withdraws; others can't take its share.
+        tok.setBlocked(treasury, false);
+        vm.prank(buyer);
+        vm.expectRevert(AgentRoyaltyVault.NothingToRelease.selector);
+        vault.withdrawOwed(address(tok), buyer);
+        vm.prank(treasury);
+        vault.withdrawOwed(address(tok), treasury);
+        assertEq(tok.balanceOf(treasury), 50e6);
+        assertEq(tok.balanceOf(address(vault)), 0);
+    }
+
+    function testFuzz_ReleaseConservesFunds(uint96 amount, bool badTreasury, bool badCreator) public {
+        vm.assume(amount > 0);
+        address c = badCreator ? address(new RejectingPayee()) : creator;
+        uint256 agentId = _mint(c, DEFAULT_CREATOR_BPS);
+        AgentRoyaltyVault vault = AgentRoyaltyVault(payable(registry.deployRoyaltyVault(agentId)));
+        if (badTreasury) {
+            address t = address(new RejectingPayee());
+            vm.prank(owner);
+            registry.setSecondaryTreasury(t);
+        }
+        vm.deal(address(vault), amount);
+        uint256 before = c.balance + registry.secondaryTreasury().balance;
+        vault.release();
+        uint256 paid = c.balance + registry.secondaryTreasury().balance - before;
+        assertEq(paid + vault.totalOwed(address(0)), amount, "every wei paid or owed");
+        assertEq(address(vault).balance, vault.totalOwed(address(0)), "vault holds exactly what it owes");
+    }
 
     function _mint(address to, uint256 royaltyBps) internal returns (uint256 agentId) {
         vm.prank(to);
