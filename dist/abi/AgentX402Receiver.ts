@@ -142,6 +142,27 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "agentOwnerOf",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "allowedTokens",
     "inputs": [
       {
@@ -156,6 +177,34 @@ const abi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "distributeFromEscrow",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "serviceId",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -546,6 +595,71 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "payForServiceEscrowed",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "serviceId",
+        "type": "bytes32"
+      },
+      {
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "name": "validAfter",
+        "type": "uint256"
+      },
+      {
+        "name": "validBefore",
+        "type": "uint256"
+      },
+      {
+        "name": "nonce",
+        "type": "bytes32"
+      },
+      {
+        "name": "v",
+        "type": "uint8"
+      },
+      {
+        "name": "r",
+        "type": "bytes32"
+      },
+      {
+        "name": "s",
+        "type": "bytes32"
+      },
+      {
+        "name": "cv",
+        "type": "uint8"
+      },
+      {
+        "name": "cr",
+        "type": "bytes32"
+      },
+      {
+        "name": "cs",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "gross",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "payForServiceForNFT",
     "inputs": [
       {
@@ -804,6 +918,18 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "serviceEscrow",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "services",
     "inputs": [
       {
@@ -902,6 +1028,18 @@ const abi = [
     "inputs": [
       {
         "name": "registry",
+        "type": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setServiceEscrow",
+    "inputs": [
+      {
+        "name": "escrow",
         "type": "address"
       }
     ],
@@ -1191,6 +1329,58 @@ const abi = [
   },
   {
     "type": "event",
+    "name": "EscrowReleased",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "serviceId",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "gross",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "systemCut",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "creatorCut",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "agentCut",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "agentRecipient",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "IdentityRegistryUpdated",
     "inputs": [
       {
@@ -1287,6 +1477,65 @@ const abi = [
         "name": "newRegistry",
         "type": "address",
         "indexed": true
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ServiceEscrowUpdated",
+    "inputs": [
+      {
+        "name": "oldEscrow",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "newEscrow",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ServiceEscrowed",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "serviceId",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "payer",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "gross",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "escrowId",
+        "type": "bytes32",
+        "indexed": false
       }
     ],
     "anonymous": false
@@ -1719,6 +1968,11 @@ const abi = [
   },
   {
     "type": "error",
+    "name": "EscrowNotSet",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "ExpectedPause",
     "inputs": []
   },
@@ -1755,6 +2009,11 @@ const abi = [
   {
     "type": "error",
     "name": "NotCollectionCreator",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotEscrow",
     "inputs": []
   },
   {

@@ -19,30 +19,6 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "DOMAIN_SEPARATOR",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "EXECUTE_TYPEHASH",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "MAX_HOOK_DEPTH",
     "inputs": [],
     "outputs": [
@@ -61,6 +37,18 @@ const abi = [
       {
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "SESSION_CALL_TYPEHASH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
       }
     ],
     "stateMutability": "view"
@@ -144,6 +132,24 @@ const abi = [
       {
         "name": "validUntil",
         "type": "uint48"
+      },
+      {
+        "name": "tokenLimits",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "token",
+            "type": "address"
+          },
+          {
+            "name": "maxPerTx",
+            "type": "uint256"
+          },
+          {
+            "name": "maxTotal",
+            "type": "uint256"
+          }
+        ]
       }
     ],
     "outputs": [
@@ -153,6 +159,18 @@ const abi = [
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "domainSeparator",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -337,6 +355,37 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "getSessionKeyTokenLimits",
+    "inputs": [
+      {
+        "name": "keyHash",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "token",
+            "type": "address"
+          },
+          {
+            "name": "maxPerTx",
+            "type": "uint256"
+          },
+          {
+            "name": "maxTotal",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "isValidSignature",
     "inputs": [
       {
@@ -513,6 +562,23 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "sessionKeyNonce",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "sessionKeys",
     "inputs": [
       {
@@ -600,6 +666,27 @@ const abi = [
       },
       {
         "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "tokenSpent",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      },
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
         "type": "uint256"
       }
     ],
@@ -834,6 +921,45 @@ const abi = [
     "type": "error",
     "name": "ReentrancyGuardReentrantCall",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SessionSelectorForbidden",
+    "inputs": [
+      {
+        "name": "selector",
+        "type": "bytes4"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "SessionTargetForbidden",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "SessionTargetsRequired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TokenLimitExceeded",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "name": "spent",
+        "type": "uint256"
+      }
+    ]
   }
 ] as const;
 export default abi;

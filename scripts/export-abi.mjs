@@ -48,6 +48,7 @@ const EXPORTS = [
   'AgentMemory',
   'AgentPaymentRouter',
   'AgentX402Receiver',
+  'AgentServiceEscrow',
   // ── Marketplace ─────────────────────────────────────────────────────
   'AgentMarketplace',
   'AgentAuctionHouse',

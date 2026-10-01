@@ -16,6 +16,20 @@
 
 ---
 
+## Follow-up — 2026-10-01
+
+| ID    | Severity | Title | Status |
+|-------|----------|-------|--------|
+| M-02  | Medium   | Session-key signature does not bind `keyHash` | **Fixed** (AgentAccount V4: EIP-712 over the account's runtime domain, binding `keyHash` and a per-key nonce) |
+| M-03  | Medium   | Royalty vault release bricked by a misconfigured payee | **Fixed** (failed pushes credited to `owed`, pulled with `withdrawOwed`; missing creator → treasury) |
+| C-01  | Critical | AgentAccount `hookSafe` summed gas in storage forever and then refused every call above 13M | **Fixed** in V4 (transient depth, per-outermost-call bound). Fork-tested on agent #241's deployed TBA: execute stopped after 24 calls of 500k gas. Accounts created before 2026-10-01 run V3 and keep the limit — move funds out. |
+| H-03  | High     | Session keys capped only ETH; empty target list = every target | **Fixed** in V4 (explicit targets, never the account; approve / pull selectors forbidden; ERC20 caps by balance delta) |
+| M-04  | Medium   | ERC-4337 inert (EntryPoint refused by `execute`) | **Fixed** in V4 |
+| M-05  | Medium   | Account EIP-712 domain carried the implementation address (shared by every clone) | **Fixed** in V4 (domain computed at call time) |
+| O-01  | High*    | Beacon-upgrade authority is an EOA | Open — multisig before mainnet |
+
+New agents get V4 accounts through AgentTBARegistry `0xdB349E2cD059E733A0c71D515f2F3bb4FFF0F600` (Base Sepolia). The royalty-vault fix ships with the mainnet identity registry (the Base Sepolia registry predates its source). AgentServiceEscrow (see ESCROW_PLAN.md) is new code in the external audit's scope.
+
 ## 0. TL;DR
 
 **Three exploitable issues found and fixed in-session, regression-pinned.**

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-30T16:30:18.848Z",
+  "generatedAt": "2026-10-01T00:54:00.952Z",
   "generator": "agent-nft/scripts/export-abi.mjs",
   "contracts": [
     {
@@ -79,9 +79,18 @@
       "namespace": null,
       "src": "src/AgentX402Receiver.sol",
       "abi": "AgentX402Receiver.json",
-      "sha256": "1697eec4b2baf127955ea9cb993ddf9fae0aa7edbfa461c399c898f228237bbb",
-      "bytes": 31571,
-      "entries": 111
+      "sha256": "cb3d23b911e3daf3b6ecf9fd1840cfc646a57636df4db26e7a8edaef9072ea6d",
+      "bytes": 36094,
+      "entries": 121
+    },
+    {
+      "contract": "AgentServiceEscrow",
+      "namespace": null,
+      "src": "src/AgentServiceEscrow.sol",
+      "abi": "AgentServiceEscrow.json",
+      "sha256": "db6d761dfdad600c668d6e2eaf0fa8ca97cdb305cb417a0d30ee30860753cbf3",
+      "bytes": 18043,
+      "entries": 72
     },
     {
       "contract": "AgentMarketplace",
@@ -106,9 +115,9 @@
       "namespace": null,
       "src": "src/AgentRoyaltyVault.sol",
       "abi": "AgentRoyaltyVault.json",
-      "sha256": "95d4f30342c5d364072d9af3085e4f14c10e6edb7bf9b5be3c591fa4dab651d0",
-      "bytes": 4558,
-      "entries": 22
+      "sha256": "162e0a2ad1b737cbc00447a045dfeb78946a555daa133ea8226860fdbe905610",
+      "bytes": 5640,
+      "entries": 23
     },
     {
       "contract": "AgentRoyaltySplitter",
@@ -151,9 +160,9 @@
       "namespace": null,
       "src": "src/AgentAccount.sol",
       "abi": "AgentAccount.json",
-      "sha256": "381dca77cc2828e747ca7c8568d91a143c87c33ed59202abe93f5a0d92471d68",
-      "bytes": 14289,
-      "entries": 45
+      "sha256": "cfe07134f5b1a789daa12449833ddef47bb422f9fcfde9479d20905f4a69d6e4",
+      "bytes": 16445,
+      "entries": 52
     },
     {
       "contract": "VimsProvenance",
