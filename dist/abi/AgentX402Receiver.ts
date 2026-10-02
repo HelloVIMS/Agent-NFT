@@ -180,7 +180,7 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "distributeFromEscrow",
+    "name": "distributeFromStream",
     "inputs": [
       {
         "name": "token",
@@ -595,7 +595,7 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "payForServiceEscrowed",
+    "name": "payForServiceForNFT",
     "inputs": [
       {
         "name": "nft",
@@ -660,7 +660,7 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "payForServiceForNFT",
+    "name": "payForServiceStreamed",
     "inputs": [
       {
         "name": "nft",
@@ -918,7 +918,7 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "serviceEscrow",
+    "name": "serviceStream",
     "inputs": [],
     "outputs": [
       {
@@ -1036,10 +1036,10 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "setServiceEscrow",
+    "name": "setServiceStream",
     "inputs": [
       {
-        "name": "escrow",
+        "name": "stream",
         "type": "address"
       }
     ],
@@ -1329,58 +1329,6 @@ const abi = [
   },
   {
     "type": "event",
-    "name": "EscrowReleased",
-    "inputs": [
-      {
-        "name": "nft",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "tokenId",
-        "type": "uint256",
-        "indexed": true
-      },
-      {
-        "name": "serviceId",
-        "type": "bytes32",
-        "indexed": true
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "indexed": false
-      },
-      {
-        "name": "gross",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "systemCut",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "creatorCut",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "agentCut",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "agentRecipient",
-        "type": "address",
-        "indexed": false
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "IdentityRegistryUpdated",
     "inputs": [
       {
@@ -1477,65 +1425,6 @@ const abi = [
         "name": "newRegistry",
         "type": "address",
         "indexed": true
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ServiceEscrowUpdated",
-    "inputs": [
-      {
-        "name": "oldEscrow",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "newEscrow",
-        "type": "address",
-        "indexed": true
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ServiceEscrowed",
-    "inputs": [
-      {
-        "name": "nft",
-        "type": "address",
-        "indexed": true
-      },
-      {
-        "name": "tokenId",
-        "type": "uint256",
-        "indexed": true
-      },
-      {
-        "name": "serviceId",
-        "type": "bytes32",
-        "indexed": true
-      },
-      {
-        "name": "payer",
-        "type": "address",
-        "indexed": false
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "indexed": false
-      },
-      {
-        "name": "gross",
-        "type": "uint256",
-        "indexed": false
-      },
-      {
-        "name": "escrowId",
-        "type": "bytes32",
-        "indexed": false
       }
     ],
     "anonymous": false
@@ -1742,6 +1631,65 @@ const abi = [
   },
   {
     "type": "event",
+    "name": "ServiceStreamUpdated",
+    "inputs": [
+      {
+        "name": "oldStream",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "newStream",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ServiceStreamed",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "serviceId",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "payer",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "gross",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "streamId",
+        "type": "bytes32",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "ServiceUpdated",
     "inputs": [
       {
@@ -1794,6 +1742,58 @@ const abi = [
       {
         "name": "active",
         "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "StreamPaid",
+    "inputs": [
+      {
+        "name": "nft",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "serviceId",
+        "type": "bytes32",
+        "indexed": true
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "gross",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "systemCut",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "creatorCut",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "agentCut",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "agentRecipient",
+        "type": "address",
         "indexed": false
       }
     ],
@@ -1968,11 +1968,6 @@ const abi = [
   },
   {
     "type": "error",
-    "name": "EscrowNotSet",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "ExpectedPause",
     "inputs": []
   },
@@ -2013,17 +2008,17 @@ const abi = [
   },
   {
     "type": "error",
-    "name": "NotEscrow",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "NotInitializing",
     "inputs": []
   },
   {
     "type": "error",
     "name": "NotOwner",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotStream",
     "inputs": []
   },
   {
@@ -2074,6 +2069,11 @@ const abi = [
   {
     "type": "error",
     "name": "ServiceInactive",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "StreamNotSet",
     "inputs": []
   },
   {

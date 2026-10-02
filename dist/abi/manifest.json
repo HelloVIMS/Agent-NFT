@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-01T00:54:00.952Z",
+  "generatedAt": "2026-10-02T05:33:38.644Z",
   "generator": "agent-nft/scripts/export-abi.mjs",
   "contracts": [
     {
@@ -79,18 +79,18 @@
       "namespace": null,
       "src": "src/AgentX402Receiver.sol",
       "abi": "AgentX402Receiver.json",
-      "sha256": "cb3d23b911e3daf3b6ecf9fd1840cfc646a57636df4db26e7a8edaef9072ea6d",
-      "bytes": 36094,
+      "sha256": "8aa51ee872e4849ce72b7cc9d85f4b7b362f85209abdab1938ad888cdf57cc39",
+      "bytes": 36090,
       "entries": 121
     },
     {
-      "contract": "AgentServiceEscrow",
+      "contract": "AgentServiceStream",
       "namespace": null,
-      "src": "src/AgentServiceEscrow.sol",
-      "abi": "AgentServiceEscrow.json",
-      "sha256": "db6d761dfdad600c668d6e2eaf0fa8ca97cdb305cb417a0d30ee30860753cbf3",
-      "bytes": 18043,
-      "entries": 72
+      "src": "src/AgentServiceStream.sol",
+      "abi": "AgentServiceStream.json",
+      "sha256": "319ab5838449aad0bec795e84dae8f3081588d056570c91e415f34f939af7967",
+      "bytes": 15021,
+      "entries": 62
     },
     {
       "contract": "AgentMarketplace",

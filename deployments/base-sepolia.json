@@ -23,7 +23,8 @@
     "AgentCollectionFactory": "0x6B182188269208533Ed95B7C2b83240f21fA7f12",
     "AgentRoyaltySplitterFactory": "0x785d63DE8d3EE714A5F550f1FcE2593154B98393",
     "AgentAvatarExtension": "0x132A0d33aC8040A81E5a3A865Ca2D5238D2Bdbc1",
-    "AgentIdentityKeyExtension": "0xC6d25a28430eFfD9953250f5BDAC5Ab26228E974"
+    "AgentIdentityKeyExtension": "0xC6d25a28430eFfD9953250f5BDAC5Ab26228E974",
+    "AgentServiceStream": "0x412981446A6a4673Ec7E378A3f1E88161D7ee433"
   },
   "implementations": {
     "AgentIdentityRegistry": "0xCBBa112c05A97E1880e21504984acf40351D94b3",
@@ -235,6 +236,10 @@
       "registry": "0x1383FA459907ce08f7A6c4619C40f672C0cA7D5e",
       "implementation": "0x50183A126Ad080e88eDE5166bEaDAa0DdaAaa24C",
       "note": "Accounts of agents minted before 2026-10-01 run V3: execute stops after ~13M lifetime gas; move funds out. Session keys there cap only ETH."
+    },
+    "AgentServiceEscrow": {
+      "address": "0x2A50200A12314fA5A026FaaD48248969c025a0e9",
+      "note": "retired 2026-10-02 for AgentServiceStream; all escrows released, holds 0"
     }
   }
 }

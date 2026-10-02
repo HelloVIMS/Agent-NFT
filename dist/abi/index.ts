@@ -9,7 +9,7 @@ export { default as AgentContextRegistry_ABI } from './AgentContextRegistry';
 export { default as AgentMemory_ABI } from './AgentMemory';
 export { default as AgentPaymentRouter_ABI } from './AgentPaymentRouter';
 export { default as AgentX402Receiver_ABI } from './AgentX402Receiver';
-export { default as AgentServiceEscrow_ABI } from './AgentServiceEscrow';
+export { default as AgentServiceStream_ABI } from './AgentServiceStream';
 export { default as AgentMarketplace_ABI } from './AgentMarketplace';
 export { default as AgentAuctionHouse_ABI } from './AgentAuctionHouse';
 export { default as AgentRoyaltyVault_ABI } from './AgentRoyaltyVault';
