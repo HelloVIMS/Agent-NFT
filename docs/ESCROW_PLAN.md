@@ -1,12 +1,9 @@
 # Escrow for agent services — plan
 
-Status: **built and deployed on Base Sepolia (2026-10-01)** with the recommended defaults below:
-VIMS watcher at launch (production origin, 1-of-1 on testnet — mainnet needs ≥3 independent watchers,
-strict majority), hourly epochs, 48 h claim window, SLA ≤ 5% (access services: 1%), escrow required for
-access services (terms are fixed on-chain when the service is published), seller claims, anyone closes.
-AgentServiceEscrow `0x2A50200A12314fA5A026FaaD48248969c025a0e9`; receiver `payForServiceEscrowed` /
-`distributeFromEscrow`; daemon watcher (`VIMS_ESCROW_WATCHER=1`) and keeper. Not built: buyer
-`challenge` and staked watchers (option 2), which come together; early cancel. Written 2026-09-29.
+Status: **superseded (2026-10-02) by AgentServiceStream.** The escrow was built and ran on Base Sepolia, but
+judging delivery needed trusted (or staked) watchers. Streams need no judge: the payment vests to the seller
+per second and the buyer cancels for the unvested part, with reputation and buyer-side limits handling trust.
+See `src/AgentServiceStream.sol` and AGENTS.md. Kept for the design history. Written 2026-09-29.
 Scope: time-based access services first (the case that needs it most), one-shot jobs second.
 
 ## Problem
