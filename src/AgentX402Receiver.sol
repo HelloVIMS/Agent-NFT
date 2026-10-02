@@ -28,8 +28,8 @@ interface IReputationSettlements {
     function recordSettlementForNFT(address nft, uint256 tokenId, address payer, bytes32 serviceId, uint256 amount) external;
 }
 
-interface IAgentServiceEscrow {
-    function open(bytes32 escrowId, address buyer, address nft, uint256 tokenId, bytes32 serviceId, address token, uint256 amount) external;
+interface IAgentServiceStream {
+    function open(bytes32 streamId, address buyer, address nft, uint256 tokenId, bytes32 serviceId, address token, uint256 amount) external;
 }
 
 /**
@@ -737,38 +737,42 @@ contract AgentX402Receiver is
         if (agentCut   > 0) tk.safeTransfer(agentRecipient, agentCut);
     }
 
-    // ============ Escrowed services (v4) ============
+    // ============ Streamed services (v4) ============
 
-    /// @notice AgentServiceEscrow holding payments for services delivered
-    ///         over time. Zero: escrowed payments are off.
-    IAgentServiceEscrow public serviceEscrow;
+    /// @notice AgentServiceStream holding payments for services delivered
+    ///         over time, vesting to the seller per second. Zero: off.
+    /// @dev    The slot the escrow draft used as serviceEscrow; on Base
+    ///         Sepolia it holds the retired escrow (all released) until
+    ///         setServiceStream replaces it.
+    IAgentServiceStream public serviceStream;
 
-    event ServiceEscrowUpdated(address indexed oldEscrow, address indexed newEscrow);
-    event ServiceEscrowed(address indexed nft, uint256 indexed tokenId, bytes32 indexed serviceId, address payer, address token, uint256 gross, bytes32 escrowId);
-    event EscrowReleased(address indexed nft, uint256 indexed tokenId, bytes32 indexed serviceId, address token, uint256 gross,
+    event ServiceStreamUpdated(address indexed oldStream, address indexed newStream);
+    event ServiceStreamed(address indexed nft, uint256 indexed tokenId, bytes32 indexed serviceId, address payer, address token, uint256 gross, bytes32 streamId);
+    event StreamPaid(address indexed nft, uint256 indexed tokenId, bytes32 indexed serviceId, address token, uint256 gross,
         uint256 systemCut, uint256 creatorCut, uint256 agentCut, address agentRecipient);
 
-    error NotEscrow();
-    error EscrowNotSet();
+    error NotStream();
+    error StreamNotSet();
 
-    function setServiceEscrow(address escrow) external onlyOwner {
-        emit ServiceEscrowUpdated(address(serviceEscrow), escrow);
-        serviceEscrow = IAgentServiceEscrow(escrow);
+    function setServiceStream(address stream) external onlyOwner {
+        emit ServiceStreamUpdated(address(serviceStream), stream);
+        serviceStream = IAgentServiceStream(stream);
     }
 
     /// @notice The owner of agent `tokenId` of `nft` (identity registry or
-    ///         a registered collection) — whom the escrow lets set terms.
+    ///         a registered collection) — who may set stream terms and
+    ///         cancel a stream as the seller.
     function agentOwnerOf(address nft, uint256 tokenId) external view returns (address owner) {
         (,,, owner) = _payees(nft, tokenId);
     }
 
-    /// @notice Settle a hire of an escrowed service. The buyer signs exactly
+    /// @notice Settle a hire of a streamed service. The buyer signs exactly
     ///         what they sign for an immediate payment — the service's
     ///         terms are fixed on-chain when the seller sets them — and the
-    ///         funds go to the escrow, which releases them as service is
-    ///         delivered and refunds the rest. The escrow id is the nonce.
-    ///         `nft` is the identity registry for identity agents.
-    function payForServiceEscrowed(
+    ///         funds open a stream that vests to the seller per second and
+    ///         refunds the unvested part on cancel. The stream id is the
+    ///         nonce. `nft` is the identity registry for identity agents.
+    function payForServiceStreamed(
         address nft,
         uint256 tokenId,
         bytes32 serviceId,
@@ -779,8 +783,8 @@ contract AgentX402Receiver is
         uint8   v,  bytes32 r,  bytes32 s,
         uint8   cv, bytes32 cr, bytes32 cs
     ) external nonReentrant whenNotPaused returns (uint256 gross) {
-        IAgentServiceEscrow escrow = serviceEscrow;
-        if (address(escrow) == address(0)) revert EscrowNotSet();
+        IAgentServiceStream stream = serviceStream;
+        if (address(stream) == address(0)) revert StreamNotSet();
         bool identity = nft == address(identityRegistry);
         Service memory svc = identity ? services[tokenId][serviceId] : servicesForNFT[nft][tokenId][serviceId];
         if (!svc.active || svc.price == 0) revert ServiceInactive();
@@ -794,21 +798,21 @@ contract AgentX402Receiver is
         IERC3009(svc.token).receiveWithAuthorization(
             from, address(this), gross, validAfter, validBefore, nonce, v, r, s
         );
-        IERC20(svc.token).safeTransfer(address(escrow), gross);
-        escrow.open(nonce, from, nft, tokenId, serviceId, svc.token, gross);
+        IERC20(svc.token).safeTransfer(address(stream), gross);
+        stream.open(nonce, from, nft, tokenId, serviceId, svc.token, gross);
 
-        emit ServiceEscrowed(nft, tokenId, serviceId, from, svc.token, gross, nonce);
+        emit ServiceStreamed(nft, tokenId, serviceId, from, svc.token, gross, nonce);
         (,,, address owner) = _payees(nft, tokenId);
         if (identity) _recordSettlement(tokenId, from, serviceId, gross);
         else _recordSettlementForNFT(nft, tokenId, from, serviceId, gross);
         _recordNFTStats(nft, tokenId, from, owner, svc.token, gross);
     }
 
-    /// @notice Pay out what the escrow released, by the same split as an
-    ///         immediate payment. The escrow sends the tokens first.
-    function distributeFromEscrow(address token, uint256 amount, address nft, uint256 tokenId, bytes32 serviceId) external nonReentrant {
-        if (msg.sender != address(serviceEscrow) || msg.sender == address(0)) revert NotEscrow();
+    /// @notice Pay out what a stream vested, by the same split as an
+    ///         immediate payment. The stream sends the tokens first.
+    function distributeFromStream(address token, uint256 amount, address nft, uint256 tokenId, bytes32 serviceId) external nonReentrant {
+        if (msg.sender != address(serviceStream) || msg.sender == address(0)) revert NotStream();
         (uint256 systemCut, uint256 creatorCut, uint256 agentCut, address agentRecipient) = _disburse(nft, tokenId, token, amount);
-        emit EscrowReleased(nft, tokenId, serviceId, token, amount, systemCut, creatorCut, agentCut, agentRecipient);
+        emit StreamPaid(nft, tokenId, serviceId, token, amount, systemCut, creatorCut, agentCut, agentRecipient);
     }
 }
