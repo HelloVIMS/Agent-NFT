@@ -241,5 +241,8 @@
       "address": "0x2A50200A12314fA5A026FaaD48248969c025a0e9",
       "note": "retired 2026-10-02 for AgentServiceStream; all escrows released, holds 0"
     }
+  },
+  "blocks": {
+    "AgentServiceStream": 47575459
   }
 }
