@@ -12,8 +12,8 @@
   "explorer": "https://sepolia.basescan.org",
   "proxies": {
     "AgentIdentityRegistry": "0xfE1ef66Ba95891d3cDf6FB83FE1444Bc3bB9FEeF",
-    "AgentTBARegistry": "0xdB349E2cD059E733A0c71D515f2F3bb4FFF0F600",
-    "AgentTBAImplementation": "0xe786333C9811a2Da73E42a41b643d33272e2479f",
+    "AgentTBARegistry": "0x20dAf63c533e2B170cd53e5906eb01cBa36b2729",
+    "AgentTBAImplementation": "0x5380B42553B682E7F98CE87749478385C11dd70e",
     "AgentReputationRegistry": "0x5563EE2939F6839CE82B3cA6E50AA285e8d1C316",
     "AgentPaymentRouter": "0x1d4320d0cdcbA7d60dc1A76cE63AA13a2Cd43b97",
     "AgentContextRegistry": "0x816D8AA61c283d874ae6C9A9c380A43fd325f9D5",
@@ -240,9 +240,15 @@
     "AgentServiceEscrow": {
       "address": "0x2A50200A12314fA5A026FaaD48248969c025a0e9",
       "note": "retired 2026-10-02 for AgentServiceStream; all escrows released, holds 0"
+    },
+    "AgentTBARegistryV4": {
+      "registry": "0xdB349E2cD059E733A0c71D515f2F3bb4FFF0F600",
+      "implementation": "0xe786333C9811a2Da73E42a41b643d33272e2479f",
+      "note": "Accounts of agents minted 2026-10-01 to 2026-10-03 run V4: no sovereign mode (an account holding its own NFT, or in an ownership cycle, locks once its session keys expire)."
     }
   },
   "blocks": {
-    "AgentServiceStream": 47575459
+    "AgentServiceStream": 47575459,
+    "AgentTBARegistry": 47633892
   }
 }

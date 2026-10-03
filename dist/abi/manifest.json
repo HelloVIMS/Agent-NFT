@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-02T05:33:38.644Z",
+  "generatedAt": "2026-10-03T14:01:38.160Z",
   "generator": "agent-nft/scripts/export-abi.mjs",
   "contracts": [
     {
@@ -160,9 +160,9 @@
       "namespace": null,
       "src": "src/AgentAccount.sol",
       "abi": "AgentAccount.json",
-      "sha256": "cfe07134f5b1a789daa12449833ddef47bb422f9fcfde9479d20905f4a69d6e4",
-      "bytes": 16445,
-      "entries": 52
+      "sha256": "08111761d889702655020f5a6699d09c1d41c645aee41d16d16312b1abe10cec",
+      "bytes": 20854,
+      "entries": 77
     },
     {
       "contract": "VimsProvenance",

@@ -19,6 +19,18 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "ERC1271_FORWARD_GAS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_HOOK_DEPTH",
     "inputs": [],
     "outputs": [
@@ -37,6 +49,42 @@ const abi = [
       {
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MAX_OWNER_DEPTH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MAX_RECOVERY_DELAY",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint48"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MIN_RECOVERY_DELAY",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint48"
       }
     ],
     "stateMutability": "view"
@@ -100,6 +148,20 @@ const abi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "cancelRecovery",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "completeRecovery",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -386,6 +448,30 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "guardian",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isSovereign",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "isValidSignature",
     "inputs": [
       {
@@ -484,7 +570,7 @@ const abi = [
         "type": "address"
       },
       {
-        "name": "",
+        "name": "tokenId",
         "type": "uint256"
       },
       {
@@ -498,7 +584,7 @@ const abi = [
         "type": "bytes4"
       }
     ],
-    "stateMutability": "pure"
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -508,6 +594,54 @@ const abi = [
       {
         "name": "",
         "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pendingSovereignKey",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proposeRecovery",
+    "inputs": [
+      {
+        "name": "newKey",
+        "type": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "recoveryDelay",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint48"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "recoveryReadyAt",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint48"
       }
     ],
     "stateMutability": "view"
@@ -618,6 +752,46 @@ const abi = [
       {
         "name": "revoked",
         "type": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "setGuardian",
+    "inputs": [
+      {
+        "name": "g",
+        "type": "address"
+      },
+      {
+        "name": "delay",
+        "type": "uint48"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setSovereignKey",
+    "inputs": [
+      {
+        "name": "key",
+        "type": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "sovereignKey",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view"
@@ -840,6 +1014,58 @@ const abi = [
   },
   {
     "type": "event",
+    "name": "GuardianSet",
+    "inputs": [
+      {
+        "name": "guardian",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "delay",
+        "type": "uint48",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RecoveryCancelled",
+    "inputs": [],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RecoveryCompleted",
+    "inputs": [
+      {
+        "name": "newKey",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RecoveryProposed",
+    "inputs": [
+      {
+        "name": "newKey",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "readyAt",
+        "type": "uint48",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "SessionKeyCreated",
     "inputs": [
       {
@@ -867,6 +1093,18 @@ const abi = [
       {
         "name": "keyHash",
         "type": "bytes32",
+        "indexed": true
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SovereignKeySet",
+    "inputs": [
+      {
+        "name": "key",
+        "type": "address",
         "indexed": true
       }
     ],
@@ -909,12 +1147,32 @@ const abi = [
   },
   {
     "type": "error",
+    "name": "InvalidDelay",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidEntryPoint",
     "inputs": []
   },
   {
     "type": "error",
     "name": "InvalidSignature",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NoRecovery",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotGuardian",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "RecoveryNotReady",
     "inputs": []
   },
   {
@@ -945,6 +1203,11 @@ const abi = [
   {
     "type": "error",
     "name": "SessionTargetsRequired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SovereignKeyRequired",
     "inputs": []
   },
   {

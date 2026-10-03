@@ -9,14 +9,14 @@ interface IIdentityTBA {
     function trustedTBARegistry() external view returns (address);
 }
 
-/// Deploys an AgentTBARegistry (which deploys the AgentAccount V4
-/// implementation) and makes it the identity registry's trusted TBA
-/// registry, so agents minted from now on get V4 accounts. Accounts that
+/// Deploys an AgentTBARegistry (which deploys the current AgentAccount
+/// implementation — V5) and makes it the identity registry's trusted TBA
+/// registry, so agents minted from now on get it. Accounts that
 /// already exist keep their implementation (ERC-6551 accounts can't be
 /// re-pointed).
 ///
 ///   IDENTITY_REGISTRY, ENTRYPOINT, PRIVATE_KEY
-contract DeployTBARegistryV4 is Script {
+contract DeployTBARegistry is Script {
     function run() external returns (AgentTBARegistry tba) {
         address identity = vm.envAddress("IDENTITY_REGISTRY");
         address entryPoint = vm.envAddress("ENTRYPOINT");
@@ -24,7 +24,7 @@ contract DeployTBARegistryV4 is Script {
         tba = deploy(identity, entryPoint);
         vm.stopBroadcast();
         console.log("AgentTBARegistry:", address(tba));
-        console.log("AgentAccount V4 implementation:", tba.implementation());
+        console.log("AgentAccount implementation:", tba.implementation());
     }
 
     function deploy(address identity, address entryPoint) public returns (AgentTBARegistry tba) {

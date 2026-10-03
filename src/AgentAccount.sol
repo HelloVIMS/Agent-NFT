@@ -20,6 +20,19 @@ import "@openzeppelin/contracts/interfaces/IERC1271.sol";
  *      session keys sign EIP-712 over this account and their own keyHash,
  *      name explicit targets, can't approve or pull, and spend ERC20s only
  *      within per-token caps.
+ *
+ *      V5: sovereign mode. An account that holds its own NFT — directly, or
+ *      through a cycle of accounts holding each other's — has no owner who
+ *      could ever sign (V4 accounts in that state were locked for good once
+ *      their session keys expired). Before moving the NFT in, the owner
+ *      names a sovereign key — the agent's own runtime key — which then
+ *      acts as owner: execute, session keys, ERC-1271/4337 signatures, and
+ *      moving the NFT out again, which ends sovereignty. The sovereign key
+ *      rotates itself; an optional guardian can replace a lost one after a
+ *      delay the sovereign key can veto. ERC-1271 follows contract owners
+ *      with bounded gas, so an ownership cycle can't recurse unboundedly.
+ *      The session-call signature format is V4's, so its EIP-712 domain
+ *      version stays "4".
  */
 import {VimsProvenance} from "./VimsProvenance.sol";
 
@@ -117,6 +130,38 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
     error SessionTargetForbidden(address target);
     error SessionSelectorForbidden(bytes4 selector);
     error TokenLimitExceeded(address token, uint256 spent);
+
+    // ============ Sovereign mode (V5) ============
+
+    /// @notice Acts as owner while this account holds its own NFT.
+    address public sovereignKey;
+    /// @notice May replace a lost sovereign key, after `recoveryDelay`.
+    address public guardian;
+    uint48 public recoveryDelay;
+    /// @notice A guardian's proposed sovereign key and when it can take effect.
+    address public pendingSovereignKey;
+    uint48 public recoveryReadyAt;
+
+    uint48 public constant MIN_RECOVERY_DELAY = 1 days;
+    uint48 public constant MAX_RECOVERY_DELAY = 90 days;
+    /// @notice Gas an ERC-1271 check forwards to a contract owner: bounds an
+    ///         ownership cycle's recursion (63/64 per level ends it).
+    uint256 public constant ERC1271_FORWARD_GAS = 200_000;
+    /// @notice How far an ownership chain is followed to find a cycle.
+    uint8 public constant MAX_OWNER_DEPTH = 8;
+    uint256 internal constant OWNER_CALL_GAS = 30_000;
+
+    event SovereignKeySet(address indexed key);
+    event GuardianSet(address indexed guardian, uint48 delay);
+    event RecoveryProposed(address indexed newKey, uint48 readyAt);
+    event RecoveryCancelled();
+    event RecoveryCompleted(address indexed newKey);
+
+    error SovereignKeyRequired();
+    error NotGuardian();
+    error RecoveryNotReady();
+    error NoRecovery();
+    error InvalidDelay();
     
     constructor(address _entryPoint) {
         entryPoint = _entryPoint;
@@ -225,10 +270,12 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
             return 0x1626ba7e; // ERC-1271 magic value
         }
         
-        // Also check if owner is a smart contract that can validate
+        // Also check if owner is a smart contract that can validate (never
+        // this account: a sovereign account's signer is its sovereign key,
+        // checked above). Bounded gas: an ownership cycle ends.
         address _owner = owner();
-        if (_owner.code.length > 0) {
-            try IERC1271(_owner).isValidSignature(hash, signature) returns (bytes4 result) {
+        if (_owner != address(this) && _owner.code.length > 0 && !isSovereign()) {
+            try IERC1271(_owner).isValidSignature{gas: ERC1271_FORWARD_GAS}(hash, signature) returns (bytes4 result) {
                 return result;
             } catch {
                 return 0xffffffff;
@@ -483,6 +530,79 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
         return _tokenLimits[keyHash];
     }
 
+    // ============ Sovereign mode ============
+
+    /// @notice True while this account holds its own NFT, directly or
+    ///         through accounts that are themselves owned along a chain that
+    ///         leads back here (within MAX_OWNER_DEPTH).
+    function isSovereign() public view returns (bool) {
+        address o = owner();
+        for (uint256 i = 0; i < MAX_OWNER_DEPTH; i++) {
+            if (o == address(this)) return true;
+            if (o.code.length == 0) return false;
+            (bool ok, bytes memory ret) = o.staticcall{gas: OWNER_CALL_GAS}(abi.encodeWithSelector(this.owner.selector));
+            if (!ok || ret.length < 32) return false;
+            o = abi.decode(ret, (address));
+        }
+        return false;
+    }
+
+    /// @notice Names (or, sovereign, rotates) the sovereign key. While
+    ///         sovereign it can't be cleared: that would lock the account.
+    function setSovereignKey(address key) external {
+        require(_isValidSigner(msg.sender), "Only owner");
+        if (key == address(this)) revert SovereignKeyRequired();
+        if (key == address(0) && isSovereign()) revert SovereignKeyRequired();
+        sovereignKey = key;
+        _clearRecovery();
+        emit SovereignKeySet(key);
+    }
+
+    /// @notice Sets a recovery guardian (zero: none) and its delay.
+    function setGuardian(address g, uint48 delay) external {
+        require(_isValidSigner(msg.sender), "Only owner");
+        if (g != address(0) && (delay < MIN_RECOVERY_DELAY || delay > MAX_RECOVERY_DELAY)) revert InvalidDelay();
+        if (g == address(this)) revert NotGuardian();
+        guardian = g;
+        recoveryDelay = g == address(0) ? 0 : delay;
+        _clearRecovery();
+        emit GuardianSet(g, recoveryDelay);
+    }
+
+    /// @notice Guardian: propose a new sovereign key (sovereign accounts only).
+    function proposeRecovery(address newKey) external {
+        if (msg.sender != guardian || guardian == address(0)) revert NotGuardian();
+        if (!isSovereign() || newKey == address(0) || newKey == address(this)) revert SovereignKeyRequired();
+        pendingSovereignKey = newKey;
+        recoveryReadyAt = uint48(block.timestamp) + recoveryDelay;
+        emit RecoveryProposed(newKey, recoveryReadyAt);
+    }
+
+    /// @notice The current sovereign key (or owner) vetoes a recovery.
+    function cancelRecovery() external {
+        require(_isValidSigner(msg.sender), "Only owner");
+        if (pendingSovereignKey == address(0)) revert NoRecovery();
+        _clearRecovery();
+        emit RecoveryCancelled();
+    }
+
+    /// @notice Anyone: complete a recovery whose delay has passed.
+    function completeRecovery() external {
+        address k = pendingSovereignKey;
+        if (k == address(0)) revert NoRecovery();
+        if (block.timestamp < recoveryReadyAt) revert RecoveryNotReady();
+        if (!isSovereign()) revert SovereignKeyRequired();
+        sovereignKey = k;
+        _clearRecovery();
+        emit RecoveryCompleted(k);
+        emit SovereignKeySet(k);
+    }
+
+    function _clearRecovery() internal {
+        pendingSovereignKey = address(0);
+        recoveryReadyAt = 0;
+    }
+
     /**
      * @notice Returns the owner of the NFT that owns this account
      */
@@ -509,10 +629,13 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
     }
     
     /**
-     * @notice Check if a signer is valid (owner of the NFT)
+     * @notice Check if a signer is valid: the NFT's owner, or — while this
+     *         account holds its own NFT — the sovereign key.
      */
     function _isValidSigner(address signer) internal view returns (bool) {
-        return signer == owner();
+        address o = owner();
+        if (signer == o && o != address(this)) return true;
+        return signer != address(0) && signer == sovereignKey && isSovereign();
     }
     
     function _isAllowedTarget(SessionKey storage key, address target) internal view returns (bool) {
@@ -541,8 +664,15 @@ contract AgentAccount is IERC165, IERC721Receiver, IERC1155Receiver, IERC1271, R
             interfaceId == 0x3a871cdd; // IAccount.validateUserOp selector
     }
     
-    // ERC-721 Receiver
-    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+    // ERC-721 Receiver. Receiving its own NFT makes the account sovereign:
+    // refused without a sovereign key, which would lock it for good.
+    // (A plain transferFrom skips this hook; the daemon and SDK only use
+    // safe transfers to go sovereign.)
+    function onERC721Received(address, address, uint256 tokenId, bytes calldata) external view returns (bytes4) {
+        (uint256 chainId, address tokenContract, uint256 ownTokenId) = token();
+        if (msg.sender == tokenContract && tokenId == ownTokenId && chainId == block.chainid && sovereignKey == address(0)) {
+            revert SovereignKeyRequired();
+        }
         return IERC721Receiver.onERC721Received.selector;
     }
     
