@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-04T05:23:20.559Z",
+  "generatedAt": "2026-10-04T06:03:08.657Z",
   "generator": "agent-nft/scripts/export-abi.mjs",
   "contracts": [
     {
@@ -145,6 +145,15 @@
       "sha256": "1505d5fa145e4cbc78c340dffc5144ef8eb9c903ebc08a251fcc208d383554a9",
       "bytes": 10948,
       "entries": 36
+    },
+    {
+      "contract": "AgentCurveMarket",
+      "namespace": null,
+      "src": "src/AgentCurveMarket.sol",
+      "abi": "AgentCurveMarket.json",
+      "sha256": "d54c8821be674f7a6f5c529bab24cc6ea4f92291b8ab69d139d55f7c9c9f0176",
+      "bytes": 14084,
+      "entries": 52
     },
     {
       "contract": "AgentCollectionImpl",

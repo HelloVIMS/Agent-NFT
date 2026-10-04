@@ -1,0 +1,827 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "usdc_",
+        "type": "address"
+      },
+      {
+        "name": "referenceCollection",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "VIMS_AUTHOR",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "VIMS_LICENSE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "VIMS_REPO",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "VIMS_VERSION",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "buy",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address"
+      },
+      {
+        "name": "maxPrice",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "price",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "collectionCodehash",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "configure",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address"
+      },
+      {
+        "name": "curve",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "kind",
+            "type": "uint8"
+          },
+          {
+            "name": "floor",
+            "type": "uint96"
+          },
+          {
+            "name": "ceiling",
+            "type": "uint96"
+          },
+          {
+            "name": "length",
+            "type": "uint32"
+          },
+          {
+            "name": "a",
+            "type": "uint16"
+          },
+          {
+            "name": "b",
+            "type": "uint96"
+          }
+        ]
+      },
+      {
+        "name": "currency",
+        "type": "address"
+      },
+      {
+        "name": "reserveBps",
+        "type": "uint16"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "credit",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "onERC721Received",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes4"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "outFromHere",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "priceAt",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address"
+      },
+      {
+        "name": "sold",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "quoteBuy",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address"
+      },
+      {
+        "name": "n",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "quoteSell",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "saleOf",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "curve",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "kind",
+                "type": "uint8"
+              },
+              {
+                "name": "floor",
+                "type": "uint96"
+              },
+              {
+                "name": "ceiling",
+                "type": "uint96"
+              },
+              {
+                "name": "length",
+                "type": "uint32"
+              },
+              {
+                "name": "a",
+                "type": "uint16"
+              },
+              {
+                "name": "b",
+                "type": "uint96"
+              }
+            ]
+          },
+          {
+            "name": "currency",
+            "type": "address"
+          },
+          {
+            "name": "reserveBps",
+            "type": "uint16"
+          },
+          {
+            "name": "configured",
+            "type": "bool"
+          },
+          {
+            "name": "started",
+            "type": "bool"
+          },
+          {
+            "name": "sold",
+            "type": "uint32"
+          },
+          {
+            "name": "reserve",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "sell",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "minPayout",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "payout",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "stock",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address"
+      },
+      {
+        "name": "tokenIds",
+        "type": "uint256[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "stockOf",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "unstock",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address"
+      },
+      {
+        "name": "n",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "usdc",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "vimsAttest",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "vimsProvenance",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "author",
+        "type": "bytes32"
+      },
+      {
+        "name": "repo",
+        "type": "bytes32"
+      },
+      {
+        "name": "license",
+        "type": "bytes32"
+      },
+      {
+        "name": "version",
+        "type": "string"
+      },
+      {
+        "name": "contractName",
+        "type": "string"
+      },
+      {
+        "name": "magic",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "withdraw",
+    "inputs": [
+      {
+        "name": "currency",
+        "type": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "Bought",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "buyer",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "price",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "toReserve",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "sold",
+        "type": "uint32",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SaleConfigured",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "curve",
+        "type": "tuple",
+        "indexed": false,
+        "components": [
+          {
+            "name": "kind",
+            "type": "uint8"
+          },
+          {
+            "name": "floor",
+            "type": "uint96"
+          },
+          {
+            "name": "ceiling",
+            "type": "uint96"
+          },
+          {
+            "name": "length",
+            "type": "uint32"
+          },
+          {
+            "name": "a",
+            "type": "uint16"
+          },
+          {
+            "name": "b",
+            "type": "uint96"
+          }
+        ]
+      },
+      {
+        "name": "currency",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "reserveBps",
+        "type": "uint16",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SoldBack",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "seller",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "payout",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "sold",
+        "type": "uint32",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Stocked",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": true
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Unstocked",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": true
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Withdrawn",
+    "inputs": [
+      {
+        "name": "currency",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "AddressEmptyCode",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AddressInsufficientBalance",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "FailedInnerCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidCurve",
+    "inputs": [
+      {
+        "name": "reason",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "MathOverflowedMulDiv",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NoReserve",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotACollection",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotBoughtHere",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotConfigured",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotCreator",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotHolder",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NothingToWithdraw",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PayoutBelowLimit",
+    "inputs": [
+      {
+        "name": "payout",
+        "type": "uint256"
+      },
+      {
+        "name": "limit",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "PriceAboveLimit",
+    "inputs": [
+      {
+        "name": "price",
+        "type": "uint256"
+      },
+      {
+        "name": "limit",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ReserveTooHigh",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SafeERC20FailedOperation",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "SoldOut",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TermsLocked",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TransferFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Unsolicited",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UnsupportedCurrency",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WrongPayment",
+    "inputs": []
+  }
+]

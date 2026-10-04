@@ -58,6 +58,7 @@ const EXPORTS = [
   'AgentRoyaltySplitterFactory',
   // ── Collections ─────────────────────────────────────────────────────
   'AgentCollectionFactory',
+  'AgentCurveMarket',
   'AgentCollectionImpl',
   // ── TBA + provenance ────────────────────────────────────────────────
   'AgentAccount',

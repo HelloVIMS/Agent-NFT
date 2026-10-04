@@ -269,5 +269,15 @@
   "blocks": {
     "AgentServiceStream": 47575459,
     "AgentTBARegistry": 47633892
+  },
+  "curveMarket": {
+    "address": "0x12515d4615DE573536EE3EcdE87bAa64C94d36c9",
+    "deployedAt": "2026-10-04",
+    "tx": "0x1bd0a6fb01aeae7ec990b7d68995207ca31c471604ff7a5561ced6bbd38c9032",
+    "block": 47662583,
+    "usdc": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+    "collectionCodehash": "0x08639487ced0157179296636697ef8fcdaf10d5bab7bb32e2368642978305fc7",
+    "script": "script/DeployCurveMarket.s.sol",
+    "why": "sells a collection's agents along a price curve (CurveMath), ETH or USDC, buy-only or reserve-backed; immutable, no owner"
   }
 }
