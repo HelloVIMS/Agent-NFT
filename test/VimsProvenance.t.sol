@@ -91,7 +91,7 @@ contract VimsProvenanceTest is Test {
             uint256[] memory th = new uint256[](1); th[0] = 1;
             deployments[5] = address(new ReputationLevelHook(address(new _StubReceiver()), address(0xAE9), th));
         }
-        deployments[6] = address(new VoteGatedHook(address(0xC0DE), 5));
+        deployments[6] = address(new VoteGatedHook(5));
 
         bytes32 prefixMask = 0xffffffffffffffff000000000000000000000000000000000000000000000000;
         bytes32[] memory seen = new bytes32[](7);

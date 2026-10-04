@@ -7,10 +7,6 @@ const abi = [
     "type": "constructor",
     "inputs": [
       {
-        "name": "_governor",
-        "type": "address"
-      },
-      {
         "name": "_maxStage",
         "type": "uint8"
       }
@@ -191,11 +187,16 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "governor",
-    "inputs": [],
+    "name": "governorOf",
+    "inputs": [
+      {
+        "name": "host",
+        "type": "address"
+      }
+    ],
     "outputs": [
       {
-        "name": "",
+        "name": "g",
         "type": "address"
       }
     ],
@@ -286,6 +287,22 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "setGovernor",
+    "inputs": [
+      {
+        "name": "host",
+        "type": "address"
+      },
+      {
+        "name": "next",
+        "type": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setStage",
     "inputs": [
       {
@@ -368,6 +385,28 @@ const abi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "GovernorSet",
+    "inputs": [
+      {
+        "name": "host",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "previous",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "governor",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false
   },
   {
     "type": "event",

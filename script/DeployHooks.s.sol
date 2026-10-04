@@ -77,7 +77,7 @@ contract DeployHooksScript is Script {
                 vm.envOr("PRICE_FEED_BULL_THRESHOLD", DEFAULT_BULL_THRESHOLD))),
             address(new ReputationLevelHook(receiver, reputation, hires)),
             address(new EvolutionStagesHook(stages, vm.envOr("STAGE_MIN_SECONDS", uint256(1 hours)))),
-            address(new VoteGatedHook(vm.envOr("VOTE_GOVERNOR", vm.addr(pk)), uint8(vm.envOr("VOTE_MAX_STAGE", uint256(4))))),
+            address(new VoteGatedHook(uint8(vm.envOr("VOTE_MAX_STAGE", uint256(4))))),
             address(new AgentStatusHook())
         ];
         vm.stopBroadcast();

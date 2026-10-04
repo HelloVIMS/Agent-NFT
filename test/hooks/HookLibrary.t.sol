@@ -461,34 +461,78 @@ contract HookLibraryTest is Test {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // VoteGatedHook — governor names the collection
+    // VoteGatedHook — each collection's own governor
     // ─────────────────────────────────────────────────────────────────────
 
-    function test_VoteGated_onlyGovernorAdvancesPerHost() public {
-        address gov = address(0x60);
-        VoteGatedHook h = new VoteGatedHook(gov, 4);
+    function test_VoteGated_eachCollectionsCreatorGovernsItsOwn() public {
+        address creatorA = address(0xCA);
+        address creatorB = address(0xCB);
+        FakeCollection a = new FakeCollection(creatorA);
+        FakeCollection b = new FakeCollection(creatorB);
+        VoteGatedHook h = new VoteGatedHook(4);
+        assertEq(h.governorOf(address(a)), creatorA);
         vm.expectRevert(VoteGatedHook.NotGovernor.selector);
-        h.setStage(HOST_A, 1, 1);
-        vm.startPrank(gov);
-        h.setStage(HOST_A, 1, 2);
+        h.setStage(address(a), 1, 1);
+        vm.prank(creatorB);
+        vm.expectRevert(VoteGatedHook.NotGovernor.selector);
+        h.setStage(address(a), 1, 1); // another collection's creator
+        vm.startPrank(creatorA);
+        h.setStage(address(a), 1, 2);
         vm.expectRevert(VoteGatedHook.StageNotIncreasing.selector);
-        h.setStage(HOST_A, 1, 2);
+        h.setStage(address(a), 1, 2);
         vm.expectRevert(VoteGatedHook.StageNotIncreasing.selector);
-        h.setStage(HOST_A, 1, 5);
+        h.setStage(address(a), 1, 5);
         vm.stopPrank();
-        assertEq(h.stage(HOST_A, 1), 2);
-        assertEq(h.stage(HOST_B, 1), 0);
+        assertEq(h.stage(address(a), 1), 2);
+        assertEq(h.stage(address(b), 1), 0);
         bytes32 trig = h.TRIG_VOTE_GATED();
-        vm.prank(HOST_A);
-        EvolutionTypes.EvolutionResult memory a = h.onTrigger(1, trig, "");
-        vm.prank(HOST_B);
-        EvolutionTypes.EvolutionResult memory b = h.onTrigger(1, trig, "");
-        assertTrue(a.svgChanged && b.svgChanged);
-        assertTrue(a.newStateHash != b.newStateHash);
+        vm.prank(address(a));
+        EvolutionTypes.EvolutionResult memory ra = h.onTrigger(1, trig, "");
+        vm.prank(address(b));
+        EvolutionTypes.EvolutionResult memory rb = h.onTrigger(1, trig, "");
+        assertTrue(ra.svgChanged && rb.svgChanged);
+        assertTrue(ra.newStateHash != rb.newStateHash);
     }
 
-    function test_VoteGated_zeroGovernorReverts() public {
+    // Handed to a DAO, the role is the DAO's: the creator can't take it back.
+    function test_VoteGated_creatorHandsTheRoleToItsDAO() public {
+        address creator = address(0xCA);
+        address dao = address(0xDA0);
+        address next = address(0xDA1);
+        FakeCollection c = new FakeCollection(creator);
+        VoteGatedHook h = new VoteGatedHook(4);
+        vm.prank(creator);
         vm.expectRevert(VoteGatedHook.ZeroGovernor.selector);
-        new VoteGatedHook(address(0), 4);
+        h.setGovernor(address(c), address(0));
+        vm.prank(creator);
+        h.setGovernor(address(c), dao);
+        assertEq(h.governorOf(address(c)), dao);
+        vm.startPrank(creator);
+        vm.expectRevert(VoteGatedHook.NotGovernor.selector);
+        h.setStage(address(c), 1, 1);
+        vm.expectRevert(VoteGatedHook.NotGovernor.selector);
+        h.setGovernor(address(c), creator);
+        vm.stopPrank();
+        vm.startPrank(dao);
+        h.setStage(address(c), 1, 1);
+        h.setGovernor(address(c), next);
+        vm.stopPrank();
+        assertEq(h.governorOf(address(c)), next);
     }
+
+    // A host with no creator (an EOA, an identity registry) has no governor.
+    function test_VoteGated_noCreatorNoGovernor() public {
+        VoteGatedHook h = new VoteGatedHook(4);
+        assertEq(h.governorOf(HOST_A), address(0));
+        vm.prank(HOST_A);
+        vm.expectRevert(VoteGatedHook.NotGovernor.selector);
+        h.setStage(HOST_A, 1, 1);
+        vm.expectRevert(VoteGatedHook.NotGovernor.selector);
+        h.setGovernor(HOST_A, address(0xDA0));
+    }
+}
+
+contract FakeCollection {
+    address public immutable collectionCreator;
+    constructor(address c) { collectionCreator = c; }
 }

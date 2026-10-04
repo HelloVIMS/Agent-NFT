@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-03T14:01:38.160Z",
+  "generatedAt": "2026-10-04T05:23:20.559Z",
   "generator": "agent-nft/scripts/export-abi.mjs",
   "contracts": [
     {
@@ -331,9 +331,9 @@
       "namespace": "hooks",
       "src": "src/hooks/VoteGatedHook.sol",
       "abi": "hooks/VoteGatedHook.json",
-      "sha256": "6868f34e46f3a9cad45be00ec1797d5238e13a92aa0be61d4afdcfbd0f61267b",
-      "bytes": 6791,
-      "entries": 25
+      "sha256": "b0ed695ef9648dfa1a743906dcb458e8a4dbca868559ec0570436cf939003b68",
+      "bytes": 7450,
+      "entries": 27
     }
   ]
 }

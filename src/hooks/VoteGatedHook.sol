@@ -8,13 +8,19 @@ import {Strings}           from "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
  * @title VoteGatedHook
- * @notice Stages that only a `governor` (an OZ Governor executor or a
- *         multisig) can advance; anyone may then redraw with
- *         `triggerEvolve(id, keccak256("vote.gated"), "")`.
- * @dev    FLAG_ON_TRIGGER. Holds no funds and declares no transfer
- *         permissions, so a stuck governor can't freeze holders. Stages are
- *         per host collection: the governor names the collection.
+ * @notice Stages that only a collection's governor can advance; anyone may
+ *         then redraw with `triggerEvolve(id, keccak256("vote.gated"), "")`.
+ * @dev    One deployment serves every collection, each with its own
+ *         governor: the collection's creator until it hands the role on (to
+ *         an OZ Governor executor, a DAO, a multisig). Only the current
+ *         governor can hand it on, so a creator that gave it to its DAO
+ *         can't take it back. FLAG_ON_TRIGGER; holds no funds and declares
+ *         no transfer permissions, so a stuck governor can't freeze holders.
  */
+interface ICollectionCreator {
+    function collectionCreator() external view returns (address);
+}
+
 contract VoteGatedHook is BaseEvolutionHook, VimsProvenance {
     function _vimsContractName() internal pure override returns (string memory) {
         return "VoteGatedHook";
@@ -26,18 +32,35 @@ contract VoteGatedHook is BaseEvolutionHook, VimsProvenance {
     error ZeroGovernor();
     error StageNotIncreasing();
 
-    address public immutable governor;
-    uint8   public immutable maxStage;
+    uint8 public immutable maxStage;
 
     /// @notice host collection => token id => stage.
     mapping(address => mapping(uint256 => uint8)) public stage;
+    /// @notice host collection => governor it was handed to (unset: its creator).
+    mapping(address => address) internal _governor;
 
     event StageAdvanced(address indexed host, uint256 indexed agentId, uint8 stage);
+    event GovernorSet(address indexed host, address indexed previous, address indexed governor);
 
-    constructor(address _governor, uint8 _maxStage) {
-        if (_governor == address(0)) revert ZeroGovernor();
-        governor = _governor;
+    constructor(uint8 _maxStage) {
         maxStage = _maxStage;
+    }
+
+    /// @notice Who advances `host`'s stages: the governor it was handed to,
+    ///         else the collection's creator (zero for a host without one).
+    function governorOf(address host) public view returns (address g) {
+        g = _governor[host];
+        if (g != address(0) || host.code.length == 0) return g;
+        try ICollectionCreator(host).collectionCreator() returns (address c) { g = c; } catch {}
+    }
+
+    /// @notice The current governor hands the role on (never to zero).
+    function setGovernor(address host, address next) external {
+        address current = governorOf(host);
+        if (current == address(0) || msg.sender != current) revert NotGovernor();
+        if (next == address(0)) revert ZeroGovernor();
+        _governor[host] = next;
+        emit GovernorSet(host, current, next);
     }
 
     function getPermissions() public pure override returns (uint256) {
@@ -45,7 +68,8 @@ contract VoteGatedHook is BaseEvolutionHook, VimsProvenance {
     }
 
     function setStage(address host, uint256 agentId, uint8 newStage) external {
-        if (msg.sender != governor) revert NotGovernor();
+        address g = governorOf(host);
+        if (g == address(0) || msg.sender != g) revert NotGovernor();
         if (newStage <= stage[host][agentId] || newStage > maxStage) revert StageNotIncreasing();
         stage[host][agentId] = newStage;
         emit StageAdvanced(host, agentId, newStage);

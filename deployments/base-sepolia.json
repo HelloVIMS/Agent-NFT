@@ -184,7 +184,7 @@
     "OracleHook": "0xC1317C719e636521E499E12030BF2c455d298519",
     "ReputationLevelHook": "0xC5cD42f6f104F2D8f3272bbEF12D654D8e687406",
     "EvolutionStagesHook": "0xA9f41e1F4a12f8091840153656C05a7ec34b9a8d",
-    "VoteGatedHook": "0xB6DCB793B070Ba16B4Da23E58d38896605403aC4",
+    "VoteGatedHook": "0x43135A28cA2c961EF925960bABE6b1107eb1D2d7",
     "AgentStatusHook": "0x0aea20ba4649D88cBb93B0287CF2fed2743Bc41e",
     "config": {
       "x402Receiver": "0xd180DC89270Df505F5d4B7B36e83318f330014A7",
@@ -241,6 +241,13 @@
         "IdentityTipBeneficiaryResolver": "0x59713745374f8da99eDF620F144f5B793e0Fbdb7"
       },
       "why": "state keyed by token id only (anyone could inflate counters or fast-forward stages; collections collided); ReputationLevelHook reverted on every call; RevenueLevelHook's recorder never called; TipJar paid identity-agent owners for collection tokens."
+    },
+    {
+      "replacedAt": "2026-10-04",
+      "hooks": {
+        "VoteGatedHook": "0xB6DCB793B070Ba16B4Da23E58d38896605403aC4"
+      },
+      "why": "one immutable governor (the deployer key) for every collection: a creator couldn't advance its own agents; now each collection's creator governs it until handing the role to its DAO"
     }
   ],
   "history": {
