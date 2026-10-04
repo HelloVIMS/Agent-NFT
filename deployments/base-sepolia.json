@@ -33,7 +33,7 @@
     "AgentMemory": "0xedDb9b1bD7d065db5EAE4b0dE2DeeDddd57B9649",
     "AgentX402Receiver": "0xb880a889d60380F7F9D96472263eaDc521bD78DD",
     "AgentMarketplace": "0xcc1E532C8148278c56DBBBcb02f23648C06C2950",
-    "AgentCollectionImpl": "0xDcBF7187E116577491B65C0E8b0c2aE30e4393c4",
+    "AgentCollectionImpl": "0x77BBda14512CfB8DAF345ed576800C2D46bc6323",
     "AgentAvatarExtension": "0xC6929383104a670FA5fDa0ABa95a874E489527B9",
     "AgentIdentityKeyExtension": "0x12244dE4Dd814ec6242cF0f060D04ABb1037BB26"
   },
@@ -58,7 +58,7 @@
         "notes": "second testnet deploy"
       }
     ],
-    "implementation": "0xDcBF7187E116577491B65C0E8b0c2aE30e4393c4",
+    "implementation": "0x77BBda14512CfB8DAF345ed576800C2D46bc6323",
     "implementationLegacy": [
       {
         "address": "0xE5a34709CCb56acA387A43afb8D008aEA4bBba86",
@@ -82,6 +82,11 @@
         "address": "0x19DAaa46d5ACf28FC30935Eb53A4CeF9d2453dd5",
         "replacedAt": "2026-09-30",
         "notes": "on-chain SVG tokens had no metadata document"
+      },
+      {
+        "address": "0xDcBF7187E116577491B65C0E8b0c2aE30e4393c4",
+        "replacedAt": "2026-10-04T05:00:00Z",
+        "notes": "an owner's per-agent hook could lift the collection hook's guards (soulbound)"
       }
     ],
     "beacon": "0xA28E020f8E6258B890e78630C0A5034642f97f2C",
@@ -146,6 +151,13 @@
         "to": "0xf1126e12c7bea39383A0f13e0Adf7Af0Efd64799"
       },
       "adds": "nftSettlements / nftVolume per-NFT paid-hire stats"
+    },
+    "collection-guards-2026-10-04": {
+      "contract": "AgentCollectionImpl",
+      "previous": "0xDcBF7187E116577491B65C0E8b0c2aE30e4393c4",
+      "current": "0x77BBda14512CfB8DAF345ed576800C2D46bc6323",
+      "upgradeTx": "0xe6d1c1991638a686ce55782962e3fa51f60ab244456e434cf4dd1bbe72224fda",
+      "why": "an owner's per-agent hook replaced the collection hook for its guards too, so a creator's collection-wide soulbound (or any before-transfer/before-mint rule) could be lifted by any owner; the collection hook's guards now always run"
     }
   },
   "secondaryRoyalty": {

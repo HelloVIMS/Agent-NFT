@@ -73,6 +73,17 @@ contract SellerTrapHook is BaseEvolutionHook {
     }
 }
 
+contract CountingGuardHook is BaseEvolutionHook {
+    uint256 public beforeCalls;
+    function getPermissions() public pure override returns (uint256) {
+        return EvolutionTypes.FLAG_BEFORE_TRANSFER;
+    }
+    function beforeTransfer(uint256, address, address) external override returns (bytes4) {
+        beforeCalls++;
+        return this.beforeTransfer.selector;
+    }
+}
+
 contract EvolutionHooksTest is Test {
 
     /// @dev The next call comes from `c`'s creator (the free mint paths are creator-only).
@@ -519,5 +530,43 @@ contract EvolutionHooksTest is Test {
         assertEq(uint8(collection.metadataMode(id)), uint8(AgentCollectionImpl.MetadataMode.OnChainSVG));
         string memory uri = collection.tokenURI(id);
         assertTrue(bytes(uri).length > 100 && keccak256(bytes(uri)) != keccak256("ipfs://static"), "serves the evolved art");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // The collection's guards always run: an owner's hook can't lift them
+    // ─────────────────────────────────────────────────────────────────────────
+
+    function test_ownersHookCantEscapeACollectionSoulbound() public {
+        SoulboundHook lock = new SoulboundHook();
+        uint256 id = _registerFor(collection, minter, "A", "uri");
+        vm.prank(creator);
+        collection.setCollectionHook(address(lock));
+        // Mints still work under the lock.
+        _asCreator(collection);
+        collection.registerAgent("B", "uri");
+        vm.prank(minter);
+        collection.setHook(id, address(recolor)); // the owner's own (cosmetic) hook
+        (address active,) = collection.activeHookFor(id);
+        assertEq(active, address(recolor), "the owner's hook still drives evolution");
+        vm.prank(minter);
+        vm.expectRevert(SoulboundHook.TransferBlocked.selector);
+        collection.transferFrom(minter, buyer, id);
+        // Lifting the collection's lock is the creator's call.
+        vm.prank(creator);
+        collection.setCollectionHook(address(0));
+        vm.prank(minter);
+        collection.transferFrom(minter, buyer, id);
+        assertEq(collection.ownerOf(id), buyer);
+    }
+
+    function test_collectionGuardRunsOnceWhenItIsTheActiveHook() public {
+        CountingGuardHook both = new CountingGuardHook();
+        vm.prank(creator);
+        collection.setCollectionHook(address(both));
+        uint256 id = _registerFor(collection, minter, "A", "uri");
+        uint256 before = both.beforeCalls();
+        vm.prank(minter);
+        collection.transferFrom(minter, buyer, id);
+        assertEq(both.beforeCalls() - before, 1, "once per transfer, not twice");
     }
 }

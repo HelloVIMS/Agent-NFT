@@ -1116,8 +1116,17 @@ contract AgentCollectionImpl is
 
     // ── Internal lifecycle dispatchers ───────────────────────────────────────
 
+    // Guards (before-mint, before-transfer) of the creator's collection hook
+    // always run: an owner's per-agent hook overrides how an agent evolves,
+    // never the collection's rules (a soulbound collection stays soulbound).
     function _callBeforeMint(uint256 agentId, address to, bytes memory data) internal {
         (address hook, uint256 perms) = activeHookFor(agentId);
+        address ch = collectionHook;
+        if (ch != address(0) && ch != hook) _beforeMint(ch, hookPermissions[ch], agentId, to, data);
+        _beforeMint(hook, perms, agentId, to, data);
+    }
+
+    function _beforeMint(address hook, uint256 perms, uint256 agentId, address to, bytes memory data) private {
         if (hook == address(0)) return;
         if (!EvolutionTypes.hasFlag(perms, EvolutionTypes.FLAG_BEFORE_MINT)) return;
         bytes4 sel = IAgentEvolutionHook(hook).beforeMint(agentId, to, data);
@@ -1156,6 +1165,8 @@ contract AgentCollectionImpl is
         address currentOwner = _ownerOf(tokenId);
         (address hook, uint256 perms) = activeHookFor(tokenId);
         if (currentOwner != address(0) && to != address(0)) {
+            address ch = collectionHook;
+            if (ch != address(0) && ch != hook) _callBeforeTransfer(ch, hookPermissions[ch], tokenId, currentOwner, to);
             _callBeforeTransfer(hook, perms, tokenId, currentOwner, to);
         }
 
