@@ -161,7 +161,7 @@ contract AgentCollectionFactory is Ownable, VimsProvenance {
         uint256 serviceRoyaltyBps_,
         string calldata description_,
         address creator_
-    ) internal returns (uint256 collectionId, address contractAddress) {
+    ) internal virtual returns (uint256 collectionId, address contractAddress) {
         if (bytes(name_).length == 0) revert InvalidName();
         if (bytes(symbol_).length == 0) revert InvalidSymbol();
 
@@ -254,5 +254,27 @@ contract AgentCollectionFactory is Ownable, VimsProvenance {
             }
         }
         revert("Collection not found");
+    }
+}
+
+contract AgentReserveCollectionFactory is AgentCollectionFactory {
+    address public immutable curveMarket;
+
+    constructor(address implementation_, address protocolFeeRecipient_, address market_)
+        AgentCollectionFactory(implementation_, protocolFeeRecipient_)
+    {
+        if (market_ == address(0)) revert InvalidFeeRecipient();
+        curveMarket = market_;
+        renounceOwnership();
+    }
+
+    function _createCollection(
+        string calldata name_, string calldata symbol_, uint256 maxSupply_,
+        uint256 salesRoyaltyBps_, uint256 serviceRoyaltyBps_, string calldata description_, address creator_
+    ) internal override returns (uint256 collectionId, address contractAddress) {
+        (collectionId, contractAddress) = super._createCollection(
+            name_, symbol_, maxSupply_, salesRoyaltyBps_, serviceRoyaltyBps_, description_, creator_
+        );
+        AgentCollectionImpl(contractAddress).setCurveMarketOnce(curveMarket);
     }
 }

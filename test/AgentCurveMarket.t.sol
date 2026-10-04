@@ -8,7 +8,13 @@ import "../src/AgentCollectionImpl.sol";
 import "../src/AgentCollectionFactory.sol";
 import {AgentCurveMarket} from "../src/AgentCurveMarket.sol";
 import {CurveMath} from "../src/libraries/CurveMath.sol";
+import {BaseEvolutionHook} from "../src/hooks/BaseEvolutionHook.sol";
 import {SoulboundHook as CurveSoulboundHook} from "../src/hooks/SoulboundHook.sol";
+
+contract RevertingCurveAfterHook is BaseEvolutionHook {
+    function getPermissions() public pure override returns (uint256) { return 1 << 3; }
+    function afterTransfer(uint256, address, address) external pure override returns (bytes4) { revert("after transfer blocked"); }
+}
 
 contract FakeCreatorOnly {
     address public collectionCreator;
@@ -35,6 +41,7 @@ contract AgentCurveMarketTest is Test, IERC721Receiver {
 
     AgentCollectionFactory factory;
     AgentCollectionImpl col;
+    AgentCollectionImpl legacyCol;
     AgentCurveMarket market;
     ERC20Mock usdc;
 
@@ -50,10 +57,14 @@ contract AgentCurveMarketTest is Test, IERC721Receiver {
         AgentCollectionImpl impl = new AgentCollectionImpl();
         factory = new AgentCollectionFactory(address(impl), protocol);
         vm.prank(creator);
+        (, address sample) = factory.createCollection("Legacy", "OLD", 0, 500, 500, "");
+        legacyCol = AgentCollectionImpl(sample);
+        usdc = new ERC20Mock();
+        market = new AgentCurveMarket(address(usdc), sample, address(impl), address(0));
+        factory = AgentCollectionFactory(market.collectionFactory());
+        vm.prank(creator);
         (, address addr) = factory.createCollection("Curved", "CRV", 0, 500, 500, "");
         col = AgentCollectionImpl(addr);
-        usdc = new ERC20Mock();
-        market = new AgentCurveMarket(address(usdc), addr);
         for (uint256 i; i < 20; ++i) _mint();
         vm.prank(creator);
         col.setApprovalForAll(address(market), true);
@@ -102,6 +113,26 @@ contract AgentCurveMarketTest is Test, IERC721Receiver {
         vm.expectRevert(AgentCurveMarket.ReserveTooHigh.selector);
         market.configure(address(col), _curve(CurveMath.Kind.Linear), address(0), 10_001);
         vm.stopPrank();
+    }
+
+    function test_purchaseCommitsToTheQuotedTerms() public {
+        _open(CurveMath.Kind.Linear, address(usdc), 6_000, 2);
+        (bool quoted, bytes memory data) = address(market).staticcall(abi.encodeWithSignature("termsHash(address)", address(col)));
+        assertTrue(quoted, "market must expose a quote commitment");
+        bytes32 terms = abi.decode(data, (bytes32));
+        vm.prank(creator);
+        market.configure(address(col), _curve(CurveMath.Kind.Linear), address(usdc), 0);
+        uint256 before = usdc.balanceOf(alice);
+        vm.prank(alice);
+        (bool changed, ) = address(market).call(abi.encodeWithSignature("buyWithTerms(address,uint256,bytes32)", address(col), FLOOR, terms));
+        assertFalse(changed, "reserve changes must invalidate a pending purchase");
+        assertEq(usdc.balanceOf(alice), before);
+        vm.prank(creator);
+        market.configure(address(col), _curve(CurveMath.Kind.Linear), address(usdc), 6_000);
+        vm.prank(alice);
+        (bool bought, ) = address(market).call(abi.encodeWithSignature("buyWithTerms(address,uint256,bytes32)", address(col), FLOOR, terms));
+        assertTrue(bought);
+        assertEq(market.saleOf(address(col)).reserve, FLOOR * 6_000 / 10_000);
     }
 
     function test_termsLockAtTheFirstSale() public {
@@ -376,7 +407,11 @@ contract AgentCurveMarketTest is Test, IERC721Receiver {
     }
 
     function test_transferHookFailureRollsBackPaymentAndStock() public {
-        _open(CurveMath.Kind.Linear, address(usdc), 6_000, 3);
+        col = legacyCol;
+        for (uint256 i; i < 3; ++i) _mint();
+        vm.prank(creator);
+        col.setApprovalForAll(address(market), true);
+        _open(CurveMath.Kind.Linear, address(usdc), 0, 3);
         CurveSoulboundHook lock = new CurveSoulboundHook(0);
         vm.prank(creator);
         col.setCollectionHook(address(lock));
@@ -396,7 +431,7 @@ contract AgentCurveMarketTest is Test, IERC721Receiver {
         market.buy(address(col), FLOOR);
     }
 
-    function test_redemptionBlockedByHookPreservesTheClaimAndReserve() public {
+    function test_redemptionCannotBeBlockedByCollectionHooks() public {
         _open(CurveMath.Kind.Linear, address(usdc), 6_000, 3);
         vm.prank(alice);
         (uint256 id, ) = market.buy(address(col), FLOOR);
@@ -406,16 +441,71 @@ contract AgentCurveMarketTest is Test, IERC721Receiver {
         uint256 reserve = market.saleOf(address(col)).reserve;
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(CurveSoulboundHook.TransferLocked.selector, 0));
+        col.transferFrom(alice, bob, id);
+        uint256 balance = usdc.balanceOf(alice);
+        vm.prank(alice);
+        market.sell(address(col), id, reserve);
+        assertEq(usdc.balanceOf(alice) - balance, reserve);
+        assertEq(col.ownerOf(id), address(market));
+        assertFalse(market.outFromHere(address(col), id));
+        assertEq(market.saleOf(address(col)).reserve, 0);
+        vm.prank(bob);
+        market.buy(address(col), FLOOR);
+        assertEq(col.ownerOf(id), bob);
+    }
+
+    function test_afterTransferHooksCannotRollBackRedemption() public {
+        _open(CurveMath.Kind.Linear, address(usdc), 6_000, 3);
+        vm.prank(alice);
+        (uint256 id, ) = market.buy(address(col), FLOOR);
+        RevertingCurveAfterHook hook = new RevertingCurveAfterHook();
+        vm.prank(creator);
+        col.setCollectionHook(address(hook));
+        vm.prank(alice);
+        vm.expectRevert("after transfer blocked");
+        col.transferFrom(alice, bob, id);
+        vm.prank(alice);
+        uint256 paid = market.sell(address(col), id, 0);
+        assertEq(paid, FLOOR * 6_000 / 10_000);
+        assertEq(col.ownerOf(id), address(market));
+        assertEq(market.saleOf(address(col)).reserve, 0);
+    }
+
+    function test_reserveFactoryCannotBeUpgradedAndExitCannotBeReconfigured() public {
+        assertEq(factory.owner(), address(0));
+        address implementation = factory.implementation();
+        UpgradeableBeacon beacon = factory.beacon();
+        vm.startPrank(creator);
+        vm.expectRevert();
+        factory.upgradeImplementation(address(legacyCol));
+        vm.expectRevert();
+        beacon.upgradeTo(address(legacyCol));
+        vm.expectRevert(AgentCollectionImpl.NotCreator.selector);
+        col.setCurveMarketOnce(creator);
+        vm.stopPrank();
+        assertEq(factory.implementation(), implementation);
+        assertEq(col.curveMarket(), address(market));
+    }
+
+    function test_upgradeableCollectionsCannotPromiseReserveRedemption() public {
+        vm.prank(creator);
+        vm.expectRevert(AgentCurveMarket.ImmutableReserveCollectionRequired.selector);
+        market.configure(address(legacyCol), _curve(CurveMath.Kind.Linear), address(usdc), 6_000);
+        vm.prank(creator);
+        market.configure(address(legacyCol), _curve(CurveMath.Kind.Linear), address(usdc), 0);
+    }
+
+    function test_nonVetoableExitStillRequiresNFTApproval() public {
+        _open(CurveMath.Kind.Linear, address(usdc), 6_000, 3);
+        vm.startPrank(alice);
+        (uint256 id, ) = market.buy(address(col), FLOOR);
+        col.setApprovalForAll(address(market), false);
+        vm.expectRevert();
         market.sell(address(col), id, 0);
+        vm.stopPrank();
         assertEq(col.ownerOf(id), alice);
         assertTrue(market.outFromHere(address(col), id));
-        assertEq(market.saleOf(address(col)).reserve, reserve);
-        assertEq(market.saleOf(address(col)).sold, 1);
-        vm.prank(creator);
-        col.setCollectionHook(address(0));
-        vm.prank(alice);
-        market.sell(address(col), id, 0);
-        assertEq(market.saleOf(address(col)).reserve, 0);
+        assertEq(market.saleOf(address(col)).reserve, FLOOR * 6_000 / 10_000);
     }
 
     function test_rejectingPayeeCannotBlockOtherWithdrawals() public {
@@ -593,31 +683,43 @@ contract AgentCurveMarketForkTest is Test {
         (, address collection) = factory.createCollection("Fork curve", "FORK", 10, 500, 500, "");
         AgentCollectionImpl c = AgentCollectionImpl(collection);
         uint256 originalId = c.registerAgent("Original", "ipfs://original");
-        uint256 replacementId = c.registerAgent("Replacement", "ipfs://replacement");
         vm.stopPrank();
-        AgentCurveMarket replacement = new AgentCurveMarket(0x036CbD53842c5426634e7929541eC2318f3dCF7e, collection);
+        AgentCollectionImpl implementation = new AgentCollectionImpl();
+        AgentCurveMarket replacement = new AgentCurveMarket(0x036CbD53842c5426634e7929541eC2318f3dCF7e, collection, address(implementation), address(deployed));
+        AgentCollectionFactory fixedFactory = AgentCollectionFactory(replacement.collectionFactory());
+        vm.startPrank(creator);
+        (, address fixedCollection) = fixedFactory.createCollection("Fixed curve", "FIX", 10, 500, 500, "");
+        AgentCollectionImpl fixedToken = AgentCollectionImpl(fixedCollection);
+        uint256 replacementId = fixedToken.registerAgent("Replacement", "ipfs://replacement");
+        vm.stopPrank();
         CurveMath.Curve memory curve = CurveMath.Curve({kind: CurveMath.Kind.Linear, floor: 100, ceiling: 200, length: 2, a: 0, b: 0});
         uint256[] memory ids = new uint256[](1);
         for (uint256 i; i < 2; ++i) {
             AgentCurveMarket m = i == 0 ? deployed : replacement;
+            AgentCollectionImpl token = i == 0 ? c : fixedToken;
+            address nft = address(token);
             ids[0] = i == 0 ? originalId : replacementId;
             vm.startPrank(creator);
-            c.setApprovalForAll(address(m), true);
-            m.configure(collection, curve, address(0), 6_000);
-            m.stock(collection, ids);
+            token.setApprovalForAll(address(m), true);
+            m.configure(nft, curve, address(0), 6_000);
+            m.stock(nft, ids);
             vm.stopPrank();
             vm.startPrank(buyer);
-            c.setApprovalForAll(address(m), true);
-            m.buy{value: 100}(collection, 100);
-            c.transferFrom(buyer, creator, ids[0]);
+            token.setApprovalForAll(address(m), true);
+            m.buy{value: 100}(nft, 100);
+            token.transferFrom(buyer, creator, ids[0]);
             vm.stopPrank();
             vm.startPrank(creator);
             if (i == 0) {
-                m.stock(collection, ids);
+                replacement.configure(nft, curve, address(0), 0);
+                token.setApprovalForAll(address(replacement), true);
+                vm.expectRevert(AgentCurveMarket.LegacyClaimOutstanding.selector);
+                replacement.stock(nft, ids);
+                m.stock(nft, ids);
             } else {
                 vm.expectRevert(AgentCurveMarket.AlreadyOutstanding.selector);
-                m.stock(collection, ids);
-                m.sell(collection, ids[0], 60);
+                m.stock(nft, ids);
+                m.sell(nft, ids[0], 60);
             }
             vm.stopPrank();
         }
@@ -628,9 +730,11 @@ contract AgentCurveMarketForkTest is Test {
         assertEq(deployed.saleOf(collection).sold, 1);
         assertEq(deployed.saleOf(collection).reserve, 60);
         assertFalse(deployed.outFromHere(collection, originalId));
-        assertEq(replacement.saleOf(collection).sold, 0);
-        assertEq(replacement.saleOf(collection).reserve, 0);
-        assertEq(replacement.collectionFactory(), address(factory));
+        assertEq(replacement.saleOf(fixedCollection).sold, 0);
+        assertEq(replacement.saleOf(fixedCollection).reserve, 0);
+        assertEq(replacement.legacyCollectionFactory(), address(factory));
+        assertEq(fixedFactory.owner(), address(0));
+        assertEq(fixedToken.curveMarket(), address(replacement));
     }
 }
 
@@ -647,11 +751,13 @@ contract AgentCurveMarketInvariant is Test {
         AgentCollectionImpl impl = new AgentCollectionImpl();
         AgentCollectionFactory factory = new AgentCollectionFactory(address(impl), protocol);
         vm.prank(creator);
+        (, address sample) = factory.createCollection("Reference", "REF", 0, 500, 500, "");
+        usdc = new ERC20Mock();
+        market = new AgentCurveMarket(address(usdc), sample, address(impl), address(0));
+        factory = AgentCollectionFactory(market.collectionFactory());
+        vm.startPrank(creator);
         (, address addr) = factory.createCollection("Inv", "INV", 0, 500, 500, "");
         col = AgentCollectionImpl(addr);
-        usdc = new ERC20Mock();
-        market = new AgentCurveMarket(address(usdc), addr);
-        vm.startPrank(creator);
         market.configure(addr, CurveMath.Curve({kind: CurveMath.Kind.Smootherstep, floor: 1e6, ceiling: 97e6, length: 40, a: 0, b: 0}), address(usdc), 7_300);
         uint256[] memory ids = new uint256[](30);
         for (uint256 i; i < 30; ++i) ids[i] = col.registerAgent("I", "ipfs://i");

@@ -98,6 +98,12 @@ contract BytecodeSizeAudit is Test {
         }
     }
 
+    function test_AgentCurveMarket_underCeilings() public {
+        _check("AgentCurveMarket.sol:AgentCurveMarket", EIP170_CEILING);
+        assertLe(vm.getCode("AgentCurveMarket.sol:AgentCurveMarket").length + 128, 49_152, "market initcode exceeds EIP-3860");
+        _check("AgentCollectionFactory.sol:AgentReserveCollectionFactory", EIP170_CEILING);
+    }
+
     function test_AgentRoyaltySplitter_underCeiling() public {
         _check("AgentRoyaltySplitter.sol:AgentRoyaltySplitter", EIP170_CEILING);
     }

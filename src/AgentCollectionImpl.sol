@@ -935,10 +935,14 @@ contract AgentCollectionImpl is
      *         lock) stays with collectionCreator.
      */
     function setRoyaltyReceiverOnce(address receiver_) external {
-        if (msg.sender != factory) revert NotCreator();
-        if (receiver_ == address(0)) revert InvalidAddress();
-        if (royaltyReceiver != address(0)) revert AlreadySet();
+        _checkFactoryAssignment(royaltyReceiver, receiver_);
         royaltyReceiver = receiver_;
+    }
+
+    function _checkFactoryAssignment(address current, address next) private view {
+        if (msg.sender != factory) revert NotCreator();
+        if (next == address(0)) revert InvalidAddress();
+        if (current != address(0)) revert AlreadySet();
     }
 
     function _financialRecipient() internal view returns (address) {
@@ -1163,8 +1167,10 @@ contract AgentCollectionImpl is
         // Resolve the hook once, before ownership moves: the same hook sees
         // both sides of a transfer, even when the sale ends the override.
         address currentOwner = _ownerOf(tokenId);
+        bool runTransferHooks = currentOwner != address(0) && to != address(0)
+            && !(msg.sender == curveMarket && (currentOwner == curveMarket || to == curveMarket));
         (address hook, uint256 perms) = activeHookFor(tokenId);
-        if (currentOwner != address(0) && to != address(0)) {
+        if (runTransferHooks) {
             address ch = collectionHook;
             if (ch != address(0) && ch != hook) _callBeforeTransfer(ch, hookPermissions[ch], tokenId, currentOwner, to);
             _callBeforeTransfer(hook, perms, tokenId, currentOwner, to);
@@ -1187,7 +1193,7 @@ contract AgentCollectionImpl is
             ownerAgents[to].push(tokenId);
         }
 
-        if (from != address(0) && to != address(0)) {
+        if (runTransferHooks) {
             _callAfterTransfer(hook, perms, tokenId, from, to);
         }
 
@@ -1300,4 +1306,10 @@ contract AgentCollectionImpl is
     mapping(uint256 => MetadataMode) public metadataMode;
     /// @notice Who set each token's hook override (see activeHookFor).
     mapping(uint256 => address) public hookSetter;
+    address public curveMarket;
+
+    function setCurveMarketOnce(address market) external {
+        _checkFactoryAssignment(curveMarket, market);
+        curveMarket = market;
+    }
 }

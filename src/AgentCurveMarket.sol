@@ -8,9 +8,11 @@ import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Recei
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {CurveMath} from "./libraries/CurveMath.sol";
 import {VimsProvenance} from "./VimsProvenance.sol";
+import {AgentReserveCollectionFactory} from "./AgentCollectionFactory.sol";
 
 interface ICurveCollection {
     function factory() external view returns (address);
+    function curveMarket() external view returns (address);
     function collectionCreator() external view returns (address);
     function royaltyReceiver() external view returns (address);
     function protocolFeeRecipient() external view returns (address);
@@ -60,6 +62,9 @@ contract AgentCurveMarket is ReentrancyGuard, IERC721Receiver, VimsProvenance {
     /// @notice Runtime code of the factory's collection proxies.
     bytes32 public immutable collectionCodehash;
     address public immutable collectionFactory;
+    bytes32 public immutable legacyCollectionCodehash;
+    address public immutable legacyCollectionFactory;
+    address public immutable previousMarket;
     address public immutable usdc;
 
     mapping(address => Sale) internal _sales;
@@ -95,13 +100,28 @@ contract AgentCurveMarket is ReentrancyGuard, IERC721Receiver, VimsProvenance {
     error Unsolicited();
     error NothingToWithdraw();
     error TransferFailed();
+    error ImmutableReserveCollectionRequired();
+    error LegacyClaimOutstanding();
+    error InvalidPreviousMarket();
+    error TermsChanged();
 
-    constructor(address usdc_, address referenceCollection) {
-        if (usdc_.code.length == 0 || referenceCollection.code.length == 0) revert NotACollection();
-        collectionFactory = ICurveCollection(referenceCollection).factory();
-        if (collectionFactory.code.length == 0) revert NotACollection();
+    constructor(address usdc_, address referenceCollection, address reserveImplementation, address previousMarket_) {
+        if (usdc_.code.length == 0 || referenceCollection.code.length == 0 || reserveImplementation.code.length == 0) revert NotACollection();
+        legacyCollectionFactory = ICurveCollection(referenceCollection).factory();
+        if (legacyCollectionFactory.code.length == 0) revert NotACollection();
+        legacyCollectionCodehash = referenceCollection.codehash;
+        if (previousMarket_ != address(0)) {
+            if (previousMarket_.code.length == 0 || AgentCurveMarket(previousMarket_).usdc() != usdc_
+                || AgentCurveMarket(previousMarket_).collectionCodehash() != legacyCollectionCodehash) revert InvalidPreviousMarket();
+        }
+        previousMarket = previousMarket_;
         usdc = usdc_;
-        collectionCodehash = referenceCollection.codehash;
+        AgentReserveCollectionFactory reserveFactory = new AgentReserveCollectionFactory(
+            reserveImplementation, ICurveCollection(referenceCollection).protocolFeeRecipient(), address(this)
+        );
+        collectionFactory = address(reserveFactory);
+        (, address sample) = reserveFactory.createCollection("Reserve reference", "REF", 1, 0, 0, "Immutable reserve collection reference");
+        collectionCodehash = sample.codehash;
     }
 
     // ── creator ───────────────────────────────────────────────────────────
@@ -113,6 +133,9 @@ contract AgentCurveMarket is ReentrancyGuard, IERC721Receiver, VimsProvenance {
         if (s.started) revert TermsLocked();
         if (currency != address(0) && currency != usdc) revert UnsupportedCurrency();
         if (reserveBps > 10_000) revert ReserveTooHigh();
+        if (reserveBps != 0 && (!isReserveCollection(collection) || ICurveCollection(collection).curveMarket() != address(this))) {
+            revert ImmutableReserveCollectionRequired();
+        }
         CurveMath.validate(curve);
         s.curve = curve;
         s.currency = currency;
@@ -124,9 +147,11 @@ contract AgentCurveMarket is ReentrancyGuard, IERC721Receiver, VimsProvenance {
     /// @notice Hand agents over for sale (each approved to this market).
     function stock(address collection, uint256[] calldata tokenIds) external nonReentrant {
         _onlyCreator(collection);
+        bool legacyReserve = previousMarket != address(0) && AgentCurveMarket(previousMarket).saleOf(collection).reserveBps != 0;
         _stocking = collection;
         for (uint256 i; i < tokenIds.length; ++i) {
             if (outFromHere[collection][tokenIds[i]]) revert AlreadyOutstanding();
+            if (legacyReserve && AgentCurveMarket(previousMarket).outFromHere(collection, tokenIds[i])) revert LegacyClaimOutstanding();
             IERC721(collection).safeTransferFrom(msg.sender, address(this), tokenIds[i]);
             _stock[collection].push(tokenIds[i]);
             emit Stocked(collection, tokenIds[i]);
@@ -151,6 +176,15 @@ contract AgentCurveMarket is ReentrancyGuard, IERC721Receiver, VimsProvenance {
     /// @notice Buy the next agent at no more than `maxPrice`. ETH: send at
     ///         least the price (the rest comes back); USDC: approve it.
     function buy(address collection, uint256 maxPrice) external payable nonReentrant returns (uint256 tokenId, uint256 price) {
+        return _buy(collection, maxPrice);
+    }
+
+    function buyWithTerms(address collection, uint256 maxPrice, bytes32 expectedTerms) external payable nonReentrant returns (uint256 tokenId, uint256 price) {
+        if (termsHash(collection) != expectedTerms) revert TermsChanged();
+        return _buy(collection, maxPrice);
+    }
+
+    function _buy(address collection, uint256 maxPrice) private returns (uint256 tokenId, uint256 price) {
         Sale storage s = _sales[collection];
         if (!s.configured) revert NotConfigured();
         uint256[] storage st = _stock[collection];
@@ -218,6 +252,16 @@ contract AgentCurveMarket is ReentrancyGuard, IERC721Receiver, VimsProvenance {
         return _sales[collection];
     }
 
+    function termsHash(address collection) public view returns (bytes32) {
+        Sale storage s = _sales[collection];
+        if (!s.configured) revert NotConfigured();
+        return keccak256(abi.encode(block.chainid, address(this), collection, s.curve, s.currency, s.reserveBps));
+    }
+
+    function isReserveCollection(address collection) public view returns (bool) {
+        return collection.codehash == collectionCodehash && ICurveCollection(collection).factory() == collectionFactory;
+    }
+
     function stockOf(address collection) external view returns (uint256) {
         return _stock[collection].length;
     }
@@ -251,7 +295,8 @@ contract AgentCurveMarket is ReentrancyGuard, IERC721Receiver, VimsProvenance {
     // ── internal ─────────────────────────────────────────────────────────
 
     function _onlyCreator(address collection) internal view {
-        if (collection.codehash != collectionCodehash || ICurveCollection(collection).factory() != collectionFactory) revert NotACollection();
+        if (!isReserveCollection(collection) && (collection.codehash != legacyCollectionCodehash
+            || ICurveCollection(collection).factory() != legacyCollectionFactory)) revert NotACollection();
         if (ICurveCollection(collection).collectionCreator() != msg.sender) revert NotCreator();
     }
 
