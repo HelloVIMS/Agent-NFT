@@ -10,6 +10,7 @@ import {CurveMath} from "./libraries/CurveMath.sol";
 import {VimsProvenance} from "./VimsProvenance.sol";
 
 interface ICurveCollection {
+    function factory() external view returns (address);
     function collectionCreator() external view returns (address);
     function royaltyReceiver() external view returns (address);
     function protocolFeeRecipient() external view returns (address);
@@ -58,6 +59,7 @@ contract AgentCurveMarket is ReentrancyGuard, IERC721Receiver, VimsProvenance {
 
     /// @notice Runtime code of the factory's collection proxies.
     bytes32 public immutable collectionCodehash;
+    address public immutable collectionFactory;
     address public immutable usdc;
 
     mapping(address => Sale) internal _sales;
@@ -88,13 +90,16 @@ contract AgentCurveMarket is ReentrancyGuard, IERC721Receiver, VimsProvenance {
     error WrongPayment();
     error NoReserve();
     error NotBoughtHere();
+    error AlreadyOutstanding();
     error NotHolder();
     error Unsolicited();
     error NothingToWithdraw();
     error TransferFailed();
 
     constructor(address usdc_, address referenceCollection) {
-        if (usdc_ == address(0) || referenceCollection.code.length == 0) revert NotACollection();
+        if (usdc_.code.length == 0 || referenceCollection.code.length == 0) revert NotACollection();
+        collectionFactory = ICurveCollection(referenceCollection).factory();
+        if (collectionFactory.code.length == 0) revert NotACollection();
         usdc = usdc_;
         collectionCodehash = referenceCollection.codehash;
     }
@@ -102,7 +107,7 @@ contract AgentCurveMarket is ReentrancyGuard, IERC721Receiver, VimsProvenance {
     // ── creator ───────────────────────────────────────────────────────────
 
     /// @notice Set (or, before the first sale, change) a collection's terms.
-    function configure(address collection, CurveMath.Curve calldata curve, address currency, uint16 reserveBps) external {
+    function configure(address collection, CurveMath.Curve calldata curve, address currency, uint16 reserveBps) external nonReentrant {
         _onlyCreator(collection);
         Sale storage s = _sales[collection];
         if (s.started) revert TermsLocked();
@@ -121,6 +126,7 @@ contract AgentCurveMarket is ReentrancyGuard, IERC721Receiver, VimsProvenance {
         _onlyCreator(collection);
         _stocking = collection;
         for (uint256 i; i < tokenIds.length; ++i) {
+            if (outFromHere[collection][tokenIds[i]]) revert AlreadyOutstanding();
             IERC721(collection).safeTransferFrom(msg.sender, address(this), tokenIds[i]);
             _stock[collection].push(tokenIds[i]);
             emit Stocked(collection, tokenIds[i]);
@@ -194,12 +200,16 @@ contract AgentCurveMarket is ReentrancyGuard, IERC721Receiver, VimsProvenance {
     }
 
     /// @notice Withdraw what sales credited to you in `currency` (0: ETH).
-    function withdraw(address currency) external nonReentrant {
-        uint256 amount = credit[currency][msg.sender];
+    function withdraw(address currency) external {
+        withdrawFor(currency, msg.sender);
+    }
+
+    function withdrawFor(address currency, address account) public nonReentrant {
+        uint256 amount = credit[currency][account];
         if (amount == 0) revert NothingToWithdraw();
-        credit[currency][msg.sender] = 0;
-        emit Withdrawn(currency, msg.sender, amount);
-        _pay(currency, msg.sender, amount);
+        credit[currency][account] = 0;
+        emit Withdrawn(currency, account, amount);
+        _pay(currency, account, amount);
     }
 
     // ── reads ───────────────────────────────────────────────────────────
@@ -228,7 +238,9 @@ contract AgentCurveMarket is ReentrancyGuard, IERC721Receiver, VimsProvenance {
 
     /// @notice Price of the agent when `sold` are out, for drawing the curve.
     function priceAt(address collection, uint256 sold) external view returns (uint256) {
-        return CurveMath.priceAt(_sales[collection].curve, sold);
+        Sale storage s = _sales[collection];
+        if (!s.configured) revert NotConfigured();
+        return CurveMath.priceAt(s.curve, sold);
     }
 
     function onERC721Received(address, address, uint256, bytes calldata) external view returns (bytes4) {
@@ -239,7 +251,7 @@ contract AgentCurveMarket is ReentrancyGuard, IERC721Receiver, VimsProvenance {
     // ── internal ─────────────────────────────────────────────────────────
 
     function _onlyCreator(address collection) internal view {
-        if (collection.codehash != collectionCodehash) revert NotACollection();
+        if (collection.codehash != collectionCodehash || ICurveCollection(collection).factory() != collectionFactory) revert NotACollection();
         if (ICurveCollection(collection).collectionCreator() != msg.sender) revert NotCreator();
     }
 

@@ -144,6 +144,34 @@ contract CurveMathTest is Test {
         assertEq(h.priceAt(c, 10_000), 1_010e6, "uncapped");
     }
 
+    function test_cappedTiersSaturateBeforeMultiplicationOverflows() public view {
+        CurveMath.Curve memory c = CurveMath.Curve({kind: CurveMath.Kind.Tiers, floor: 10, ceiling: 100, length: 0, a: 1, b: type(uint96).max});
+        h.validate(c);
+        assertEq(h.priceAt(c, type(uint256).max), 100);
+        c.b = 0;
+        assertEq(h.priceAt(c, type(uint256).max), 10);
+    }
+
+    function testFuzz_shapedEndpointsAtMaximumPrices(uint8 kind, uint32 length, uint16 a, uint96 m) public view {
+        CurveMath.Curve memory c = CurveMath.Curve({kind: CurveMath.Kind(bound(kind, 0, 6)), floor: 0, ceiling: type(uint96).max,
+            length: uint32(bound(length, 2, CurveMath.MAX_LENGTH)), a: 0, b: 0});
+        if (c.kind == CurveMath.Kind.Power) c.a = uint16(bound(a, 2, 4));
+        if (c.kind == CurveMath.Kind.AdjustableS) {
+            c.a = uint16(bound(a, 2, 8));
+            c.b = uint96(bound(m, WAD / 20, WAD * 19 / 20));
+        }
+        h.validate(c);
+        uint256 previous;
+        uint256 start = c.length > 10 ? c.length - 10 : 0;
+        for (uint256 i = start; i < c.length; ++i) {
+            uint256 price = h.priceAt(c, i);
+            assertGe(price, previous);
+            assertLe(price, c.ceiling);
+            previous = price;
+        }
+        assertEq(previous, c.ceiling);
+    }
+
     function test_invalidCurvesAreRefused() public {
         CurveMath.Curve memory c = _c(CurveMath.Kind.Linear, 0, 0);
         c.length = 1;

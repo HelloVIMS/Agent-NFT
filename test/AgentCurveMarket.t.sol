@@ -8,6 +8,7 @@ import "../src/AgentCollectionImpl.sol";
 import "../src/AgentCollectionFactory.sol";
 import {AgentCurveMarket} from "../src/AgentCurveMarket.sol";
 import {CurveMath} from "../src/libraries/CurveMath.sol";
+import {SoulboundHook as CurveSoulboundHook} from "../src/hooks/SoulboundHook.sol";
 
 contract FakeCreatorOnly {
     address public collectionCreator;
@@ -279,6 +280,222 @@ contract AgentCurveMarketTest is Test, IERC721Receiver {
         col.safeTransferFrom(creator, address(market), id);
     }
 
+    function test_restockingAnOutstandingAgentCannotCreatePhantomSupply() public {
+        _open(CurveMath.Kind.Linear, address(usdc), 6_000, 2);
+        vm.prank(alice);
+        (uint256 id, ) = market.buy(address(col), FLOOR);
+        vm.prank(alice);
+        col.transferFrom(alice, creator, id);
+        uint256[] memory ids = new uint256[](1);
+        ids[0] = id;
+        vm.prank(creator);
+        vm.expectRevert();
+        market.stock(address(col), ids);
+        assertEq(col.ownerOf(id), creator);
+        assertEq(market.saleOf(address(col)).sold, 1);
+        vm.prank(creator);
+        market.sell(address(col), id, 0);
+        assertEq(market.saleOf(address(col)).sold, 0);
+        assertEq(market.saleOf(address(col)).reserve, 0);
+    }
+
+    function test_identicalProxyCodeDoesNotProveFactoryMembership() public {
+        bytes memory initData = abi.encodeCall(AgentCollectionImpl.initialize, (
+            "Imitation", "COPY", 0, 500, 500, alice, "", protocol, 200, 50
+        ));
+        BeaconProxy copy = new BeaconProxy(address(factory.beacon()), initData);
+        assertEq(address(copy).codehash, address(col).codehash);
+        vm.prank(alice);
+        vm.expectRevert(AgentCurveMarket.NotACollection.selector);
+        market.configure(address(copy), _curve(CurveMath.Kind.Linear), address(usdc), 6_000);
+    }
+
+    function test_splitterCanCollectCreditsWithoutImpersonation() public {
+        address[] memory payees = new address[](2);
+        payees[0] = alice;
+        payees[1] = bob;
+        uint256[] memory shares = new uint256[](2);
+        shares[0] = 7_000;
+        shares[1] = 3_000;
+        vm.startPrank(creator);
+        (, address other, address splitter) = factory.createCollectionWithSplits("Split", "SPL", 10, 500, 500, "", payees, shares);
+        AgentCollectionImpl c = AgentCollectionImpl(other);
+        uint256[] memory ids = new uint256[](1);
+        ids[0] = c.registerAgent("Split agent", "ipfs://split");
+        c.setApprovalForAll(address(market), true);
+        market.configure(other, _curve(CurveMath.Kind.Linear), address(usdc), 6_000);
+        market.stock(other, ids);
+        vm.stopPrank();
+        vm.prank(alice);
+        market.buy(other, FLOOR);
+        uint256 owed = market.credit(address(usdc), splitter);
+        assertGt(owed, 0);
+        uint256 before = usdc.balanceOf(address(this));
+        (bool ok, ) = address(market).call(abi.encodeWithSignature("withdrawFor(address,address)", address(usdc), splitter));
+        assertTrue(ok, "a contract payee must not need to initiate a transaction");
+        assertEq(usdc.balanceOf(address(this)), before, "caller cannot redirect proceeds");
+        assertEq(usdc.balanceOf(splitter), owed);
+        assertEq(market.credit(address(usdc), splitter), 0);
+        uint256 a0 = usdc.balanceOf(alice);
+        uint256 b0 = usdc.balanceOf(bob);
+        AgentRoyaltySplitter(payable(splitter)).releaseAll(usdc);
+        assertEq(usdc.balanceOf(alice) - a0, owed * 7_000 / 10_000);
+        assertEq(usdc.balanceOf(bob) - b0, owed * 3_000 / 10_000);
+    }
+
+    function test_unknownCollectionPriceHasAnExplicitError() public {
+        vm.expectRevert(AgentCurveMarket.NotConfigured.selector);
+        market.priceAt(address(0xBAD), 0);
+    }
+
+    function test_duplicateStockBatchRollsBackCompletely() public {
+        uint256[] memory ids = new uint256[](2);
+        ids[0] = 1;
+        ids[1] = 1;
+        vm.prank(creator);
+        vm.expectRevert();
+        market.stock(address(col), ids);
+        assertEq(market.stockOf(address(col)), 0);
+        assertEq(col.ownerOf(1), creator);
+    }
+
+    function test_transferOfOutstandingAgentMovesItsRedemptionRight() public {
+        _open(CurveMath.Kind.Linear, address(usdc), 6_000, 2);
+        vm.prank(alice);
+        (uint256 id, ) = market.buy(address(col), FLOOR);
+        vm.prank(alice);
+        col.transferFrom(alice, bob, id);
+        vm.prank(alice);
+        vm.expectRevert(AgentCurveMarket.NotHolder.selector);
+        market.sell(address(col), id, 0);
+        uint256 before = usdc.balanceOf(bob);
+        vm.prank(bob);
+        market.sell(address(col), id, 0);
+        assertEq(usdc.balanceOf(bob) - before, FLOOR * 6_000 / 10_000);
+        assertEq(market.saleOf(address(col)).reserve, 0);
+    }
+
+    function test_transferHookFailureRollsBackPaymentAndStock() public {
+        _open(CurveMath.Kind.Linear, address(usdc), 6_000, 3);
+        CurveSoulboundHook lock = new CurveSoulboundHook(0);
+        vm.prank(creator);
+        col.setCollectionHook(address(lock));
+        uint256 balance = usdc.balanceOf(alice);
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(CurveSoulboundHook.TransferLocked.selector, 0));
+        market.buy(address(col), FLOOR);
+        assertEq(usdc.balanceOf(alice), balance);
+        assertEq(usdc.balanceOf(address(market)), 0);
+        assertEq(market.stockOf(address(col)), 3);
+        assertEq(market.saleOf(address(col)).sold, 0);
+        assertFalse(market.saleOf(address(col)).started);
+        assertFalse(market.outFromHere(address(col), 3));
+        vm.prank(creator);
+        col.setCollectionHook(address(0));
+        vm.prank(alice);
+        market.buy(address(col), FLOOR);
+    }
+
+    function test_redemptionBlockedByHookPreservesTheClaimAndReserve() public {
+        _open(CurveMath.Kind.Linear, address(usdc), 6_000, 3);
+        vm.prank(alice);
+        (uint256 id, ) = market.buy(address(col), FLOOR);
+        CurveSoulboundHook lock = new CurveSoulboundHook(0);
+        vm.prank(creator);
+        col.setCollectionHook(address(lock));
+        uint256 reserve = market.saleOf(address(col)).reserve;
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(CurveSoulboundHook.TransferLocked.selector, 0));
+        market.sell(address(col), id, 0);
+        assertEq(col.ownerOf(id), alice);
+        assertTrue(market.outFromHere(address(col), id));
+        assertEq(market.saleOf(address(col)).reserve, reserve);
+        assertEq(market.saleOf(address(col)).sold, 1);
+        vm.prank(creator);
+        col.setCollectionHook(address(0));
+        vm.prank(alice);
+        market.sell(address(col), id, 0);
+        assertEq(market.saleOf(address(col)).reserve, 0);
+    }
+
+    function test_rejectingPayeeCannotBlockOtherWithdrawals() public {
+        _open(CurveMath.Kind.Linear, address(0), 6_000, 3);
+        vm.prank(alice);
+        market.buy{value: FLOOR}(address(col), FLOOR);
+        uint256 owed = market.credit(address(0), protocol);
+        vm.etch(protocol, hex"60006000fd");
+        vm.expectRevert(AgentCurveMarket.TransferFailed.selector);
+        market.withdrawFor(address(0), protocol);
+        assertEq(market.credit(address(0), protocol), owed);
+        uint256 creatorOwed = market.credit(address(0), creator);
+        uint256 before = creator.balance;
+        market.withdrawFor(address(0), creator);
+        assertEq(creator.balance - before, creatorOwed);
+        assertEq(address(market).balance, market.saleOf(address(col)).reserve + owed);
+    }
+
+    function test_multipleCollectionsAndCurrenciesKeepLiabilitiesSeparate() public {
+        _open(CurveMath.Kind.Linear, address(usdc), 6_000, 3);
+        vm.startPrank(creator);
+        (, address other) = factory.createCollection("Native", "NAT", 10, 500, 500, "");
+        AgentCollectionImpl c = AgentCollectionImpl(other);
+        uint256[] memory ids = new uint256[](1);
+        ids[0] = c.registerAgent("Native agent", "ipfs://native");
+        c.setApprovalForAll(address(market), true);
+        market.configure(other, _curve(CurveMath.Kind.Linear), address(0), 10_000);
+        market.stock(other, ids);
+        vm.stopPrank();
+        vm.prank(alice);
+        (uint256 id, ) = market.buy(address(col), FLOOR);
+        vm.prank(bob);
+        market.buy{value: FLOOR}(other, FLOOR);
+        market.withdrawFor(address(usdc), creator);
+        market.withdrawFor(address(usdc), protocol);
+        vm.prank(alice);
+        market.sell(address(col), id, 0);
+        assertEq(usdc.balanceOf(address(market)), 0);
+        assertEq(address(market).balance, FLOOR);
+        assertEq(market.saleOf(other).reserve, FLOOR);
+        vm.startPrank(bob);
+        c.approve(address(market), ids[0]);
+        market.sell(other, ids[0], FLOOR);
+        vm.stopPrank();
+        assertEq(address(market).balance, 0);
+    }
+
+    function testFuzz_allCurvesRoundTripWithoutLeakingReserve(uint8 kind, uint16 reserveBps, uint8 count) public {
+        CurveMath.Curve memory c = _curve(CurveMath.Kind(bound(kind, 0, 8)));
+        c.a = c.kind == CurveMath.Kind.Tiers ? 2 : 4;
+        c.b = c.kind == CurveMath.Kind.AdjustableS ? 0.5e18 : c.kind == CurveMath.Kind.Exponential ? 0.1e18 : c.kind == CurveMath.Kind.Tiers ? 11 : 0;
+        c.floor = 13;
+        c.ceiling = 199;
+        reserveBps = uint16(bound(reserveBps, 1, 10_000));
+        count = uint8(bound(count, 1, 20));
+        vm.startPrank(creator);
+        market.configure(address(col), c, address(usdc), reserveBps);
+        uint256[] memory ids = new uint256[](count);
+        for (uint256 i; i < count; ++i) ids[i] = i + 1;
+        market.stock(address(col), ids);
+        vm.stopPrank();
+        uint256 expected;
+        for (uint256 i; i < count; ++i) {
+            vm.prank(alice);
+            (ids[i], ) = market.buy(address(col), type(uint256).max);
+            expected += CurveMath.priceAt(c, i) * reserveBps / 10_000;
+        }
+        assertEq(market.saleOf(address(col)).reserve, expected);
+        for (uint256 i; i < count; ++i) {
+            uint256 owed = market.credit(address(usdc), creator);
+            if (owed > 0) market.withdrawFor(address(usdc), creator);
+            vm.prank(alice);
+            market.sell(address(col), ids[i], 0);
+        }
+        assertEq(market.saleOf(address(col)).reserve, 0);
+        assertEq(market.saleOf(address(col)).sold, 0);
+        assertEq(market.stockOf(address(col)), count);
+        assertEq(usdc.balanceOf(address(market)), market.credit(address(usdc), protocol));
+    }
+
     function test_termsCanBeReadAndQuoted() public {
         _open(CurveMath.Kind.Power, address(usdc), 0, 5);
         uint256 three = market.quoteBuy(address(col), 3);
@@ -322,6 +539,39 @@ contract CurveMarketHandler is Test {
         holderOf[k] = holderOf[holderOf.length - 1];
         held.pop();
         holderOf.pop();
+    }
+
+    function transfer(uint256 which, uint256 who) external {
+        if (held.length == 0) return;
+        uint256 k = which % held.length;
+        address to = who % (actors.length + 1) == actors.length
+            ? AgentCollectionImpl(c).collectionCreator() : actors[who % actors.length];
+        vm.prank(holderOf[k]);
+        AgentCollectionImpl(c).transferFrom(holderOf[k], to, held[k]);
+        holderOf[k] = to;
+    }
+
+    function unstock(uint256 n) external {
+        address creator = AgentCollectionImpl(c).collectionCreator();
+        vm.prank(creator);
+        m.unstock(c, n % 5);
+    }
+
+    function stock(uint256 which) external {
+        address creator = AgentCollectionImpl(c).collectionCreator();
+        uint256[] memory ids = AgentCollectionImpl(c).getAgentsByOwner(creator);
+        if (ids.length == 0) return;
+        uint256 id = ids[which % ids.length];
+        if (m.outFromHere(c, id)) return;
+        uint256[] memory batch = new uint256[](1);
+        batch[0] = id;
+        vm.prank(creator);
+        m.stock(c, batch);
+    }
+
+    function withdraw(uint256 who) external {
+        address payee = who % 2 == 0 ? AgentCollectionImpl(c).collectionCreator() : AgentCollectionImpl(c).protocolFeeRecipient();
+        if (m.credit(address(usdc), payee) != 0) m.withdrawFor(address(usdc), payee);
     }
 
     function heldCount() external view returns (uint256) {

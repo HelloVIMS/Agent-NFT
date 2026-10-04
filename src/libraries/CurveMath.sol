@@ -74,8 +74,9 @@ library CurveMath {
     function priceAt(Curve memory c, uint256 sold) internal pure returns (uint256) {
         if (c.kind == Kind.Exponential) return _exponential(c, sold);
         if (c.kind == Kind.Tiers) {
-            uint256 p = uint256(c.floor) + (sold / c.a) * uint256(c.b);
-            return c.ceiling != 0 && p > c.ceiling ? c.ceiling : p;
+            uint256 steps = sold / c.a;
+            if (c.ceiling != 0 && c.b != 0 && steps > (uint256(c.ceiling) - c.floor) / c.b) return c.ceiling;
+            return uint256(c.floor) + steps * uint256(c.b);
         }
         uint256 last = uint256(c.length) - 1;
         uint256 x = sold >= last ? WAD : (sold * WAD) / last;
