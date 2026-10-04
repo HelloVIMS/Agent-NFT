@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-04T06:03:08.657Z",
+  "generatedAt": "2026-10-04T18:42:57.452Z",
   "generator": "agent-nft/scripts/export-abi.mjs",
   "contracts": [
     {
@@ -147,22 +147,31 @@
       "entries": 36
     },
     {
+      "contract": "AgentReserveCollectionFactory",
+      "namespace": null,
+      "src": "src/AgentReserveCollectionFactory.sol",
+      "abi": "AgentReserveCollectionFactory.json",
+      "sha256": "8f6afa4866acb3b33aef939dcf8a098c8243395dfe468a0b38a4b8089babad27",
+      "bytes": 11212,
+      "entries": 37
+    },
+    {
       "contract": "AgentCurveMarket",
       "namespace": null,
       "src": "src/AgentCurveMarket.sol",
       "abi": "AgentCurveMarket.json",
-      "sha256": "d54c8821be674f7a6f5c529bab24cc6ea4f92291b8ab69d139d55f7c9c9f0176",
-      "bytes": 14084,
-      "entries": 52
+      "sha256": "314e0a4d4b1eb8c7dc670705d6c5103c340943c10cb88c785977f29657891051",
+      "bytes": 16798,
+      "entries": 65
     },
     {
       "contract": "AgentCollectionImpl",
       "namespace": null,
       "src": "src/AgentCollectionImpl.sol",
       "abi": "AgentCollectionImpl.json",
-      "sha256": "1c504d727cff138de9d0bfb9cc20726526d9ef38615b362d4bd1352d33f8081b",
-      "bytes": 50845,
-      "entries": 183
+      "sha256": "cc226cbf80caa4f2f7cfdf26472e7f985dbf727f8ebfbdde483d4170ab77fff2",
+      "bytes": 51252,
+      "entries": 185
     },
     {
       "contract": "AgentAccount",

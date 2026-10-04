@@ -16,6 +16,7 @@ export { default as AgentRoyaltyVault_ABI } from './AgentRoyaltyVault';
 export { default as AgentRoyaltySplitter_ABI } from './AgentRoyaltySplitter';
 export { default as AgentRoyaltySplitterFactory_ABI } from './AgentRoyaltySplitterFactory';
 export { default as AgentCollectionFactory_ABI } from './AgentCollectionFactory';
+export { default as AgentReserveCollectionFactory_ABI } from './AgentReserveCollectionFactory';
 export { default as AgentCurveMarket_ABI } from './AgentCurveMarket';
 export { default as AgentCollectionImpl_ABI } from './AgentCollectionImpl';
 export { default as AgentAccount_ABI } from './AgentAccount';

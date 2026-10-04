@@ -13,6 +13,14 @@ const abi = [
       {
         "name": "referenceCollection",
         "type": "address"
+      },
+      {
+        "name": "reserveImplementation",
+        "type": "address"
+      },
+      {
+        "name": "previousMarket_",
+        "type": "address"
       }
     ],
     "stateMutability": "nonpayable"
@@ -92,12 +100,53 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "buyWithTerms",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address"
+      },
+      {
+        "name": "maxPrice",
+        "type": "uint256"
+      },
+      {
+        "name": "expectedTerms",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "name": "price",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
     "name": "collectionCodehash",
     "inputs": [],
     "outputs": [
       {
         "name": "",
         "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "collectionFactory",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view"
@@ -175,6 +224,47 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "isReserveCollection",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "legacyCollectionCodehash",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "legacyCollectionFactory",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "onERC721Received",
     "inputs": [
       {
@@ -219,6 +309,18 @@ const abi = [
       {
         "name": "",
         "type": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "previousMarket",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view"
@@ -415,6 +517,23 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "termsHash",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "unstock",
     "inputs": [
       {
@@ -491,6 +610,22 @@ const abi = [
     "inputs": [
       {
         "name": "currency",
+        "type": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "withdrawFor",
+    "inputs": [
+      {
+        "name": "currency",
+        "type": "address"
+      },
+      {
+        "name": "account",
         "type": "address"
       }
     ],
@@ -697,7 +832,17 @@ const abi = [
   },
   {
     "type": "error",
+    "name": "AlreadyOutstanding",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "FailedInnerCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ImmutableReserveCollectionRequired",
     "inputs": []
   },
   {
@@ -709,6 +854,16 @@ const abi = [
         "type": "string"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidPreviousMarket",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "LegacyClaimOutstanding",
+    "inputs": []
   },
   {
     "type": "error",
@@ -801,6 +956,11 @@ const abi = [
   {
     "type": "error",
     "name": "SoldOut",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TermsChanged",
     "inputs": []
   },
   {

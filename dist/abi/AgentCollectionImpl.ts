@@ -538,6 +538,18 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "curveMarket",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "deactivateAgent",
     "inputs": [
       {
@@ -1771,6 +1783,18 @@ const abi = [
     "inputs": [
       {
         "name": "hook",
+        "type": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setCurveMarketOnce",
+    "inputs": [
+      {
+        "name": "market",
         "type": "address"
       }
     ],

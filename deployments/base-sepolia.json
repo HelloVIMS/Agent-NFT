@@ -20,8 +20,9 @@
     "AgentMemory": "0x2eEc7cB85a127D2f2B49EE1957d87797C961a2D1",
     "AgentX402Receiver": "0xd180DC89270Df505F5d4B7B36e83318f330014A7",
     "AgentMarketplace": "0x0A0D33A88d40029995D8fd09b7BB41331586A9ca",
-    "AgentCollectionFactory": "0x6B182188269208533Ed95B7C2b83240f21fA7f12",
-    "AgentRoyaltySplitterFactory": "0x785d63DE8d3EE714A5F550f1FcE2593154B98393",
+    "AgentCollectionFactory": "0x0b150A0F779Bd31a6FCA5Ef51C427D7ae3a6c043",
+    "AgentRoyaltySplitterFactory": "0xE0152438a6B1bACC220A3096c3Bd8B61BB0f9863",
+    "AgentCurveMarket": "0x9B3A239dcb136895623fFEfF5252e0ba84116f8A",
     "AgentAvatarExtension": "0x132A0d33aC8040A81E5a3A865Ca2D5238D2Bdbc1",
     "AgentIdentityKeyExtension": "0xC6d25a28430eFfD9953250f5BDAC5Ab26228E974",
     "AgentServiceStream": "0x412981446A6a4673Ec7E378A3f1E88161D7ee433"
@@ -33,20 +34,31 @@
     "AgentMemory": "0xedDb9b1bD7d065db5EAE4b0dE2DeeDddd57B9649",
     "AgentX402Receiver": "0xb880a889d60380F7F9D96472263eaDc521bD78DD",
     "AgentMarketplace": "0xcc1E532C8148278c56DBBBcb02f23648C06C2950",
-    "AgentCollectionImpl": "0x77BBda14512CfB8DAF345ed576800C2D46bc6323",
+    "AgentCollectionImpl": "0x18f0f54A986eda8Cbfecf3b786c14733fFA7e4bC",
     "AgentAvatarExtension": "0xC6929383104a670FA5fDa0ABa95a874E489527B9",
     "AgentIdentityKeyExtension": "0x12244dE4Dd814ec6242cF0f060D04ABb1037BB26"
   },
   "agentCollectionLibraries": {
-    "AgentCollectionRenderer": "0x167655252e710533083C12e0Ea48c10d1F92f2FA",
+    "AgentCollectionRenderer": "0x970805E84d46079f272fE6E3690eE3d4a714a8e0",
+    "AgentCollectionAtomicLib": "0x12D64538159E042A5389801e6B807755218376eA",
+    "AgentCollectionPixeLib": "0x2022cF06758Ed9cBB9dF9B3e807D823c0B8437fd",
     "AgentCollectionEIP712": "0xc8c233Cea8d2d6EDCce00Bf6744e4aA8d4F5b8C7",
     "AgentCollectionPaymentLib": "0x14c2b4259155CA4179A547064d977c8CA42BeFBe",
     "deployedAt": "2026-05-10T05:15:00Z",
     "notes": "Linked external libraries for AgentCollectionImpl. PaymentLib keeps impl bytecode under EIP-170 once collectionBaseURI was added; EIP712 carries a verifyCommit() entry that consolidates the keeper signature verification block."
   },
   "agentCollectionFactory": {
-    "factory": "0x6B182188269208533Ed95B7C2b83240f21fA7f12",
+    "factory": "0x0b150A0F779Bd31a6FCA5Ef51C427D7ae3a6c043",
+    "immutable": true,
+    "curveMarket": "0x9B3A239dcb136895623fFEfF5252e0ba84116f8A",
     "factoryLegacy": [
+      {
+        "address": "0x6B182188269208533Ed95B7C2b83240f21fA7f12",
+        "replacedAt": "2026-10-04",
+        "beacon": "0xA28E020f8E6258B890e78630C0A5034642f97f2C",
+        "implementation": "0x77BBda14512CfB8DAF345ed576800C2D46bc6323",
+        "notes": "Previous upgradeable factory remains unchanged; new reserve-backed collections use the immutable factory."
+      },
       {
         "address": "0x45F4F9082a6232111F5a9daFe89d23B5bbc3399A",
         "replacedAt": "2026-05-08T19:35:00Z",
@@ -58,8 +70,13 @@
         "notes": "second testnet deploy"
       }
     ],
-    "implementation": "0x77BBda14512CfB8DAF345ed576800C2D46bc6323",
+    "implementation": "0x18f0f54A986eda8Cbfecf3b786c14733fFA7e4bC",
     "implementationLegacy": [
+      {
+        "address": "0x77BBda14512CfB8DAF345ed576800C2D46bc6323",
+        "replacedAt": "2026-10-04",
+        "notes": "Still serves the previous factory; its beacon was not upgraded."
+      },
       {
         "address": "0xE5a34709CCb56acA387A43afb8D008aEA4bBba86",
         "replacedAt": "2026-05-08T19:35:00Z"
@@ -89,9 +106,13 @@
         "notes": "an owner's per-agent hook could lift the collection hook's guards (soulbound)"
       }
     ],
-    "beacon": "0xA28E020f8E6258B890e78630C0A5034642f97f2C",
-    "splitterFactory": "0x785d63DE8d3EE714A5F550f1FcE2593154B98393",
+    "beacon": "0x43Df54be3919A9FF0F3B87a075bb3634CE74294d",
+    "splitterFactory": "0xE0152438a6B1bACC220A3096c3Bd8B61BB0f9863",
     "splitterFactoryLegacy": [
+      {
+        "address": "0x785d63DE8d3EE714A5F550f1FcE2593154B98393",
+        "replacedAt": "2026-10-04"
+      },
       {
         "address": "0xB0194Ca0EB5799293121Be50a0D6e71e717595DF",
         "replacedAt": "2026-05-08T19:35:00Z"
@@ -100,12 +121,14 @@
     "protocolFeeRecipient": "0xE48840eD6678218Bd21dF2671b98bCF23de661b9",
     "protocolPrimaryFeeBps": 200,
     "protocolSecondaryFeeBps": 50,
-    "deployedAt": "2026-05-08T03:30:00Z",
-    "redeployedAt": "2026-05-08T19:35:00Z",
+    "deployedAt": "2026-10-04",
+    "redeployedAt": "2026-10-04",
+    "block": 47685498,
+    "tx": "0xa6dc237aaeacfc82e3cec26bca881a3b25c49768f2dba78e6a09000b8a74b532",
     "patternBUpgradedAt": "2026-05-10T05:15:00Z",
-    "notes": "v0.9.1 testnet beacon-proxy factory + impl. Adds collectionBaseURI + setBaseURI(), so creators can pre-upload shuffled metadata to IPFS and `tokenURI(id)` resolves to `${baseURI}${id}.json` for any token minted via mintAgent('','') / mintAgentAllowlist('','',proof). Bytecode kept under EIP-170 by linking AgentCollectionRenderer, AgentCollectionEIP712 (with verifyCommit consolidating the keeper signature flow), and AgentCollectionPaymentLib (primary-mint payment split). createCollectionWithSplits() keeps msg.sender as collectionCreator (governance: hooks, mint config, allowlist, baseURI, lock) and wires the splitter as royaltyReceiver via setRoyaltyReceiverOnce.",
-    "implementationUpgradedAt": "2026-09-30",
-    "implementationNotes": "script/UpgradeCollectionImpl.s.sol, rehearsed by test/CollectionBeaconUpgradeFork.t.sol against every live collection. A token hook override applies only while its setter owns the token; hook-written art moves a token to on-chain SVG metadata; per-token metadata mode fixed at mint (mintAgentWithSVG for on-chain art)."
+    "notes": "AgentReserveCollectionFactory created by AgentCurveMarket v2. Factory ownership is permanently renounced; its beacon implementation cannot be changed. Creators retain mint settings, metadata, royalty splits and evolution governance. Only custody transfers initiated by the pinned curve market bypass transfer hooks; ERC721 ownership and approvals are still enforced.",
+    "implementationUpgradedAt": "2026-10-04",
+    "implementationNotes": "Fresh immutable factory, not an upgrade of the previous beacon. Runtime size 24520 bytes. Deployment script: script/DeployCurveMarket.s.sol; implementation transaction 0xb28102019ef15a1167a41c0ec5b83cbd1840760987a6dc385ecc3f663cc02730."
   },
   "implementationHistory": {
     "_note": "Pre-mainnet testnet iterations. The current canonical version is v0.9.2; earlier entries are kept for forensic continuity only.",
@@ -268,16 +291,33 @@
   },
   "blocks": {
     "AgentServiceStream": 47575459,
-    "AgentTBARegistry": 47633892
+    "AgentTBARegistry": 47633892,
+    "AgentCollectionFactory": 47685498,
+    "AgentCurveMarket": 47685498
   },
   "curveMarket": {
-    "address": "0x12515d4615DE573536EE3EcdE87bAa64C94d36c9",
+    "version": 2,
+    "address": "0x9B3A239dcb136895623fFEfF5252e0ba84116f8A",
     "deployedAt": "2026-10-04",
-    "tx": "0x1bd0a6fb01aeae7ec990b7d68995207ca31c471604ff7a5561ced6bbd38c9032",
-    "block": 47662583,
+    "tx": "0xa6dc237aaeacfc82e3cec26bca881a3b25c49768f2dba78e6a09000b8a74b532",
+    "block": 47685498,
     "usdc": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
-    "collectionCodehash": "0x08639487ced0157179296636697ef8fcdaf10d5bab7bb32e2368642978305fc7",
+    "collectionFactory": "0x0b150A0F779Bd31a6FCA5Ef51C427D7ae3a6c043",
+    "collectionImplementation": "0x18f0f54A986eda8Cbfecf3b786c14733fFA7e4bC",
+    "collectionCodehash": "0x7affc9bbf81fd40287ad5be6e3003c8dc3b0249cf270e7468a886cf93de64551",
+    "previousMarket": "0x12515d4615DE573536EE3EcdE87bAa64C94d36c9",
+    "legacyCollectionFactory": "0x6B182188269208533Ed95B7C2b83240f21fA7f12",
     "script": "script/DeployCurveMarket.s.sol",
-    "why": "sells a collection's agents along a price curve (CurveMath), ETH or USDC, buy-only or reserve-backed; immutable, no owner"
-  }
+    "why": "Immutable reserve collections prevent hook/upgrade vetoes on market exits. Adds quote commitments, predecessor-claim checks and permissionless payments to recorded payees."
+  },
+  "curveMarketLegacy": [
+    {
+      "address": "0x12515d4615DE573536EE3EcdE87bAa64C94d36c9",
+      "deployedAt": "2026-10-04",
+      "tx": "0x1bd0a6fb01aeae7ec990b7d68995207ca31c471604ff7a5561ced6bbd38c9032",
+      "block": 47662583,
+      "retiredAt": "2026-10-04",
+      "notes": "UI exits only. Existing NFT holdings, reserves and withdrawal credits remain unchanged at this immutable address."
+    }
+  ]
 }
