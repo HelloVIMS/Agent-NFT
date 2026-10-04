@@ -579,6 +579,61 @@ contract CurveMarketHandler is Test {
     }
 }
 
+contract AgentCurveMarketForkTest is Test {
+    function test_liveMarketAndReplacementOnReadOnlyFork() public {
+        string memory endpoint = vm.envOr("BASE_SEPOLIA_RPC", string(""));
+        if (bytes(endpoint).length == 0) { vm.skip(true); return; }
+        vm.createSelectFork(endpoint);
+        AgentCollectionFactory factory = AgentCollectionFactory(0x6B182188269208533Ed95B7C2b83240f21fA7f12);
+        AgentCurveMarket deployed = AgentCurveMarket(0x12515d4615DE573536EE3EcdE87bAa64C94d36c9);
+        address creator = makeAddr("curve-creator");
+        address buyer = makeAddr("curve-buyer");
+        vm.deal(buyer, 1 ether);
+        vm.startPrank(creator);
+        (, address collection) = factory.createCollection("Fork curve", "FORK", 10, 500, 500, "");
+        AgentCollectionImpl c = AgentCollectionImpl(collection);
+        uint256 originalId = c.registerAgent("Original", "ipfs://original");
+        uint256 replacementId = c.registerAgent("Replacement", "ipfs://replacement");
+        vm.stopPrank();
+        AgentCurveMarket replacement = new AgentCurveMarket(0x036CbD53842c5426634e7929541eC2318f3dCF7e, collection);
+        CurveMath.Curve memory curve = CurveMath.Curve({kind: CurveMath.Kind.Linear, floor: 100, ceiling: 200, length: 2, a: 0, b: 0});
+        uint256[] memory ids = new uint256[](1);
+        for (uint256 i; i < 2; ++i) {
+            AgentCurveMarket m = i == 0 ? deployed : replacement;
+            ids[0] = i == 0 ? originalId : replacementId;
+            vm.startPrank(creator);
+            c.setApprovalForAll(address(m), true);
+            m.configure(collection, curve, address(0), 6_000);
+            m.stock(collection, ids);
+            vm.stopPrank();
+            vm.startPrank(buyer);
+            c.setApprovalForAll(address(m), true);
+            m.buy{value: 100}(collection, 100);
+            c.transferFrom(buyer, creator, ids[0]);
+            vm.stopPrank();
+            vm.startPrank(creator);
+            if (i == 0) {
+                m.stock(collection, ids);
+            } else {
+                vm.expectRevert(AgentCurveMarket.AlreadyOutstanding.selector);
+                m.stock(collection, ids);
+                m.sell(collection, ids[0], 60);
+            }
+            vm.stopPrank();
+        }
+        vm.startPrank(buyer);
+        deployed.buy{value: 200}(collection, 200);
+        deployed.sell(collection, originalId, 120);
+        vm.stopPrank();
+        assertEq(deployed.saleOf(collection).sold, 1);
+        assertEq(deployed.saleOf(collection).reserve, 60);
+        assertFalse(deployed.outFromHere(collection, originalId));
+        assertEq(replacement.saleOf(collection).sold, 0);
+        assertEq(replacement.saleOf(collection).reserve, 0);
+        assertEq(replacement.collectionFactory(), address(factory));
+    }
+}
+
 contract AgentCurveMarketInvariant is Test {
     AgentCurveMarket market;
     AgentCollectionImpl col;
