@@ -13,6 +13,7 @@ export { default as AgentServiceStream_ABI } from './AgentServiceStream';
 export { default as AgentMarketplace_ABI } from './AgentMarketplace';
 export { default as AgentAuctionHouse_ABI } from './AgentAuctionHouse';
 export { default as AgentRoyaltyVault_ABI } from './AgentRoyaltyVault';
+export { default as AgentCollectionRoyaltyVault_ABI } from './AgentCollectionRoyaltyVault';
 export { default as AgentRoyaltySplitter_ABI } from './AgentRoyaltySplitter';
 export { default as AgentRoyaltySplitterFactory_ABI } from './AgentRoyaltySplitterFactory';
 export { default as AgentCollectionFactory_ABI } from './AgentCollectionFactory';

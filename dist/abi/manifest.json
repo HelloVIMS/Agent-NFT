@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-04T18:42:57.452Z",
+  "generatedAt": "2026-10-09T03:54:27.966Z",
   "generator": "agent-nft/scripts/export-abi.mjs",
   "contracts": [
     {
@@ -120,6 +120,15 @@
       "entries": 23
     },
     {
+      "contract": "AgentCollectionRoyaltyVault",
+      "namespace": null,
+      "src": "src/AgentCollectionRoyaltyVault.sol",
+      "abi": "AgentCollectionRoyaltyVault.json",
+      "sha256": "bb3118a2c94413f038d493944e512211d31981a05e3a8b4a6f70909f3b71fc45",
+      "bytes": 5640,
+      "entries": 23
+    },
+    {
       "contract": "AgentRoyaltySplitter",
       "namespace": null,
       "src": "src/AgentRoyaltySplitter.sol",
@@ -142,18 +151,18 @@
       "namespace": null,
       "src": "src/AgentCollectionFactory.sol",
       "abi": "AgentCollectionFactory.json",
-      "sha256": "1505d5fa145e4cbc78c340dffc5144ef8eb9c903ebc08a251fcc208d383554a9",
-      "bytes": 10948,
-      "entries": 36
+      "sha256": "4561148369ef4b16e117bfcab725d46f45b4ada39f4e56bf02c86afd95ae8727",
+      "bytes": 12160,
+      "entries": 40
     },
     {
       "contract": "AgentReserveCollectionFactory",
       "namespace": null,
       "src": "src/AgentReserveCollectionFactory.sol",
       "abi": "AgentReserveCollectionFactory.json",
-      "sha256": "8f6afa4866acb3b33aef939dcf8a098c8243395dfe468a0b38a4b8089babad27",
-      "bytes": 11212,
-      "entries": 37
+      "sha256": "a94bcda15635c820fc7e93f27db11520c44ddec3376913f0f7e48a4fc0e2aa4e",
+      "bytes": 12424,
+      "entries": 41
     },
     {
       "contract": "AgentCurveMarket",
@@ -169,9 +178,9 @@
       "namespace": null,
       "src": "src/AgentCollectionImpl.sol",
       "abi": "AgentCollectionImpl.json",
-      "sha256": "cc226cbf80caa4f2f7cfdf26472e7f985dbf727f8ebfbdde483d4170ab77fff2",
-      "bytes": 51252,
-      "entries": 185
+      "sha256": "a0b87822f378417b06180518ac499d411507abd3ffbbd747b9199097026eff85",
+      "bytes": 50384,
+      "entries": 183
     },
     {
       "contract": "AgentAccount",

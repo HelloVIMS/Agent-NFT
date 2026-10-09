@@ -137,6 +137,27 @@ const abi = [
   },
   {
     "type": "function",
+    "name": "collectionRoyaltyVault",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "collections",
     "inputs": [
       {
@@ -286,6 +307,27 @@ const abi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "deployCollectionRoyaltyVault",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address"
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "vault",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -582,6 +624,28 @@ const abi = [
   },
   {
     "type": "event",
+    "name": "CollectionRoyaltyVaultDeployed",
+    "inputs": [
+      {
+        "name": "collection",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": true
+      },
+      {
+        "name": "vault",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "OwnershipTransferred",
     "inputs": [
       {
@@ -610,6 +674,11 @@ const abi = [
   {
     "type": "error",
     "name": "InvalidSymbol",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotFactoryCollection",
     "inputs": []
   },
   {

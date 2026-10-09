@@ -54,6 +54,7 @@ const EXPORTS = [
   'AgentAuctionHouse',
   // ── Royalty + vault ─────────────────────────────────────────────────
   'AgentRoyaltyVault',
+  'AgentCollectionRoyaltyVault',
   'AgentRoyaltySplitter',
   'AgentRoyaltySplitterFactory',
   // ── Collections ─────────────────────────────────────────────────────

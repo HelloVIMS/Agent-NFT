@@ -324,56 +324,6 @@ const abi = [
   },
   {
     "type": "function",
-    "name": "calculateSalesRoyaltySplit",
-    "inputs": [
-      {
-        "name": "agentId",
-        "type": "uint256"
-      },
-      {
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "creatorCut",
-        "type": "uint256"
-      },
-      {
-        "name": "ownerCut",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "calculateServiceRoyaltySplit",
-    "inputs": [
-      {
-        "name": "agentId",
-        "type": "uint256"
-      },
-      {
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "creatorCut",
-        "type": "uint256"
-      },
-      {
-        "name": "ownerCut",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "collectionBaseURI",
     "inputs": [],
     "outputs": [

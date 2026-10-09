@@ -20,9 +20,9 @@
     "AgentMemory": "0x2eEc7cB85a127D2f2B49EE1957d87797C961a2D1",
     "AgentX402Receiver": "0xd180DC89270Df505F5d4B7B36e83318f330014A7",
     "AgentMarketplace": "0x0A0D33A88d40029995D8fd09b7BB41331586A9ca",
-    "AgentCollectionFactory": "0x0b150A0F779Bd31a6FCA5Ef51C427D7ae3a6c043",
+    "AgentCollectionFactory": "0x0c8b852aA1392076F93E92ed2a19E4ba1cEF0A8a",
     "AgentRoyaltySplitterFactory": "0xE0152438a6B1bACC220A3096c3Bd8B61BB0f9863",
-    "AgentCurveMarket": "0x9B3A239dcb136895623fFEfF5252e0ba84116f8A",
+    "AgentCurveMarket": "0xd935921aA4d9A7d5AFfa55434fE45A0d388B3Ed6",
     "AgentAvatarExtension": "0x132A0d33aC8040A81E5a3A865Ca2D5238D2Bdbc1",
     "AgentIdentityKeyExtension": "0xC6d25a28430eFfD9953250f5BDAC5Ab26228E974",
     "AgentServiceStream": "0x412981446A6a4673Ec7E378A3f1E88161D7ee433"
@@ -34,7 +34,7 @@
     "AgentMemory": "0xedDb9b1bD7d065db5EAE4b0dE2DeeDddd57B9649",
     "AgentX402Receiver": "0xb880a889d60380F7F9D96472263eaDc521bD78DD",
     "AgentMarketplace": "0xcc1E532C8148278c56DBBBcb02f23648C06C2950",
-    "AgentCollectionImpl": "0x18f0f54A986eda8Cbfecf3b786c14733fFA7e4bC",
+    "AgentCollectionImpl": "0x463AB73d1C08C32B789a8BD9985bb8e6B422C0D8",
     "AgentAvatarExtension": "0xC6929383104a670FA5fDa0ABa95a874E489527B9",
     "AgentIdentityKeyExtension": "0x12244dE4Dd814ec6242cF0f060D04ABb1037BB26"
   },
@@ -48,10 +48,22 @@
     "notes": "Linked external libraries for AgentCollectionImpl. PaymentLib keeps impl bytecode under EIP-170 once collectionBaseURI was added; EIP712 carries a verifyCommit() entry that consolidates the keeper signature verification block."
   },
   "agentCollectionFactory": {
-    "factory": "0x0b150A0F779Bd31a6FCA5Ef51C427D7ae3a6c043",
+    "factory": "0x0c8b852aA1392076F93E92ed2a19E4ba1cEF0A8a",
     "immutable": true,
-    "curveMarket": "0x9B3A239dcb136895623fFEfF5252e0ba84116f8A",
+    "curveMarket": "0xd935921aA4d9A7d5AFfa55434fE45A0d388B3Ed6",
     "factoryLegacy": [
+      {
+        "address": "0x6b657499Bf579E4CD6287EFB1eda98d7FBa6D50f",
+        "current": true,
+        "beacon": "0x18391C153311cF436D83A5cCC286DAbC0d9eD6e3",
+        "implementation": "0x7a8b2fBc76B5dbE66346284A5A6487ED723786D9",
+        "notes": "Upgradeable factory recognised (buy-only) by the current market. Collections pay the protocol secondary fee through per-token AgentCollectionRoyaltyVaults."
+      },
+      {
+        "address": "0x0b150A0F779Bd31a6FCA5Ef51C427D7ae3a6c043",
+        "replacedAt": "2026-10-09",
+        "notes": "Previous immutable reserve factory (market 0x9B3A\u2026). Its collections pay no protocol secondary fee."
+      },
       {
         "address": "0x6B182188269208533Ed95B7C2b83240f21fA7f12",
         "replacedAt": "2026-10-04",
@@ -70,8 +82,13 @@
         "notes": "second testnet deploy"
       }
     ],
-    "implementation": "0x18f0f54A986eda8Cbfecf3b786c14733fFA7e4bC",
+    "implementation": "0x463AB73d1C08C32B789a8BD9985bb8e6B422C0D8",
     "implementationLegacy": [
+      {
+        "address": "0x18f0f54A986eda8Cbfecf3b786c14733fFA7e4bC",
+        "replacedAt": "2026-10-09",
+        "notes": "Reserve implementation of the previous market."
+      },
       {
         "address": "0x77BBda14512CfB8DAF345ed576800C2D46bc6323",
         "replacedAt": "2026-10-04",
@@ -293,24 +310,30 @@
     "AgentServiceStream": 47575459,
     "AgentTBARegistry": 47633892,
     "AgentCollectionFactory": 47685498,
-    "AgentCurveMarket": 47685498
+    "AgentCurveMarket": 47874663
   },
   "curveMarket": {
-    "version": 2,
-    "address": "0x9B3A239dcb136895623fFEfF5252e0ba84116f8A",
-    "deployedAt": "2026-10-04",
-    "tx": "0xa6dc237aaeacfc82e3cec26bca881a3b25c49768f2dba78e6a09000b8a74b532",
-    "block": 47685498,
+    "version": 3,
+    "address": "0xd935921aA4d9A7d5AFfa55434fE45A0d388B3Ed6",
+    "deployedAt": "2026-10-09",
+    "tx": "0x683f6586b8b637a29ebfdb7d17fbdbd53f85bdb6125d7cfd9e826ec5df48dd86",
+    "block": 47874663,
     "usdc": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
-    "collectionFactory": "0x0b150A0F779Bd31a6FCA5Ef51C427D7ae3a6c043",
-    "collectionImplementation": "0x18f0f54A986eda8Cbfecf3b786c14733fFA7e4bC",
-    "collectionCodehash": "0x7affc9bbf81fd40287ad5be6e3003c8dc3b0249cf270e7468a886cf93de64551",
-    "previousMarket": "0x12515d4615DE573536EE3EcdE87bAa64C94d36c9",
-    "legacyCollectionFactory": "0x6B182188269208533Ed95B7C2b83240f21fA7f12",
-    "script": "script/DeployCurveMarket.s.sol",
-    "why": "Immutable reserve collections prevent hook/upgrade vetoes on market exits. Adds quote commitments, predecessor-claim checks and permissionless payments to recorded payees."
+    "collectionFactory": "0x0c8b852aA1392076F93E92ed2a19E4ba1cEF0A8a",
+    "collectionImplementation": "0x463AB73d1C08C32B789a8BD9985bb8e6B422C0D8",
+    "collectionCodehash": "0x452649fde782d0feb3639303dc97300bf6a61651cc3f8df5a86d7dcd6ea664d3",
+    "previousMarket": null,
+    "legacyCollectionFactory": "0x6b657499Bf579E4CD6287EFB1eda98d7FBa6D50f",
+    "script": "script/DeployCollectionRoyaltyRelease.s.sol",
+    "why": "Collections pay the protocol secondary fee (0.5%) on resales through per-token AgentCollectionRoyaltyVaults. New factories and market; previous testnet collections left as they are.",
+    "legacyCollectionCodehash": "0x8bd4b9f4731a1a70f7ad9e4b309194dcdbfb4a172b549209659a4282bf402f94"
   },
   "curveMarketLegacy": [
+    {
+      "address": "0x9B3A239dcb136895623fFEfF5252e0ba84116f8A",
+      "replacedAt": "2026-10-09",
+      "notes": "v2 before collection secondary fees; UI exits only."
+    },
     {
       "address": "0x12515d4615DE573536EE3EcdE87bAa64C94d36c9",
       "deployedAt": "2026-10-04",
