@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import {AgentCollectionImpl} from "../src/AgentCollectionImpl.sol";
 import {AgentCollectionFactory} from "../src/AgentCollectionFactory.sol";
 import {AgentRoyaltySplitter} from "../src/AgentRoyaltySplitter.sol";
+import {AgentCollectionRoyaltyVault} from "../src/AgentCollectionRoyaltyVault.sol";
 import {AgentRoyaltySplitterFactory} from "../src/AgentRoyaltySplitterFactory.sol";
 
 /// @notice End-to-end: deploy a collection with on-chain royalty splits, mint
@@ -107,9 +108,16 @@ contract AgentCollectionWithSplitsTest is Test {
         vm.prank(MINTER);
         AgentCollectionImpl(coll).mintAgent("A", "uri");
 
+        // Marketplaces pay the token's vault, which releases the creator share
+        // (1000 bps) to the splitter and the protocol's 50 bps to its recipient.
         (address receiver, uint256 amount) = AgentCollectionImpl(coll).royaltyInfo(1, 1 ether);
-        assertEq(receiver, splitter);
-        assertEq(amount, 0.1 ether); // 1000 bps of 1 ether
+        assertEq(receiver, factory.collectionRoyaltyVault(coll, 1));
+        assertEq(amount, 0.105 ether); // 1050 bps of 1 ether
+        vm.deal(receiver, amount);
+        factory.deployCollectionRoyaltyVault(coll, 1);
+        uint256 before = splitter.balance;
+        AgentCollectionRoyaltyVault(payable(receiver)).release();
+        assertEq(splitter.balance - before, 0.1 ether);
     }
 
     function test_RoyaltyInfoFallsBackToAgentCreatorWhenNoSplits() public {
@@ -121,8 +129,12 @@ contract AgentCollectionWithSplitsTest is Test {
         vm.prank(MINTER);
         AgentCollectionImpl(coll).mintAgent("A", "uri");
 
-        (address receiver,) = AgentCollectionImpl(coll).royaltyInfo(1, 1 ether);
-        assertEq(receiver, MINTER);
+        // Without splits the vault's creator share goes to the token's creator.
+        (address receiver, uint256 amount) = AgentCollectionImpl(coll).royaltyInfo(1, 1 ether);
+        vm.deal(receiver, amount);
+        factory.deployCollectionRoyaltyVault(coll, 1);
+        AgentCollectionRoyaltyVault(payable(receiver)).release();
+        assertEq(MINTER.balance, 0.1 ether);
     }
 
     function test_ContractURI_FeeRecipientIsSplitter() public {

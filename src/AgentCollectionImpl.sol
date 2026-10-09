@@ -11,6 +11,11 @@ import {EvolutionTypes} from "./hooks/EvolutionTypes.sol";
 import {AgentCollectionRenderer} from "./AgentCollectionRenderer.sol";
 import {AgentCollectionEIP712} from "./AgentCollectionEIP712.sol";
 import {AgentCollectionPaymentLib} from "./AgentCollectionPaymentLib.sol";
+
+/// @dev The factory's royalty-vault address view (AgentCollectionFactory).
+interface ICollectionRoyaltyVaults {
+    function collectionRoyaltyVault(address collection, uint256 tokenId) external view returns (address);
+}
 import {AgentCollectionPixeLib} from "./AgentCollectionPixeLib.sol";
 
 /**
@@ -674,18 +679,6 @@ contract AgentCollectionImpl is
         return _agentCreator[agentId];
     }
 
-    function calculateSalesRoyaltySplit(uint256 agentId, uint256 amount) external view returns (uint256 creatorCut, uint256 ownerCut) {
-        uint256 royaltyBps = _salesRoyaltyBps[agentId];
-        creatorCut = (amount * royaltyBps) / 10000;
-        ownerCut = amount - creatorCut;
-    }
-
-    function calculateServiceRoyaltySplit(uint256 agentId, uint256 amount) external view returns (uint256 creatorCut, uint256 ownerCut) {
-        uint256 royaltyBps = _serviceRoyaltyBps[agentId];
-        creatorCut = (amount * royaltyBps) / 10000;
-        ownerCut = amount - creatorCut;
-    }
-
     // Sales / service royalties are COMMITTED AT MINT (via
     // `registerAgentWithRoyalty`) and immutable thereafter. The legacy
     // `updateSalesRoyalty` / `updateServiceRoyalty` selectors were removed
@@ -922,8 +915,16 @@ contract AgentCollectionImpl is
         // When the collection opted into multi-recipient royalty splits,
         // the splitter contract is the canonical ERC-2981 receiver.
         // Otherwise fall back to the per-token soulbound creator.
-        receiver = royaltyReceiver != address(0) ? royaltyReceiver : _agentCreator[tokenId];
-        royaltyAmount = (salePrice * _salesRoyaltyBps[tokenId]) / 10000;
+        // With a protocol secondary fee, the receiver is the token's royalty
+        // vault (AgentCollectionRoyaltyVault, deployed by the factory), which
+        // splits creator royalty and protocol fee on release.
+        // A token that does not exist owes no royalty to anyone.
+        if (_agentCreator[tokenId] == address(0)) return (address(0), 0);
+        uint256 systemBps = protocolFeeRecipient == address(0) ? 0 : protocolSecondaryFeeBps;
+        receiver = systemBps != 0
+            ? ICollectionRoyaltyVaults(factory).collectionRoyaltyVault(address(this), tokenId)
+            : (royaltyReceiver != address(0) ? royaltyReceiver : _agentCreator[tokenId]);
+        royaltyAmount = (salePrice * (_salesRoyaltyBps[tokenId] + systemBps)) / 10000;
     }
 
     /**

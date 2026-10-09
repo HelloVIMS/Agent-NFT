@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./AgentCollectionImpl.sol";
 import "./AgentRoyaltySplitterFactory.sol";
+import "./AgentCollectionRoyaltyVault.sol";
+import "@openzeppelin/contracts/utils/Create2.sol";
 
 /**
  * @title AgentCollectionFactory
@@ -202,6 +204,33 @@ contract AgentCollectionFactory is Ownable, VimsProvenance {
         emit CollectionCreated(collectionId, contractAddress, creator_, name_, symbol_, maxSupply_);
     }
     
+    // ============ Secondary-sale royalty vaults ============
+
+    event CollectionRoyaltyVaultDeployed(address indexed collection, uint256 indexed tokenId, address vault);
+    error NotFactoryCollection();
+
+    /**
+     * @notice Deterministic address of a collection token's royalty vault —
+     *         the receiver its royaltyInfo() names. Safe to pay before the
+     *         vault is deployed: CREATE2 keeps the address, and the funds are
+     *         released on first `release` after deployment.
+     */
+    function collectionRoyaltyVault(address collection, uint256 tokenId) public view returns (address) {
+        return Create2.computeAddress(
+            keccak256(abi.encode(collection, tokenId)),
+            keccak256(abi.encodePacked(type(AgentCollectionRoyaltyVault).creationCode, abi.encode(collection, tokenId)))
+        );
+    }
+
+    /// @notice Deploy a collection token's royalty vault (permissionless, idempotent).
+    function deployCollectionRoyaltyVault(address collection, uint256 tokenId) external returns (address vault) {
+        if (AgentCollectionImpl(collection).factory() != address(this)) revert NotFactoryCollection();
+        vault = collectionRoyaltyVault(collection, tokenId);
+        if (vault.code.length > 0) return vault;
+        vault = address(new AgentCollectionRoyaltyVault{salt: keccak256(abi.encode(collection, tokenId))}(collection, tokenId));
+        emit CollectionRoyaltyVaultDeployed(collection, tokenId, vault);
+    }
+
     /**
      * @notice Upgrade all collections to a new implementation
      * @dev Only factory owner can upgrade

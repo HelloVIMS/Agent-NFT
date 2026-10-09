@@ -65,18 +65,10 @@ contract AgentCollectionImplExtrasTest is Test {
         collection.getSalesRoyalty(999);
     }
 
-    function test_calculateServiceRoyaltySplit_returnsBpsSplit() public {
+    function test_royaltyRates_committedAtMint() public {
         uint256 id = _mint(minter);
-        (uint256 creatorCut, uint256 ownerCut) = collection.calculateServiceRoyaltySplit(id, 1 ether);
-        assertEq(creatorCut, 0.1 ether);
-        assertEq(ownerCut,   0.9 ether);
-    }
-
-    function test_calculateSalesRoyaltySplit_returnsBpsSplit() public {
-        uint256 id = _mint(minter);
-        (uint256 creatorCut, uint256 ownerCut) = collection.calculateSalesRoyaltySplit(id, 1 ether);
-        assertEq(creatorCut, 0.05 ether);
-        assertEq(ownerCut,   0.95 ether);
+        assertEq(collection.getServiceRoyalty(id), 1000); // 10% of service revenue
+        assertEq(collection.getSalesRoyalty(id), 500);    // 5% of a sale
     }
 
     // Sales / service royalties are committed at mint and immutable

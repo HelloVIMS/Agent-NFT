@@ -186,8 +186,8 @@ contract AgentCollectionImplAudit is Test {
             vm.prank(creator);
             uint256 id = c.registerAgentWithRoyalty("a","ipfs://a", bps, 0);
             (, uint256 amount) = c.royaltyInfo(id, 1 ether);
-            // amount = 1e18 * bps / 10000
-            assertEq(amount, (1 ether * uint256(bps)) / 10_000);
+            // amount = 1e18 * (creator bps + protocol secondary bps) / 10000
+            assertEq(amount, (1 ether * (uint256(bps) + c.protocolSecondaryFeeBps())) / 10_000);
         }
     }
 

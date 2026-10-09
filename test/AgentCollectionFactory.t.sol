@@ -268,8 +268,9 @@ contract AgentCollectionFactoryTest is Test {
         // Check royalty info
         (address receiver, uint256 royaltyAmount) = collection.royaltyInfo(agentId, 10000);
         
-        assertEq(receiver, creator1); // Creator of the agent
-        assertEq(royaltyAmount, 1500); // 15% of 10000
+        // The token's royalty vault, which splits creator (15%) and protocol (0.5%).
+        assertEq(receiver, factory.collectionRoyaltyVault(collectionAddr, agentId));
+        assertEq(royaltyAmount, 1550); // (15% + 0.5%) of 10000
     }
     
     function test_CustomRoyaltyOnMint() public {
@@ -283,8 +284,8 @@ contract AgentCollectionFactoryTest is Test {
         
         (address receiver, uint256 royaltyAmount) = collection.royaltyInfo(agentId, 10000);
         
-        assertEq(receiver, creator1);
-        assertEq(royaltyAmount, 2500); // Sales royalty used for ERC-2981
+        assertEq(receiver, factory.collectionRoyaltyVault(collectionAddr, agentId));
+        assertEq(royaltyAmount, 2550); // sales royalty (25%) + protocol secondary fee (0.5%)
     }
     
     function test_RoyaltyBoundsEnforced() public {
@@ -642,10 +643,7 @@ contract AgentCollectionFactoryTest is Test {
         
         uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
-        (uint256 creatorCut, uint256 ownerCut) = collection.calculateSalesRoyaltySplit(agentId, 10000);
-        
-        assertEq(creatorCut, 2000); // 20%
-        assertEq(ownerCut, 8000);   // 80%
+        assertEq(collection.getSalesRoyalty(agentId), 2000); // 20% of a sale to the creator
     }
     
     // ============ Empty Input Validation Tests ============
@@ -879,8 +877,8 @@ contract AgentCollectionFactoryTest is Test {
         uint256 agentId = _registerFor(collection, minter, "Agent1", "uri1");
         
         (address receiver, uint256 amount) = collection.royaltyInfo(agentId, 10000);
-        assertEq(receiver, creator1);
-        assertEq(amount, royaltyBps);
+        assertEq(receiver, factory.collectionRoyaltyVault(addr, agentId));
+        assertEq(amount, royaltyBps + factory.PROTOCOL_SECONDARY_FEE_BPS());
     }
     
     // ============ Additional Edge Case Tests ============

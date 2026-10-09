@@ -28,7 +28,7 @@ import {VimsProvenance} from "./VimsProvenance.sol";
  *         `release` after deployment, since CREATE2 preserves the address.
  */
 contract AgentRoyaltyVault is VimsProvenance, ReentrancyGuard {
-    function _vimsContractName() internal pure override returns (string memory) {
+    function _vimsContractName() internal pure virtual override returns (string memory) {
         return "AgentRoyaltyVault";
     }
 
@@ -151,7 +151,7 @@ contract AgentRoyaltyVault is VimsProvenance, ReentrancyGuard {
         creatorAmount  = amount - treasuryAmount;
     }
 
-    function _splitParams() internal view returns (
+    function _splitParams() internal view virtual returns (
         address creator,
         address treasury,
         uint256 creatorBps,
